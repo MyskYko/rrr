@@ -82,7 +82,6 @@ namespace rrr {
     int fi = -1;
     bool c = false;
     std::vector<int> vFanins;
-    std::vector<bool> vCompls;
     std::vector<int> vFanouts;
   };
 
@@ -137,17 +136,9 @@ namespace rrr {
     if(!action.vFanins.empty()) {
       std::cout << "\t" << "fanins: ";
       std::string delim = "";
-      if(action.vCompls.empty()) {
-        for(int fi: action.vFanins) {
-          std::cout << delim << fi;
-          delim = ", ";
-        }
-      } else {
-        assert(action.vFanins.size() == action.vCompls.size());
-        for(std::vector<int>::size_type i = 0; i < action.vFanins.size(); i++) {
-          std::cout << delim << (action.vCompls[i]? "!": "") << action.vFanins[i];
-          delim = ", ";
-        }
+      for(int fi: action.vFanins) {
+        std::cout << delim << fi;
+        delim = ", ";
       }
       std::cout << std::endl;
     }

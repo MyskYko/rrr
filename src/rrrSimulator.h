@@ -223,10 +223,10 @@ namespace rrr {
         SimulateNode(vValues, action.fi);
         break;
       case SAVE:
-        Save(action.id);
+        Save(action.idx);
         break;
       case LOAD:
-        Load(action.id);
+        Load(action.idx);
         break;
       case POP_BACK:
         // Do nothing: it may be good to keep the word vector allocated
@@ -423,7 +423,7 @@ namespace rrr {
       }
     });
     /* alternative version that updates only affected TFO
-    pNtk->ForEachTfo(target, false, [&](int id) {
+    pNtk->ForEachTfoUpdate(target, false, [&](int id) {
       bool fUpdated = ResimulateNode(vValues2, id, target);
       if(fVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";

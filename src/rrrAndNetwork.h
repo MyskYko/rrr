@@ -19,7 +19,9 @@ namespace rrr {
   private:
     // aliases
     using itr = std::list<int>::iterator;
+    using ritr = std::list<int>::reverse_iterator;
     using citr = std::list<int>::const_iterator;
+    using critr = std::list<int>::const_reverse_iterator;
     using Callback = std::function<void(Action const &)>;
 
     // network data
@@ -28,7 +30,7 @@ namespace rrr {
     std::list<int> lsInts; // internal nodes in topological order
     std::set<int> sInts; // internal nodes as a set
     std::vector<int> vPos;
-    std::vector<std::vector<int>> vvFaninEdges; // complementable edges, no duplicated fanins allowed (including complements)
+    std::vector<std::vector<int>> vvFaninEdges; // complementable edges, no duplicated fanins allowed (including complements), and nodes without fanins are treated as const-1
     std::vector<int> vRefs; // reference count (number of fanouts)
 
     // mark for network traversal
@@ -111,23 +113,26 @@ namespace rrr {
     template <template <typename> typename Container>
     void ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func);
 
-    void AddCallback(Callback const &callback);
-
-    void TrivialCollapse(int id);
-    void TrivialDecompose(int id);
-
-    void AddFanin(int id, int fi, bool c);
+    // Actions
     void RemoveFanin(int id, int idx);
     void RemoveUnused(int id, bool fRecursive = false);
     void RemoveBuffer(int id);
     void RemoveConst(int id);
+    void AddFanin(int id, int fi, bool c);
+    void TrivialCollapse(int id);
+    void TrivialDecompose(int id);
+
+    // Network cleanup
     void Propagate(int id = -1); // all nodes unless specified
     void Sweep(bool fPropagate);
 
+    // save/load
     int  Save(int slot = -1); // slot is assigned automatically unless specified
     void Load(int slot);
-    void PopBack();
+    void PopBack(); // deletes the last entry of backups
 
+    // misc
+    void AddCallback(Callback const &callback);
     void Print() const;
   };
 
@@ -285,7 +290,7 @@ namespace rrr {
     return vPos;
   }
   
-  /* }}} Network properties end */
+  /* }}} */
 
   /* {{{ Node properties */
   
@@ -357,7 +362,8 @@ namespace rrr {
       iTrav++;
       assert(iTrav != 0); //TODO: handle this overflow
     });
-    if(iTrav <= iTravStart + 1) {
+    iTrav--;
+    if(iTrav <= iTravStart) {
       // less than one fanouts excluding POs
       EndTraversal();
       return false;
@@ -383,7 +389,7 @@ namespace rrr {
     return false;
   }
 
-  /* }}} Node properties end */
+  /* }}} */
 
   /* {{{ Network traversal */
 
@@ -400,7 +406,7 @@ namespace rrr {
   }
 
   inline void AndNetwork::ForEachIntReverse(std::function<void(int)> const &func) const {
-    for(std::list<int>::const_reverse_iterator it = lsInts.rbegin(); it != lsInts.rend(); it++) {
+    for(critr it = lsInts.rbegin(); it != lsInts.rend(); it++) {
       func(*it);
     }
   }
@@ -492,14 +498,10 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
+    StartTraversal();
+    vTrav[id] = iTrav;
     citr it = std::find(lsInts.begin(), lsInts.end(), id);
     assert(it != lsInts.end());
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
-    vTrav[id] = iTrav;
     it++;
     for(; it != lsInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
@@ -518,7 +520,7 @@ namespace rrr {
         }
       }
     }
-    fLockTrav = false;
+    EndTraversal();
   }
 
   void AndNetwork::ForEachTfoReverse(int id, bool fPos, std::function<void(int)> const &func) {
@@ -526,14 +528,10 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
+    StartTraversal();
+    vTrav[id] = iTrav;
     citr it = std::find(lsInts.begin(), lsInts.end(), id);
     assert(it != lsInts.end());
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
-    vTrav[id] = iTrav;
     it++;
     for(; it != lsInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
@@ -546,15 +544,26 @@ namespace rrr {
     if(fPos) {
       for(int po: vPos) {
         if(vTrav[GetFanin(po, 0)] == iTrav) {
-          func(po);
           vTrav[po] = iTrav;
         }
       }
     }
-    fLockTrav = false;
-    std::list<int>::const_reverse_iterator end = std::find(lsInts.rbegin(), lsInts.rend(), id);
-    for(std::list<int>::const_reverse_iterator it = lsInts.rbegin(); it != end; it++) {
-      func(*it);
+    EndTraversal(); // release here so func can call IsReconvergent
+    unsigned iTravTfo = iTrav;
+    if(fPos) {
+      // use reverse order even for POs
+      for(std::vector<int>::const_reverse_iterator it = vPos.rbegin(); it != vPos.rend(); it++) {
+        assert(vTrav[*it] <= iTravTfo); // make sure func does not touch vTrav of preceding nodes
+        if(vTrav[*it] == iTravTfo) {
+          func(*it);
+        }
+      }
+    }
+    for(critr it = lsInts.rbegin(); *it != id; it++) {
+      assert(vTrav[*it] <= iTravTfo); // make sure func does not touch vTrav of preceding nodes
+      if(vTrav[*it] == iTravTfo) {
+        func(*it);
+      }
     }
   }
 
@@ -563,14 +572,10 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
+    StartTraversal();
+    vTrav[id] = iTrav;
     citr it = std::find(lsInts.begin(), lsInts.end(), id);
     assert(it != lsInts.end());
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
-    vTrav[id] = iTrav;
     it++;
     for(; it != lsInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
@@ -591,17 +596,13 @@ namespace rrr {
         }
       }
     }
-    fLockTrav = false;
+    EndTraversal();
   }
 
   template <template <typename> typename Container>
   void AndNetwork::ForEachTfos(Container<int> const &ids, bool fPos, std::function<void(int)> const &func) {
     // this includes ids themselves
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
+    StartTraversal();
     for(int id: ids) {
       vTrav[id] = iTrav;
     }
@@ -630,17 +631,13 @@ namespace rrr {
         }
       }
     }
-    fLockTrav = false;
+    EndTraversal();
   }
   
   template <template <typename> typename Container>
   void AndNetwork::ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func) {
     // this includes ids themselves
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
+    StartTraversal();
     for(int id: ids) {
       vTrav[id] = iTrav;
     }
@@ -677,97 +674,12 @@ namespace rrr {
         }
       }
     }
-    fLockTrav = false;
+    EndTraversal();
   }
 
-  /* }}} Traverse elements end */
+  /* }}} */
   
-  /* {{{ Add callbacks */
-  
-  void AndNetwork::AddCallback(Callback const &callback) {
-    vCallbacks.push_back(callback);
-  }
-  
-  /* }}} Add callbacks end  */
-
-  /* {{{ Modify network */
-
-  void AndNetwork::TrivialCollapse(int id) {
-    for(int idx = 0; idx < GetNumFanins(id);) {
-      int fi_edge = vvFaninEdges[id][idx];
-      int fi = Edge2Node(fi_edge);
-      bool c = EdgeIsCompl(fi_edge);
-      if(!IsPi(fi) && !c && vRefs[fi] == 1) {
-        Action action;
-        action.type = TRIVIAL_COLLAPSE;
-        action.id = id;
-        action.idx = idx;
-        action.fi = fi;
-        action.c = c;
-        std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
-        it = vvFaninEdges[id].erase(it);
-        vvFaninEdges[id].insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
-        ForEachFanin(fi, [&](int fi, bool c) {
-          action.vFanins.push_back(fi);
-        });
-        // remove collapsed fanin
-        vRefs[fi] = 0;
-        vvFaninEdges[fi].clear();
-        lsInts.erase(std::find(lsInts.begin(), lsInts.end(), fi));
-        sInts.erase(fi);
-        TakenAction(action);
-      } else {
-        idx++;
-      }
-    }
-  }
-
-  void AndNetwork::TrivialDecompose(int id) {
-    while(GetNumFanins(id) > 2) {
-      Action action;
-      action.type = TRIVIAL_DECOMPOSE;
-      action.id = id;
-      action.idx = vvFaninEdges[id].size() - 2;
-      int new_fi = CreateNode();
-      action.fi = new_fi;
-      action.c = false;
-      int fi_edge1 = vvFaninEdges[id].back();
-      vvFaninEdges[id].pop_back();
-      int fi_edge0 = vvFaninEdges[id].back();
-      vvFaninEdges[id].pop_back();
-      vvFaninEdges[new_fi].push_back(fi_edge0);
-      action.vFanins.push_back(Edge2Node(fi_edge0));
-      vvFaninEdges[new_fi].push_back(fi_edge1);
-      action.vFanins.push_back(Edge2Node(fi_edge1));
-      vvFaninEdges[id].push_back(Node2Edge(new_fi, false));
-      vRefs[new_fi]++;
-      itr it = std::find(lsInts.begin(), lsInts.end(), id);
-      lsInts.insert(it, new_fi);
-      sInts.insert(new_fi);
-      TakenAction(action);
-    }
-  }
-
-  void AndNetwork::AddFanin(int id, int fi, bool c) {
-    assert(FindFanin(id, fi) == -1); // no duplication
-    assert(fi != GetConst0() || !c); // no const-1
-    Action action;
-    action.type = ADD_FANIN;
-    action.id = id;
-    action.idx = vvFaninEdges[id].size();
-    action.fi = fi;
-    action.c = c;
-    itr it = std::find(lsInts.begin(), lsInts.end(), id);
-    itr it2 = std::find(it, lsInts.end(), fi);
-    if(it2 != lsInts.end()) {
-      lsInts.erase(it2);
-      it2 = lsInts.insert(it, fi);
-      SortInts(it2);
-    }
-    vRefs[fi]++;
-    vvFaninEdges[id].push_back(Node2Edge(fi, c));
-    TakenAction(action);
-  }
+  /* {{{ Actions */
   
   void AndNetwork::RemoveFanin(int id, int idx) {
     Action action;
@@ -818,17 +730,16 @@ namespace rrr {
     action.c = c;
     ForEachFanoutRidx(id, true, [&](int fo, bool foc, int idx) {
       action.vFanouts.push_back(fo);
-      // duplicate
       int idx2 = FindFanin(fo, fi);
-      if(idx2 != -1) {
+      if(idx2 != -1) { // if substitution would lead to duplication
         if(GetCompl(fo, idx2) == (c ^ foc)) {
-          // it already exists, so just remove one
+          // if the existing one has the same polarity, just remove oneself
           vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
           if(fPropagating && GetNumFanins(fo) == 1) {
             vTrav[fo] = iTrav;
           }
         } else {
-          // add const-0
+          // if the existing one has a different polarity, replace them with const-0
           vRefs[fi]--;
           vRefs[GetConst0()]++;
           if(idx < idx2) {
@@ -843,15 +754,12 @@ namespace rrr {
             vTrav[fo] = iTrav;
           }
         }
-        return;
-      }
-      // const
-      if(fi == GetConst0()) {
+      } else if(fi == GetConst0()) { // if buffering constant
         assert(!c);
         if(foc) {
-          // just remove const-1
+          // just remove if const-1 would be added otherwise
           vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-          // exception is po
+          // exception is when fanout is PO, explicitly add const-1
           if(GetNumFanins(fo) == 0 && IsPo(fo)) {
             vRefs[GetConst0()]++;
             vvFaninEdges[fo].push_back(Node2Edge(GetConst0(), true));
@@ -867,12 +775,12 @@ namespace rrr {
             vTrav[fo] = iTrav;
           }
         }
-        return;
+      } else { // otherwise, substitute node with fanin
+        vvFaninEdges[fo][idx] = Node2Edge(fi, c ^ foc);
+        vRefs[fi]++;
       }
-      // otherwise
-      vvFaninEdges[fo][idx] = Node2Edge(fi, c ^ foc);
-      vRefs[fi]++;
     });
+    // remove node
     vRefs[id] = 0;
     vRefs[fi]--;
     vvFaninEdges[id].clear();
@@ -891,7 +799,6 @@ namespace rrr {
     action.type = REMOVE_CONST;
     action.id = id;
     ForEachFanin(id, [&](int fi, bool c) {
-      assert(fi != GetConst0() || !c);
       vRefs[fi]--;
       action.vFanins.push_back(fi);
     });
@@ -899,9 +806,9 @@ namespace rrr {
     ForEachFanoutRidx(id, true, [&](int fo, bool foc, int idx) {
       action.vFanouts.push_back(fo);
       if(c ^ foc) {
-        // just remove const-1
+        // just remove if const-1 would be added otherwise
         vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-        // exception is po
+        // exception is when fanout is PO, explicitly add const-1
         if(GetNumFanins(fo) == 0 && IsPo(fo)) {
           vRefs[GetConst0()]++;
           vvFaninEdges[fo].push_back(Node2Edge(GetConst0(), true));
@@ -918,6 +825,7 @@ namespace rrr {
         }
       }
     });
+    // remove node
     vRefs[id] = 0;
     vvFaninEdges[id].clear();
     if(!fPropagating) {
@@ -928,12 +836,88 @@ namespace rrr {
     TakenAction(action);
   }
 
+  void AndNetwork::AddFanin(int id, int fi, bool c) {
+    assert(FindFanin(id, fi) == -1); // no duplication
+    assert(fi != GetConst0() || !c); // no const-1
+    Action action;
+    action.type = ADD_FANIN;
+    action.id = id;
+    action.idx = vvFaninEdges[id].size();
+    action.fi = fi;
+    action.c = c;
+    itr it = std::find(lsInts.begin(), lsInts.end(), id);
+    itr it2 = std::find(it, lsInts.end(), fi);
+    if(it2 != lsInts.end()) {
+      lsInts.erase(it2);
+      it2 = lsInts.insert(it, fi);
+      SortInts(it2);
+    }
+    vRefs[fi]++;
+    vvFaninEdges[id].push_back(Node2Edge(fi, c));
+    TakenAction(action);
+  }
+
+  void AndNetwork::TrivialCollapse(int id) {
+    for(int idx = 0; idx < GetNumFanins(id);) {
+      int fi_edge = vvFaninEdges[id][idx];
+      int fi = Edge2Node(fi_edge);
+      bool c = EdgeIsCompl(fi_edge);
+      if(!IsPi(fi) && !c && vRefs[fi] == 1) {
+        Action action;
+        action.type = TRIVIAL_COLLAPSE;
+        action.id = id;
+        action.idx = idx;
+        action.fi = fi;
+        action.c = c;
+        std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
+        it = vvFaninEdges[id].erase(it);
+        vvFaninEdges[id].insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
+        ForEachFanin(fi, [&](int fi, bool c) {
+          action.vFanins.push_back(fi);
+        });
+        // remove collapsed fanin
+        vRefs[fi] = 0;
+        vvFaninEdges[fi].clear();
+        lsInts.erase(std::find(lsInts.begin(), lsInts.end(), fi));
+        sInts.erase(fi);
+        TakenAction(action);
+      } else {
+        idx++;
+      }
+    }
+  }
+
+  void AndNetwork::TrivialDecompose(int id) {
+    while(GetNumFanins(id) > 2) {
+      Action action;
+      action.type = TRIVIAL_DECOMPOSE;
+      action.id = id;
+      action.idx = vvFaninEdges[id].size() - 2;
+      int new_fi = CreateNode();
+      action.fi = new_fi;
+      int fi_edge1 = vvFaninEdges[id].back();
+      vvFaninEdges[id].pop_back();
+      int fi_edge0 = vvFaninEdges[id].back();
+      vvFaninEdges[id].pop_back();
+      vvFaninEdges[new_fi].push_back(fi_edge0);
+      action.vFanins.push_back(Edge2Node(fi_edge0));
+      vvFaninEdges[new_fi].push_back(fi_edge1);
+      action.vFanins.push_back(Edge2Node(fi_edge1));
+      vvFaninEdges[id].push_back(Node2Edge(new_fi, false));
+      vRefs[new_fi]++;
+      itr it = std::find(lsInts.begin(), lsInts.end(), id);
+      lsInts.insert(it, new_fi);
+      sInts.insert(new_fi);
+      TakenAction(action);
+    }
+  }
+
+  /* }}} */
+
+  /* {{{ Network cleanup */
+  
   void AndNetwork::Propagate(int id) {
-    assert(!fLockTrav);
-    fLockTrav = true;
-    vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0);
+    StartTraversal();
     itr it;
     if(id == -1) {
       ForEachInt([&](int id) {
@@ -941,10 +925,9 @@ namespace rrr {
           vTrav[id] = iTrav;
         }
       });
-      for(it = lsInts.begin(); it != lsInts.end(); it++) {
-        if(vTrav[*it] == iTrav) {
-          break;
-        }
+      it = lsInts.begin();
+      while(vTrav[*it] != iTrav && it != lsInts.end()) {
+        it++;
       }
     } else {
       vTrav[id] = iTrav;
@@ -964,26 +947,26 @@ namespace rrr {
       }
     }
     fPropagating = false;
-    fLockTrav = false;
+    EndTraversal();
   }
 
   void AndNetwork::Sweep(bool fPropagate) {
     if(fPropagate) {
       Propagate();
     }
-    for(std::list<int>::reverse_iterator it = lsInts.rbegin(); it != lsInts.rend();) {
+    for(ritr it = lsInts.rbegin(); it != lsInts.rend();) {
       if(vRefs[*it] == 0) {
         RemoveUnused(*it);
-        it = std::list<int>::reverse_iterator(lsInts.erase(--it.base()));
+        it = ritr(lsInts.erase(--it.base()));
       } else {
         it++;
       }
     }
   }
   
-  /* }}} Modify network end */
+  /* }}} */
 
-  /* {{{ Save & load */
+  /* {{{ Save/load */
 
   int AndNetwork::Save(int slot) {
     Action action;
@@ -995,7 +978,7 @@ namespace rrr {
       assert(slot < vBackups.size());
       vBackups[slot] = *this;
     }
-    action.id = slot;
+    action.idx = slot;
     TakenAction(action);
     return slot;
   }
@@ -1004,7 +987,7 @@ namespace rrr {
     assert(slot < vBackups.size());
     Action action;
     action.type = LOAD;
-    action.id = slot;
+    action.idx = slot;
     *this = vBackups[slot];
     TakenAction(action);
   }
@@ -1013,15 +996,19 @@ namespace rrr {
     assert(!vBackups.empty());
     Action action;
     action.type = POP_BACK;
-    action.id = vBackups.size() - 1;
+    action.idx = vBackups.size() - 1;
     vBackups.pop_back();
     TakenAction(action);
   }
 
-  /* }}} Save & load end */
+  /* }}} */
   
   /* {{{ Misc */
 
+  void AndNetwork::AddCallback(Callback const &callback) {
+    vCallbacks.push_back(callback);
+  }
+  
   void AndNetwork::Print() const {
     std::cout << "pi: ";
     std::string delim = "";

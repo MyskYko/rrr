@@ -253,10 +253,10 @@ namespace rrr {
         break;
       }
       case SAVE:
-        Save(action.id);
+        Save(action.idx);
         break;
       case LOAD:
-        Load(action.id);
+        Load(action.idx);
         break;
       case POP_BACK:
         PopBack();
@@ -535,7 +535,6 @@ namespace rrr {
     if(slot >= vBackups.size()) {
       vBackups.resize(slot + 1);
     }
-    //vBackups[slot].target = target;
     CopyVec(vBackups[slot].vFs, vFs);
     CopyVec(vBackups[slot].vGs, vGs);
     CopyVecVec(vBackups[slot].vvCs, vvCs);
@@ -549,7 +548,6 @@ namespace rrr {
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::Load(int slot) {
     assert(slot < vBackups.size());
-    //target = vBackups[slot].target;
     CopyVec(vFs, vBackups[slot].vFs);
     CopyVec(vGs, vBackups[slot].vGs);
     CopyVecVec(vvCs, vBackups[slot].vvCs);

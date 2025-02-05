@@ -13,42 +13,50 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   class Optimizer {
   private:
+    // aliases
     using itr = std::vector<int>::iterator;
     using citr = std::vector<int>::const_iterator;
     using ritr = std::vector<int>::reverse_iterator;
     using critr = std::vector<int>::const_reverse_iterator;
 
-    int  nVerbose;
+    // pointer to network
     Ntk *pNtk;
-    Ana *pAna;
-
-    std::function<double(Ntk *)> CostFunction;
     
+    // parameters
+    int nVerbose;
+    std::function<double(Ntk *)> CostFunction;
+
+    // data
+    Ana *pAna;
     std::mt19937 rng;
     std::vector<int> tmp;
     std::vector<bool> vMarks;
-
     std::map<int, std::set<int>> mapNewFanins;
     
-    std::function<void(Action)> CreateActionCallback();
+    // callback
+    void ActionCallback(Action const &action);
 
-  public:
-    Optimizer(Ntk *pNtk, Parameter *pPar);
-    ~Optimizer();
-    void UpdateNetwork(Ntk *pNtk_);
+    // topology
+    void MarkFaninAndTfo(int id);
 
-    void SetCostFunction(std::function<double(Ntk *)>);
+    // reduce fanins
+    bool ReduceFanin(int id, bool fRemoveUnused = false);
+    bool ReduceFaninOneRandom(int id, bool fRemoveUnused = false);
 
-    int ReduceFanin(int id, bool fRemoveUnused = false);
-    bool ReduceFaninRandom(int id, bool fRemoveUnused = false);
-
+    // reduce
     void Reduce();
     void ReduceRandom();
-    
+
+    // remove redundancy
     void RemoveRedundancy();
     void RemoveRedundancyRandom();
     
-    void MarkTfoAndFanin(int id);
+  public:
+    // constructors
+    Optimizer(Ntk *pNtk, Parameter *pPar);
+    ~Optimizer();
+    void UpdateNetwork(Ntk *pNtk_);
+    
     citr SingleAdd(int id, citr begin, citr end);
     int MultiAdd(int id, std::vector<int> const &vCands, int nMax = 0);
 
@@ -61,92 +69,78 @@ namespace rrr {
     void Run();
   };
 
-  /* {{{ Create action callback */
+  /* {{{ Callback */
   
   template <typename Ntk, typename Ana>
-  std::function<void(Action)> Optimizer<Ntk, Ana>::CreateActionCallback() {
-    return [&](Action action) {
-      PrintAction(action);
-    };
-  }
-
-  /* }}} Create action callback end */
-
-  /* {{{ Constructor */
-  
-  template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter *pPar) :
-    nVerbose(pPar->nOptimizerVerbose),
-    pNtk(pNtk) {
-    pAna = new Ana(pNtk, pPar);
+  void Optimizer<Ntk, Ana>::ActionCallback(Action const &action) {
     if(nVerbose) {
-      pNtk->AddCallback(CreateActionCallback());
+      PrintAction(action);
     }
-    CostFunction = [&](Ntk *pNtk) {
-      int nTwoInputSize = 0;
-      pNtk->ForEachInt([&](int id) {
-        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
-      });
-      return nTwoInputSize;
-    };
-    rng.seed(pPar->iSeed);
   }
-  
-  template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::~Optimizer() {
-    delete pAna;
-  }
-  
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_) {
-    pNtk = pNtk_;
-    pAna->UpdateNetwork(pNtk);
-  }
-  
-  /* }}} Constructor end */
 
-  /* {{{ Reduce fanin */
-  
-  // TODO: add a method to minimize the size of fanins (check singles, pairs, trios, and so on)?
+  /* }}} */
+
+  /* {{{ Topology */
   
   template <typename Ntk, typename Ana>
-  int Optimizer<Ntk, Ana>::ReduceFanin(int id, bool fRemoveUnused) {
-    int nRemoved = 0;
-    int nFanins = pNtk->GetNumFanins(id);
-    for(int idx = 0; idx < nFanins; idx++) {
+  void Optimizer<Ntk, Ana>::MarkFaninAndTfo(int id) {
+    vMarks.clear();
+    vMarks.resize(pNtk->GetNumNodes());
+    pNtk->ForEachFanin(id, [&](int fi, bool c) {
+      vMarks[fi] = true;
+    });
+    vMarks[id] = true;
+    pNtk->ForEachTfo(id, false, [&](int fo) {
+      vMarks[fo] = true;
+    });
+  }
+
+  /* }}} */
+
+  /* {{{ Reduce fanins */
+  
+  template <typename Ntk, typename Ana>
+  bool Optimizer<Ntk, Ana>::ReduceFanin(int id, bool fRemoveUnused) {
+    assert(pNtk->GetNumFanouts(id) > 0);
+    bool fRemoved = false;
+    for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
+      // skip fanins that were just added
       if(mapNewFanins.count(id)) {
         int fi = pNtk->GetFanin(id, idx);
         if(mapNewFanins[id].count(fi)) {
           continue;
         }
       }
+      // reduce
       if(pAna->CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
-        nRemoved++;
-        nFanins--;
+        fRemoved = true;
         idx--;
         if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
       }
     }
-    return nRemoved;
+    return fRemoved;
   }
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::ReduceFaninRandom(int id, bool fRemoveUnused) {
-    int nFanins = pNtk->GetNumFanins(id);
-    tmp.resize(nFanins);
+  bool Optimizer<Ntk, Ana>::ReduceFaninOneRandom(int id, bool fRemoveUnused) {
+    assert(pNtk->GetNumFanouts(id) > 0);
+    // generate random order
+    tmp.resize(pNtk->GetNumFanins(id));
     std::iota(tmp.begin(), tmp.end(), 0);
     std::shuffle(tmp.begin(), tmp.end(), rng);
     for(int idx: tmp) {
+      // skip fanins that were just added
       if(mapNewFanins.count(id)) {
         int fi = pNtk->GetFanin(id, idx);
         if(mapNewFanins[id].count(fi)) {
           continue;
         }
       }
+      // reduce
       if(pAna->CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
@@ -159,16 +153,18 @@ namespace rrr {
     return false;
   }
   
-  /* }}} Reduce fanin end */
-
+  // TODO: add a method to minimize the size of fanins (check singles, pairs, trios, and so on)?
+  
+  /* }}} */
+  
   /* {{{ Reduce */
 
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::Reduce() {
     std::vector<int> vInts = pNtk->GetInts();
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
-      if(nVerbose > 2) {
-        std::cout << "Reduce: node " << *it << std::endl;
+      if(!pNtk->IsInt(*it)) {
+        continue;
       }
       if(pNtk->GetNumFanouts(*it) == 0) {
         pNtk->RemoveUnused(*it);
@@ -198,9 +194,6 @@ namespace rrr {
       if(!pNtk->IsInt(*it)) {
         continue;
       }
-      if(nVerbose > 2) {
-        std::cout << "Reduce: node " << *it << std::endl;
-      }
       if(pNtk->GetNumFanouts(*it) == 0) {
         pNtk->RemoveUnused(*it);
         continue;
@@ -212,8 +205,8 @@ namespace rrr {
     }
   }
 
-  /* }}} Reduce end */
-  
+  /* }}} */
+
   /* {{{ Redundancy removal */
   
   template <typename Ntk, typename Ana>
@@ -263,7 +256,7 @@ namespace rrr {
         it = vInts.erase(it);
         continue;
       }
-      bool fReduced = ReduceFaninRandom(*it, true);
+      bool fReduced = ReduceFaninOneRandom(*it, true);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
         vInts = pNtk->GetInts();
@@ -279,25 +272,43 @@ namespace rrr {
   }
 
   /* }}} Redundancy removal end */
+  
+  /* {{{ Constructors */
+  
+  template <typename Ntk, typename Ana>
+  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter *pPar) :
+    pNtk(pNtk),
+    nVerbose(pPar->nOptimizerVerbose) {
+    CostFunction = [&](Ntk *pNtk) {
+      int nTwoInputSize = 0;
+      pNtk->ForEachInt([&](int id) {
+        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
+      });
+      return nTwoInputSize;
+    };
+    pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
+    pAna = new Ana(pNtk, pPar);
+    rng.seed(pPar->iSeed);
+  }
+  
+  template <typename Ntk, typename Ana>
+  Optimizer<Ntk, Ana>::~Optimizer() {
+    delete pAna;
+  }
+  
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_) {
+    pNtk = pNtk_;
+    pAna->UpdateNetwork(pNtk);
+  }
+  
+  /* }}} */
 
   /* {{{ Addition */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::MarkTfoAndFanin(int id) {
-    vMarks.clear();
-    vMarks.resize(pNtk->GetNumNodes());
-    vMarks[id] = true;
-    pNtk->ForEachTfo(id, false, [&](int fo) {
-      vMarks[fo] = true;
-    });
-    pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      vMarks[fi] = true;
-    });
-  }
-
-  template <typename Ntk, typename Ana>
   typename Optimizer<Ntk, Ana>::citr Optimizer<Ntk, Ana>::SingleAdd(int id, citr begin, citr end) {
-    MarkTfoAndFanin(id);
+    MarkFaninAndTfo(id);
     citr it = begin;
     for(; it != end; it++) {
       if(!pNtk->IsInt(*it) && !pNtk->IsPi(*it)) {
@@ -321,7 +332,7 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   int Optimizer<Ntk, Ana>::MultiAdd(int id, std::vector<int> const &vCands, int nMax) {
-    MarkTfoAndFanin(id);
+    MarkFaninAndTfo(id);
     int nAdded = 0;
     for(int cand: vCands) {
       if(!pNtk->IsInt(cand) && !pNtk->IsPi(cand)) {

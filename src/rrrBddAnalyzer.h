@@ -233,10 +233,10 @@ namespace rrr {
         break;
       }
       case SAVE:
-        Save(action.id);
+        Save(action.idx);
         break;
       case LOAD:
-        Load(action.id);
+        Load(action.idx);
         break;
       case POP_BACK:
         PopBack();
