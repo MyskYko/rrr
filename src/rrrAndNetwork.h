@@ -19,8 +19,8 @@ namespace rrr {
   private:
     // aliases
     using itr = std::list<int>::iterator;
-    using ritr = std::list<int>::reverse_iterator;
     using citr = std::list<int>::const_iterator;
+    using ritr = std::list<int>::reverse_iterator;
     using critr = std::list<int>::const_reverse_iterator;
     using Callback = std::function<void(Action const &)>;
 
@@ -126,7 +126,7 @@ namespace rrr {
     void Propagate(int id = -1); // all nodes unless specified
     void Sweep(bool fPropagate);
 
-    // save/load
+    // save & load
     int  Save(int slot = -1); // slot is assigned automatically unless specified
     void Load(int slot);
     void PopBack(); // deletes the last entry of backups
@@ -169,7 +169,7 @@ namespace rrr {
     fLockTrav = false;
   }
   
-  void AndNetwork::TakenAction(Action const &action) const {
+  inline void AndNetwork::TakenAction(Action const &action) const {
     for(Callback const &callback: vCallbacks) {
       callback(action);
     }
@@ -217,14 +217,14 @@ namespace rrr {
 
   /* {{{ Initialization APIs */
 
-  int AndNetwork::AddPi() {
+  inline int AndNetwork::AddPi() {
     vPis.push_back(nNodes);
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
     return nNodes++;
   }
   
-  int AndNetwork::AddAnd(int id0, int id1, bool c0, bool c1) {
+  inline int AndNetwork::AddAnd(int id0, int id1, bool c0, bool c1) {
     assert(id0 < nNodes);
     assert(id1 < nNodes);
     assert(id0 != id1);
@@ -237,7 +237,7 @@ namespace rrr {
     return nNodes++;
   }
 
-  int AndNetwork::AddPo(int id, bool c) {
+  inline int AndNetwork::AddPo(int id, bool c) {
     assert(id < nNodes);
     vPos.push_back(nNodes);
     vRefs[id]++;
@@ -278,15 +278,15 @@ namespace rrr {
     return vPis[idx];
   }
 
-  std::vector<int> AndNetwork::GetPis() const {
+  inline std::vector<int> AndNetwork::GetPis() const {
     return vPis;
   }
 
-  std::vector<int> AndNetwork::GetInts() const {
+  inline std::vector<int> AndNetwork::GetInts() const {
     return std::vector<int>(lsInts.begin(), lsInts.end());
   }
   
-  std::vector<int> AndNetwork::GetPos() const {
+  inline std::vector<int> AndNetwork::GetPos() const {
     return vPos;
   }
   
@@ -351,7 +351,7 @@ namespace rrr {
     return -1;
   }
   
-  bool AndNetwork::IsReconvergent(int id) {
+  inline bool AndNetwork::IsReconvergent(int id) {
     if(GetNumFanouts(id) <= 1) {
       return false;
     }
@@ -493,7 +493,7 @@ namespace rrr {
     assert(!fPos || nRefs == vRefs[id]);
   }
   
-  void AndNetwork::ForEachTfo(int id, bool fPos, std::function<void(int)> const &func) {
+  inline void AndNetwork::ForEachTfo(int id, bool fPos, std::function<void(int)> const &func) {
     // this does not include id itself
     if(vRefs[id] == 0) {
       return;
@@ -523,7 +523,7 @@ namespace rrr {
     EndTraversal();
   }
 
-  void AndNetwork::ForEachTfoReverse(int id, bool fPos, std::function<void(int)> const &func) {
+  inline void AndNetwork::ForEachTfoReverse(int id, bool fPos, std::function<void(int)> const &func) {
     // this does not include id itself
     if(vRefs[id] == 0) {
       return;
@@ -567,7 +567,7 @@ namespace rrr {
     }
   }
 
-  void AndNetwork::ForEachTfoUpdate(int id, bool fPos, std::function<bool(int)> const &func) {
+  inline void AndNetwork::ForEachTfoUpdate(int id, bool fPos, std::function<bool(int)> const &func) {
     // this does not include id itself
     if(vRefs[id] == 0) {
       return;
@@ -600,7 +600,7 @@ namespace rrr {
   }
 
   template <template <typename> typename Container>
-  void AndNetwork::ForEachTfos(Container<int> const &ids, bool fPos, std::function<void(int)> const &func) {
+  inline void AndNetwork::ForEachTfos(Container<int> const &ids, bool fPos, std::function<void(int)> const &func) {
     // this includes ids themselves
     StartTraversal();
     for(int id: ids) {
@@ -635,7 +635,7 @@ namespace rrr {
   }
   
   template <template <typename> typename Container>
-  void AndNetwork::ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func) {
+  inline void AndNetwork::ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func) {
     // this includes ids themselves
     StartTraversal();
     for(int id: ids) {
@@ -966,7 +966,7 @@ namespace rrr {
   
   /* }}} */
 
-  /* {{{ Save/load */
+  /* {{{ Save & load */
 
   int AndNetwork::Save(int slot) {
     Action action;

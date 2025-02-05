@@ -1,9 +1,9 @@
 #pragma once
 
-#include <iomanip>
 #include <iostream>
-#include <chrono>
+#include <iomanip>
 
+#include "rrrTypes.h"
 #include "rrrParameter.h"
 
 namespace rrr {
@@ -33,11 +33,11 @@ namespace rrr {
   void Scheduler<Opt>::Run(Ntk *pNtk, Parameter *pPar) {
     nVerbose = pPar->nSchedulerVerbose;
     //pNtk->Print();
-    auto start = std::chrono::system_clock::now();
+    time_point start = GetCurrentTime();
     Opt opt(pNtk, pPar);
-    opt.Run();
-    auto end = std::chrono::system_clock::now();
-    double elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
+    opt.Run(pPar->nTimeout);
+    time_point end = GetCurrentTime();
+    double elapsed_seconds = Duration(start, end);
     if(nVerbose) {
       std::cout << "elapsed: " << std::fixed << std::setprecision(3) << elapsed_seconds << "s" << std::endl;
     }

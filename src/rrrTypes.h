@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <chrono>
 #include <cassert>
 
 namespace rrr {
@@ -87,7 +88,7 @@ namespace rrr {
 
   /* {{{ Action helper functions */
 
-  void PrintAction(Action action) {
+  static inline void PrintAction(Action action) {
     switch(action.type) {
     case REMOVE_FANIN:
       std::cout << "remove fanin";
@@ -154,5 +155,25 @@ namespace rrr {
   }
 
   /* }}} Action helper functions */
+
+  /* {{{ Time */
+  
+  using seconds = uint64_t;
+  using clock_type = std::chrono::steady_clock;
+  using time_point = std::chrono::time_point<clock_type>;
+  
+  static inline time_point GetCurrentTime() {
+    return clock_type::now();
+  }
+
+  static inline seconds DurationInSeconds(time_point start, time_point end) {
+    return (std::chrono::duration_cast<std::chrono::seconds>(end - start)).count();
+  }
+
+  static inline double Duration(time_point start, time_point end) {
+    return (std::chrono::duration<double>(end - start)).count();
+  }
+
+  /* }}} */
   
 }

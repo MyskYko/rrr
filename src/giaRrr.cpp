@@ -55,11 +55,12 @@ Gia_Man_t *Ntk2Aig(Ntk *pNtk) {
 
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf) {
   rrr::AndNetwork *pNtk = Aig2Ntk<rrr::AndNetwork>(pGia);
   rrr::Parameter Par;
   Par.iSeed = iSeed;
   Par.nWords = nWords;
+  Par.nTimeout = nTimeout;
   Par.nSchedulerVerbose = nSchedulerVerbose;
   Par.nOptimizerVerbose = nOptimizerVerbose;
   Par.nAnalyzerVerbose = nAnalyzerVerbose;
