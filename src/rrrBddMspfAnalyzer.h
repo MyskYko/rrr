@@ -311,7 +311,7 @@ namespace rrr {
     pNtk->ForEachInt([&](int id) {
       if(vUpdates[id]) {
         if(SimulateNode(id, vFs)) {
-          pNtk->ForEachFanout(id, [&](int fo, bool c) {
+          pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
             vUpdates[fo] = true;
             vCUpdates[fo] = true;
           });
@@ -361,7 +361,7 @@ namespace rrr {
     }
     lit x = pBdd->Const1();
     IncRef(x);
-    pNtk->ForEachFanoutIdx(id, [&](int fo, bool c, int idx) {
+    pNtk->ForEachFanoutRidx(id, true, [&](int fo, bool c, int idx) {
       Assign(x, pBdd->And(x, vvCs[fo][idx]));
     });
     if(pBdd->LitIsEq(vGs[id], x)) {

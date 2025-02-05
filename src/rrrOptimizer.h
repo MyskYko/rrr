@@ -8,7 +8,6 @@
 
 #include "rrrParameter.h"
 
-
 namespace rrr {
 
   template <typename Ntk, typename Ana>
@@ -51,95 +50,23 @@ namespace rrr {
     
     void MarkTfoAndFanin(int id);
     citr SingleAdd(int id, citr begin, citr end);
-    int MultiAdd(int id, std::vector<int> const &vCands, int nMax = -1);
+    int MultiAdd(int id, std::vector<int> const &vCands, int nMax = 0);
 
     void SingleResub(bool fGreedy = true);
     void SingleResubRandom(int nItes, int nAdds, bool fGreedy = true);
+    void MultiResub(bool fGreedy = true, int nMax = 0);
     
     void SingleReplace();
-  };
 
+    void Run();
+  };
 
   /* {{{ Create action callback */
   
   template <typename Ntk, typename Ana>
   std::function<void(Action)> Optimizer<Ntk, Ana>::CreateActionCallback() {
     return [&](Action action) {
-      switch(action.type) {
-      case REMOVE_FANIN:
-        std::cout << "removed node " << action.id << " fanin " << (action.c? "!": "") << action.fi << " at index " << action.idx << std::endl;
-        break;
-      case REMOVE_UNUSED: {
-        std::cout << "removed unused node " << action.id << " with fanin ";
-        std::string delim = "";
-        for(int fi: action.vFanins) {
-          std::cout << delim << fi;
-          delim = ", ";
-        }
-        std::cout << std::endl;
-        break;
-      }
-      case REMOVE_BUFFER: {
-        std::cout << "removed buffer node " << action.id << " with fanin " << (action.c? "!": "") << action.fi << " and fanout " ;
-        std::string delim = "";
-        for(int fo: action.vFanouts) {
-          std::cout << delim << fo;
-          delim = ", ";
-        }
-        std::cout << std::endl;
-        break;
-      }
-      case REMOVE_CONST: {
-        std::cout << "removed constant node " << action.id << " with fanin ";
-        std::string delim = "";
-        for(int fi: action.vFanins) {
-          std::cout << delim << fi;
-          delim = ", ";
-        }
-        std::cout << " and fanout " ;
-        delim = "";
-        for(int fo: action.vFanouts) {
-          std::cout << delim << fo;
-          delim = ", ";
-        }
-        std::cout << std::endl;
-        break;
-      }
-      case ADD_FANIN:
-        std::cout << "added node " << action.id << " fanin " << (action.c? "!": "") << action.fi << " at index " << action.idx << std::endl;
-        break;
-      case TRIVIAL_COLLAPSE: {
-        std::cout << "collapsed node " << action.id << " fanin " << (action.c? "!": "") << action.fi << " with fanin ";
-        std::string delim = "";
-        for(int fi: action.vFanins) {
-          std::cout << delim << fi;
-          delim = ", ";
-        }
-        std::cout << std::endl;
-        break;
-      }
-      case TRIVIAL_DECOMPOSE: {
-        std::cout << "decomposed node " << action.id << " with new fanin " << (action.c? "!": "") << action.fi << " with fanin ";
-        std::string delim = "";
-        for(int fi: action.vFanins) {
-          std::cout << delim << fi;
-          delim = ", ";
-        }
-        std::cout << std::endl;
-        break;
-      }
-      case SAVE:
-        std::cout << "saved to slot " << action.id << std::endl;
-        break;
-      case LOAD:
-        std::cout << "loaded from slot " << action.id << std::endl;
-        break;
-      case POP_BACK:
-        std::cout << "deleted slot " << action.id << std::endl;
-        break;
-      default:
-        assert(0);
-      }
+      PrintAction(action);
     };
   }
 
@@ -545,6 +472,51 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::MultiResub(bool fGreedy, int nMax) {
+    // save if wanted
+    int slot = fGreedy? pNtk->Save(): -1;
+    double dCost = CostFunction(pNtk);
+    // main loop
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+      if(nVerbose) {
+        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      assert(pNtk->GetNumFanouts(*it) != 0);
+      assert(pNtk->GetNumFanins(*it) > 1);
+      pNtk->TrivialCollapse(*it);
+      std::vector<int> vCands = pNtk->GetPis();
+      std::vector<int> vInts2 = pNtk->GetInts();
+      vCands.insert(vCands.end(), vInts2.begin(), vInts2.end());
+      MultiAdd(*it, vCands, nMax);
+      RemoveRedundancy();
+      mapNewFanins.clear();
+      RemoveRedundancy();
+      double dNewCost = CostFunction(pNtk);
+      if(fGreedy) {
+        if(nVerbose) {
+          std::cout << "new cost = " << dNewCost << std::endl;
+        }
+        if(dNewCost <= dCost) {
+          pNtk->Save(slot);
+          dCost = dNewCost;
+        } else {
+          pNtk->Load(slot);
+        }
+      }
+      if(pNtk->IsInt(*it)) {
+        pNtk->TrivialDecompose(*it);
+      }
+    }
+    if(fGreedy) {
+      pNtk->PopBack();
+    }
+  }
+
+  template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::SingleReplace() {
     std::vector<int> vInts = pNtk->GetInts();
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
@@ -603,4 +575,19 @@ namespace rrr {
 
   /* }}} Resub end */
 
+  /* {{{ Run */
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::Run() {
+    RemoveRedundancy();
+    //opt.RemoveRedundancyRandom();
+    //opt.Reduce();
+    //opt.ReduceRandom();
+    //opt.SingleResubRandom(10, 5);
+    SingleResub();
+    MultiResub();
+  }
+
+  /* }}} Run end */
+  
 }

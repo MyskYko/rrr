@@ -55,15 +55,16 @@ Gia_Man_t *Ntk2Aig(Ntk *pNtk) {
 
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nOptimizerVerbose, int nAnalyzerVerbose, int fVerbose) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf) {
   rrr::AndNetwork *pNtk = Aig2Ntk<rrr::AndNetwork>(pGia);
   rrr::Parameter Par;
   Par.iSeed = iSeed;
   Par.nWords = nWords;
+  Par.nSchedulerVerbose = nSchedulerVerbose;
   Par.nOptimizerVerbose = nOptimizerVerbose;
   Par.nAnalyzerVerbose = nAnalyzerVerbose;
-  //rrr::Perform<rrr::AndNetwork, rrr::Analyzer<rrr::AndNetwork, rrr::Simulator<rrr::AndNetwork>, rrr::Solver<rrr::AndNetwork>>>(pNtk, &Par, fVerbose);
-  //rrr::Perform<rrr::AndNetwork, rrr::BddAnalyzer<rrr::AndNetwork>>(pNtk, &Par, fVerbose);
-  rrr::Perform<rrr::AndNetwork, rrr::BddMspfAnalyzer<rrr::AndNetwork>>(pNtk, &Par, fVerbose);
+  Par.fUseBddCspf = fUseBddCspf;
+  Par.fUseBddMspf = fUseBddMspf;
+  rrr::Perform(pNtk, &Par);
   return Ntk2Aig(pNtk);
 }

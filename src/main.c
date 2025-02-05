@@ -8,8 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nOptimizerVerbose, nAnalyzerVerbose, fVerbose
-#define PARAMS_DECL int iSeed, int nWords, int nOptimizerVerbose, int nAnalyzerVerbose, int fVerbose
+#define PARAMS iSeed, nWords, nSchedulerVerbose, nOptimizerVerbose, nAnalyzerVerbose, fUseBddCspf, fUseBddMspf
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nSchedulerVerbose = 1, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0
+#define PARAMS_DECL int iSeed, int nWords, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -20,14 +21,10 @@ int main(int argc, char **argv) {
   Abc_Start();
   
   int c;
-  int iSeed = 0;
-  int nWords = 10;
-  int nOptimizerVerbose = 0;
-  int nAnalyzerVerbose = 0;
-  int fVerbose = 0;
+  PARAMS_DEF;
   int fCore = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "RWOAcvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "RWSOAabcvh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -39,6 +36,10 @@ int main(int argc, char **argv) {
           nWords = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
+      case 'S':
+          nSchedulerVerbose = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
       case 'O':
           nOptimizerVerbose = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
@@ -47,11 +48,14 @@ int main(int argc, char **argv) {
           nAnalyzerVerbose = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
+      case 'a':
+          fUseBddCspf ^= 1;
+          break;
+      case 'b':
+          fUseBddMspf ^= 1;
+          break;
       case 'c':
           fCore ^= 1;
-          break;
-      case 'v':
-          fVerbose ^= 1;
           break;
       case 'h':
           goto usage;
@@ -69,7 +73,6 @@ int main(int argc, char **argv) {
   printf("start: %d nodes\n", Gia_ManAndNum(pGia));
 
   Gia_Man_t *pNew = Gia_ManRrr(pGia, PARAMS);
-  
   printf("end:   %d nodes\n", Gia_ManAndNum(pNew));
 
   if(Cec_ManVerifyTwo(pGia, pNew, 0)) {

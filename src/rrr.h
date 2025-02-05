@@ -1,50 +1,34 @@
 #pragma once
 
-#include <chrono>
+#include <cassert>
 
-#include "rrrAndNetwork.h"
 #include "rrrParameter.h"
+#include "rrrTypes.h"
+#include "rrrAndNetwork.h"
+#include "rrrScheduler.h"
 #include "rrrOptimizer.h"
 #include "rrrAnalyzer.h"
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
-#include "rrrSimulator.h"
 #include "rrrSolver.h"
-
+#include "rrrSimulator.h"
 
 namespace rrr {
 
-  template <typename Ntk, typename Ana>
-  void Perform(Ntk *pNtk, Parameter *pPar, int fVerbose) {
-
-    auto start = std::chrono::system_clock::now();
-    
-    Optimizer<Ntk, Ana> opt(pNtk, pPar);
-    if(fVerbose) {
-      pNtk->Print();
+  template <typename Ntk>
+  void Perform(Ntk *pNtk, Parameter *pPar) {
+    // TODO: make pPar const
+    assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
+    if(pPar->fUseBddCspf) {
+      Scheduler<rrr::Optimizer<Ntk, rrr::BddAnalyzer<Ntk>>> sch;
+      sch.Run(pNtk, pPar);
+    } else if(pPar->fUseBddMspf) {
+      Scheduler<rrr::Optimizer<Ntk, rrr::BddMspfAnalyzer<Ntk>>> sch;
+      sch.Run(pNtk, pPar);
+    } else {
+      Scheduler<rrr::Optimizer<Ntk, rrr::Analyzer<Ntk, rrr::Simulator<Ntk>, rrr::Solver<Ntk>>>> sch;
+      sch.Run(pNtk, pPar);
     }
-    opt.RemoveRedundancy();
-    //opt.RemoveRedundancyRandom();
-    //opt.Reduce();
-    //opt.ReduceRandom();
-    //if(pPar->fVerbose) {
-    //pNtk->Print();
-    //}
-    //opt.SingleResubRandom(1000);
-    //opt.SingleResubRandom(10, 5);
-    opt.SingleResub();
-    if(fVerbose) {
-    pNtk->Print();
-    }
-    // opt.RemoveRedundancy();
-    // if(pPar->fVerbose) {
-    //   pNtk->Print();
-    // }
-
-    auto end = std::chrono::system_clock::now();
-    double elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
-    std::cout << "elapsed: " << std::fixed << std::setprecision(3) << elapsed_seconds << "s" << std::endl;
-
   }
   
 }

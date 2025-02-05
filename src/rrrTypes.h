@@ -2,7 +2,8 @@
 
 #include <iostream>
 #include <vector>
-
+#include <string>
+#include <cassert>
 
 namespace rrr {
 
@@ -22,6 +23,8 @@ namespace rrr {
     TEMP_FALSE
   };
 
+  /* {{{ VarValue helper functions */
+  
   static inline VarValue DecideVarValue(VarValue x) {
     switch(x) {
     case UNDEF:
@@ -56,6 +59,8 @@ namespace rrr {
     }
   }
 
+  /* }}} VarValue helper functions end */
+
   enum ActionType {
     NONE,
     REMOVE_FANIN,
@@ -75,31 +80,88 @@ namespace rrr {
     int id = -1;
     int idx = -1;
     int fi = -1;
-    bool c;
+    bool c = false;
     std::vector<int> vFanins;
+    std::vector<bool> vCompls;
     std::vector<int> vFanouts;
   };
+
+  /* {{{ Action helper functions */
 
   void PrintAction(Action action) {
     switch(action.type) {
     case REMOVE_FANIN:
-      std::cout << "remove fanin " << action.id << std::endl;
+      std::cout << "remove fanin";
       break;
     case REMOVE_UNUSED:
-      std::cout << "remove unused " << action.id << std::endl;
+      std::cout << "remove unused";
       break;
     case REMOVE_BUFFER:
-      std::cout << "remove buffer " << action.id << std::endl;
+      std::cout << "remove buffer";
       break;
     case REMOVE_CONST:
-      std::cout << "propagate " << action.id << std::endl;
+      std::cout << "remove const";
       break;
     case ADD_FANIN:
-      std::cout << "add fanin " << action.id << std::endl;
+      std::cout << "add fanin";
+      break;
+    case TRIVIAL_COLLAPSE:
+      std::cout << "trivial collapse";
+      break;
+    case TRIVIAL_DECOMPOSE:
+      std::cout << "trivial decompose";
+      break;
+    case SAVE:
+      std::cout << "save";
+      break;
+    case LOAD:
+      std::cout << "load";
+      break;
+    case POP_BACK:
+      std::cout << "pop back";
       break;
     default:
       assert(0);
     }
+    std::cout << ":";
+    if(action.id != -1) {
+      std::cout << " node " << action.id;
+    }
+    if(action.fi != -1) {
+      std::cout << " fanin " << (action.c? "!": "") << action.fi;
+    }
+    if(action.idx != -1) {
+      std::cout << " index " << action.idx;
+    }
+    std::cout << std::endl;
+    if(!action.vFanins.empty()) {
+      std::cout << "\t" << "fanins: ";
+      std::string delim = "";
+      if(action.vCompls.empty()) {
+        for(int fi: action.vFanins) {
+          std::cout << delim << fi;
+          delim = ", ";
+        }
+      } else {
+        assert(action.vFanins.size() == action.vCompls.size());
+        for(std::vector<int>::size_type i = 0; i < action.vFanins.size(); i++) {
+          std::cout << delim << (action.vCompls[i]? "!": "") << action.vFanins[i];
+          delim = ", ";
+        }
+      }
+      std::cout << std::endl;
+    }
+    if(!action.vFanouts.empty()) {
+      std::cout << "\t" << "fanouts: ";
+      std::string delim = "";
+      for(int fo: action.vFanouts) {
+        std::cout << delim << fo;
+        delim = ", ";
+      }
+      std::cout << std::endl;
+    }
   }
+
+  /* }}} Action helper functions */
   
 }
