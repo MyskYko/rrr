@@ -66,10 +66,11 @@ namespace rrr {
     int  MultiAdd(int id, std::vector<int> const &vCands, int nMax = 0);
 
     // resub
-    void SingleResub(bool fGreedy = true);
-    void SingleResubRandom(int nItes, int nAdds, bool fGreedy = true);
-    void MultiResub(bool fGreedy = true, int nMax = 0);
-    //void SingleReplace();
+    void SingleResub(int id, std::vector<int> const &vCands, bool fGreedy = true);
+    void MultiResub(int id, std::vector<int> const &vCands, bool fGreedy = true, int nMax = 0);
+    
+    // apply
+    void ApplyReverseTopologically(std::function<void(int)> const &func);
     
   public:
     // constructors
@@ -395,6 +396,116 @@ namespace rrr {
 
   /* }}} */
   
+  /* {{{ Resub */
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands, bool fGreedy) {
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // save if wanted
+    int slot;
+    if(fGreedy) {
+      slot = pNtk->Save();
+    }
+    double dCost = CostFunction(pNtk);
+    // main loop
+    for(citr it = vCands.begin(); it != vCands.end(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(id)) {
+        break;
+      }
+      it = SingleAdd<citr>(id, it, vCands.end());
+      if(it == vCands.end()) {
+        break;
+      }
+      RemoveRedundancy();
+      mapNewFanins.clear();
+      double dNewCost = CostFunction(pNtk);
+      if(nVerbose) {
+        std::cout << "cost: " << dCost << " -> " << dNewCost << std::endl;
+      }
+      if(fGreedy) {
+        if(dNewCost <= dCost) {
+          pNtk->Save(slot);
+          dCost = dNewCost;
+        } else {
+          pNtk->Load(slot);
+        }
+      } else {
+        dCost = dNewCost;
+      }
+    }
+    if(pNtk->IsInt(id)) {
+      pNtk->TrivialDecompose(id);
+    }
+    if(fGreedy) {
+      pNtk->PopBack();
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::MultiResub(int id, std::vector<int> const &vCands, bool fGreedy, int nMax) {
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    // save if wanted
+    int slot;
+    if(fGreedy) {
+      slot = pNtk->Save();
+    }
+    double dCost = CostFunction(pNtk);
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // resub
+    MultiAdd(id, vCands, nMax);
+    RemoveRedundancy();
+    mapNewFanins.clear();
+    RemoveRedundancy();
+    double dNewCost = CostFunction(pNtk);
+    if(nVerbose) {
+      std::cout << "cost: " << dCost << " -> " << dNewCost << std::endl;
+    }
+    if(fGreedy && dNewCost > dCost) {
+      pNtk->Load(slot);
+    }
+    if(pNtk->IsInt(id)) {
+      pNtk->TrivialDecompose(id);
+    }
+    if(fGreedy) {
+      pNtk->PopBack();
+    }
+  }
+  
+  /* }}} */
+
+  /* {{{ Apply */
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ApplyReverseTopologically(std::function<void(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      if(nVerbose) {
+        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
+      }
+      func(*it);
+    }
+  }
+  
+  /* }}} */
+  
   /* {{{ Constructors */
   
   template <typename Ntk, typename Ana>
@@ -428,244 +539,6 @@ namespace rrr {
   
   /* }}} */
 
-  /* {{{ Resub */
-
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::SingleResub(bool fGreedy) {
-    // save if wanted
-    int slot = fGreedy? pNtk->Save(): -1;
-    double dCost = CostFunction(pNtk);
-    // main loop
-    std::vector<int> vInts = pNtk->GetInts();
-    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
-      if(Timeout()) {
-        break;
-      }
-      if(!pNtk->IsInt(*it)) {
-        continue;
-      }
-      if(nVerbose) {
-        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
-      }
-      assert(pNtk->GetNumFanouts(*it) != 0);
-      assert(pNtk->GetNumFanins(*it) > 1);
-      pNtk->TrivialCollapse(*it);
-      std::vector<int> vCands = pNtk->GetPis();
-      std::vector<int> vInts2 = pNtk->GetInts();
-      vCands.insert(vCands.end(), vInts2.begin(), vInts2.end());
-      citr it2 = vCands.begin();
-      while(true) {
-        if(Timeout()) {
-          break;
-        }
-        it2 = SingleAdd<citr>(*it, it2, vCands.end());
-        if(it2 == vCands.end()) {
-          break;
-        }
-        RemoveRedundancy();
-        mapNewFanins.clear();
-        if(!pNtk->IsInt(*it)) {
-          dCost = CostFunction(pNtk);
-          if(nVerbose) {
-            std::cout << "new cost = " << dCost << std::endl;
-          }
-          if(fGreedy) {
-            pNtk->Save(slot);
-          }
-          break;
-        }
-        double dNewCost = CostFunction(pNtk);
-        if(fGreedy) {
-          if(nVerbose) {
-            std::cout << "new cost = " << dNewCost << std::endl;
-          }
-          if(dNewCost <= dCost) {
-            pNtk->Save(slot);
-            dCost = dNewCost;
-          } else {
-            pNtk->Load(slot);
-          }
-        } else {
-          dCost = dNewCost;
-        }
-        it2++;
-      }
-      if(pNtk->IsInt(*it)) {
-        pNtk->TrivialDecompose(*it);
-      }
-    }
-    if(fGreedy) {
-      pNtk->PopBack();
-    }
-  }
-
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::SingleResubRandom(int nItes, int nAdds, bool fGreedy) {
-    // save if wanted
-    int slot = fGreedy? pNtk->Save(): -1;
-    double dCost = CostFunction(pNtk);
-    // main loop
-    for(int i = 0; i < nItes; i++) {
-      if(nVerbose) {
-        std::cout << "ite " << i << " (cost = " << dCost << ")" << std::endl;
-      }
-      int nAdded = 0;
-      for(int j = 0; j < nAdds; j++) {
-        // prepare
-        std::vector<int> vInts = pNtk->GetInts();
-        std::shuffle(vInts.begin(), vInts.end(), rng);
-        std::vector<int> vCands = pNtk->GetPis();
-        vCands.insert(vCands.end(), vInts.begin(), vInts.end());
-        std::shuffle(vCands.begin(), vCands.end(), rng);
-        // add
-        // (here, reduce guarantees node is used. it's not easy to check if node is used in general though, because some nodes remain alive when it has unused parents.)
-        bool fAdded = false;
-        for(int id: vInts) {
-          if(SingleAdd(id, vCands.begin(), vCands.end()) != vCands.end()) {
-            nAdded++;
-            fAdded = true;
-            break;
-          }
-        }
-        if(!fAdded) {
-          break;
-        }
-      }
-      if(!nAdded) {
-        break;
-      }
-      // reduce
-      RemoveRedundancyRandom();
-      // cost and save/load if wanted
-      double dNewCost = CostFunction(pNtk);
-      if(fGreedy) {
-        if(nVerbose) {
-          std::cout << "new cost = " << dNewCost << std::endl;
-        }
-        if(dNewCost <= dCost) {
-          pNtk->Save(slot);
-          dCost = dNewCost;
-        } else {
-          pNtk->Load(slot);
-        }
-      } else {
-        dCost = dNewCost;
-      }
-    }
-    if(fGreedy) {
-      pNtk->PopBack();
-    }
-  }
-
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::MultiResub(bool fGreedy, int nMax) {
-    // save if wanted
-    int slot = fGreedy? pNtk->Save(): -1;
-    double dCost = CostFunction(pNtk);
-    // main loop
-    std::vector<int> vInts = pNtk->GetInts();
-    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
-      if(Timeout()) {
-        break;
-      }
-      if(nVerbose) {
-        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
-      }
-      if(!pNtk->IsInt(*it)) {
-        continue;
-      }
-      assert(pNtk->GetNumFanouts(*it) != 0);
-      assert(pNtk->GetNumFanins(*it) > 1);
-      pNtk->TrivialCollapse(*it);
-      std::vector<int> vCands = pNtk->GetPis();
-      std::vector<int> vInts2 = pNtk->GetInts();
-      vCands.insert(vCands.end(), vInts2.begin(), vInts2.end());
-      MultiAdd(*it, vCands, nMax);
-      RemoveRedundancy();
-      mapNewFanins.clear();
-      RemoveRedundancy();
-      double dNewCost = CostFunction(pNtk);
-      if(fGreedy) {
-        if(nVerbose) {
-          std::cout << "new cost = " << dNewCost << std::endl;
-        }
-        if(dNewCost <= dCost) {
-          pNtk->Save(slot);
-          dCost = dNewCost;
-        } else {
-          pNtk->Load(slot);
-        }
-      }
-      if(pNtk->IsInt(*it)) {
-        pNtk->TrivialDecompose(*it);
-      }
-    }
-    if(fGreedy) {
-      pNtk->PopBack();
-    }
-  }
-
-  /*
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::SingleReplace() {
-    std::vector<int> vInts = pNtk->GetInts();
-    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
-      if(nVerbose) {
-        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
-      }
-      if(!pNtk->IsInt(*it)) {
-        continue;
-      }
-      if(pNtk->GetNumFanouts(*it) == 0) {
-        pNtk->RemoveUnused(*it);
-        continue;
-      }
-      ReduceFanin(*it);
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-        continue;
-      }
-      vMarks.clear();
-      vMarks.resize(pNtk->GetNumNodes());
-      vMarks[*it] = true;
-      pNtk->ForEachTfo(*it, false, [&](int fo) {
-        vMarks[fo] = true;
-      });
-      pNtk->ForEachFanin(*it, [&](int fi, bool c) {
-        vMarks[fi] = true;
-      });
-      for(citr it2 = vInts.begin(); it2 != vInts.end(); it2++) {
-        if(!pNtk->IsInt(*it)) {
-          break;
-        }
-        if(!pNtk->IsInt(*it2)) {
-          continue;
-        }
-        if(vMarks[*it2]) {
-          continue;
-        }
-        if(pAna->CheckFeasibility(*it, *it2, false)) {
-          pNtk->AddFanin(*it, *it2, false);
-        } else if(pNtk->UseComplementedEdges() && pAna->CheckFeasibility(*it, *it2, true)) {
-          pNtk->AddFanin(*it, *it2, true);
-        } else {
-          continue;
-        }
-        ReduceFanin(*it);
-        if(pNtk->GetNumFanins(*it) <= 1) {
-          break;
-        }
-      }
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-        continue;
-      }
-    }
-  }
-  */
-
-  /* }}} */
-
   /* {{{ Run */
 
   template <typename Ntk, typename Ana>
@@ -673,12 +546,15 @@ namespace rrr {
     nTimeout = nTimeout_;
     start = GetCurrentTime();
     RemoveRedundancy();
-    //opt.RemoveRedundancyRandom();
-    //opt.Reduce();
-    //opt.ReduceRandom();
-    //opt.SingleResubRandom(10, 5);
-    SingleResub();
-    MultiResub();
+    ApplyReverseTopologically([&](int id) {
+      std::vector<int> vCands = pNtk->GetPisInts();
+      SingleResub(id, vCands);
+    });
+    ApplyReverseTopologically([&](int id) {
+      std::vector<int> vCands = pNtk->GetPisInts();
+      //std::vector<int> vCands = pNtk->GetInts();
+      MultiResub(id, vCands);
+    });
   }
 
   /* }}} */

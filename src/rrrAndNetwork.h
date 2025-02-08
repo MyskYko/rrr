@@ -80,6 +80,7 @@ namespace rrr {
     int  GetPi(int idx) const;
     std::vector<int> GetPis() const;
     std::vector<int> GetInts() const;
+    std::vector<int> GetPisInts() const;
     std::vector<int> GetPos() const;
     
     // node properties
@@ -286,6 +287,12 @@ namespace rrr {
     return std::vector<int>(lsInts.begin(), lsInts.end());
   }
   
+  inline std::vector<int> AndNetwork::GetPisInts() const {
+    std::vector<int> vPisInts = vPis;
+    vPisInts.insert(vPisInts.end(), lsInts.begin(), lsInts.end());
+    return vPisInts;
+  }
+  
   inline std::vector<int> AndNetwork::GetPos() const {
     return vPos;
   }
@@ -442,26 +449,26 @@ namespace rrr {
     citr it = std::find(lsInts.begin(), lsInts.end(), id);
     assert(it != lsInts.end());
     it++;
-    int nRefs = 0;
-    for(; nRefs < vRefs[id] && it != lsInts.end(); it++) {
+    int nRefs = vRefs[id];
+    for(; nRefs != 0 && it != lsInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
         func(*it, GetCompl(*it, idx));
-        nRefs++;
+        nRefs--;
       }
     }
-    if(fPos && nRefs < vRefs[id]) {
+    if(fPos && nRefs != 0) {
       for(int po: vPos) {
         if(GetFanin(po, 0) == id) {
           func(po, GetCompl(po, 0));
-          nRefs++;
-          if(nRefs == vRefs[id]) {
+          nRefs--;
+          if(nRefs == 0) {
             break;
           }
         }
       }
     }
-    assert(!fPos || nRefs == vRefs[id]);
+    assert(!fPos || nRefs == 0);
   }
   
   inline void AndNetwork::ForEachFanoutRidx(int id, bool fPos, std::function<void(int, bool, int)> const &func) const {
@@ -471,26 +478,26 @@ namespace rrr {
     citr it = std::find(lsInts.begin(), lsInts.end(), id);
     assert(it != lsInts.end());
     it++;
-    int nRefs = 0;
-    for(; nRefs < vRefs[id] && it != lsInts.end(); it++) {
+    int nRefs = vRefs[id];
+    for(; nRefs != 0 && it != lsInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
         func(*it, GetCompl(*it, idx), idx);
-        nRefs++;
+        nRefs--;
       }
     }
-    if(fPos && nRefs < vRefs[id]) {
+    if(fPos && nRefs != 0) {
       for(int po: vPos) {
         if(GetFanin(po, 0) == id) {
           func(po, GetCompl(po, 0), 0);
-          nRefs++;
-          if(nRefs == vRefs[id]) {
+          nRefs--;
+          if(nRefs == 0) {
             break;
           }
         }
       }
     }
-    assert(!fPos || nRefs == vRefs[id]);
+    assert(!fPos || nRefs == 0);
   }
   
   inline void AndNetwork::ForEachTfo(int id, bool fPos, std::function<void(int)> const &func) {
@@ -721,61 +728,40 @@ namespace rrr {
   void AndNetwork::RemoveBuffer(int id) {
     assert(GetNumFanins(id) == 1);
     assert(!fPropagating || fLockTrav);
+    int fi = GetFanin(id, 0);
+    bool c = GetCompl(id, 0);
+    // check if it is buffering constant
+    if(fi == GetConst0()) {
+      RemoveConst(id);
+      return;
+    }
+    // remove if substitution would lead to duplication with the same polarity
+    ForEachFanoutRidx(id, false, [&](int fo, bool foc, int idx) {
+      int idx2 = FindFanin(fo, fi);
+      if(idx2 != -1 && GetCompl(fo, idx2) == (c ^ foc)) {
+        RemoveFanin(fo, idx);
+        if(fPropagating && GetNumFanins(fo) == 1) {
+          vTrav[fo] = iTrav;
+        }
+      }
+    });
+    // substitute node with fanin or const-0
     Action action;
     action.type = REMOVE_BUFFER;
     action.id = id;
-    int fi = GetFanin(id, 0);
-    bool c = GetCompl(id, 0);
     action.fi = fi;
     action.c = c;
     ForEachFanoutRidx(id, true, [&](int fo, bool foc, int idx) {
       action.vFanouts.push_back(fo);
       int idx2 = FindFanin(fo, fi);
-      if(idx2 != -1) { // if substitution would lead to duplication
-        if(GetCompl(fo, idx2) == (c ^ foc)) {
-          // if the existing one has the same polarity, just remove oneself
-          vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-          if(fPropagating && GetNumFanins(fo) == 1) {
-            vTrav[fo] = iTrav;
-          }
-        } else {
-          // if the existing one has a different polarity, replace them with const-0
-          vRefs[fi]--;
-          vRefs[GetConst0()]++;
-          if(idx < idx2) {
-            vvFaninEdges[fo][idx] = Node2Edge(GetConst0(), 0);
-            vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx2);
-          } else {
-            assert(idx != idx2);
-            vvFaninEdges[fo][idx2] = Node2Edge(GetConst0(), 0);
-            vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-          }
-          if(fPropagating) {
-            vTrav[fo] = iTrav;
-          }
+      if(idx2 != -1) { // substitute with const-0 in case of duplication
+        assert(GetCompl(fo, idx2) != (c ^ foc)); // of a different polarity
+        vRefs[GetConst0()]++;
+        vvFaninEdges[fo][idx] = Node2Edge(GetConst0(), 0);
+        if(fPropagating) {
+          vTrav[fo] = iTrav;
         }
-      } else if(fi == GetConst0()) { // if buffering constant
-        assert(!c);
-        if(foc) {
-          // just remove if const-1 would be added otherwise
-          vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-          // exception is when fanout is PO, explicitly add const-1
-          if(GetNumFanins(fo) == 0 && IsPo(fo)) {
-            vRefs[GetConst0()]++;
-            vvFaninEdges[fo].push_back(Node2Edge(GetConst0(), true));
-          }
-          if(fPropagating && GetNumFanins(fo) <= 1) {
-            vTrav[fo] = iTrav;
-          }
-        } else {
-          // add const-0
-          vRefs[GetConst0()]++;
-          vvFaninEdges[fo][idx] = Node2Edge(GetConst0(), 0);
-          if(fPropagating) {
-            vTrav[fo] = iTrav;
-          }
-        }
-      } else { // otherwise, substitute node with fanin
+      } else { // otherwise, substitute with fanin
         vvFaninEdges[fo][idx] = Node2Edge(fi, c ^ foc);
         vRefs[fi]++;
       }
@@ -795,38 +781,35 @@ namespace rrr {
   void AndNetwork::RemoveConst(int id) {
     assert(GetNumFanins(id) == 0 || FindFanin(id, GetConst0()) != -1);
     assert(!fPropagating || fLockTrav);
-    Action action;
-    action.type = REMOVE_CONST;
-    action.id = id;
-    ForEachFanin(id, [&](int fi, bool c) {
-      vRefs[fi]--;
-      action.vFanins.push_back(fi);
-    });
     bool c = (GetNumFanins(id) == 0);
-    ForEachFanoutRidx(id, true, [&](int fo, bool foc, int idx) {
-      action.vFanouts.push_back(fo);
+    // just remove immediately if polarity is true but not PO
+    ForEachFanoutRidx(id, false, [&](int fo, bool foc, int idx) {
       if(c ^ foc) {
-        // just remove if const-1 would be added otherwise
-        vvFaninEdges[fo].erase(vvFaninEdges[fo].begin() + idx);
-        // exception is when fanout is PO, explicitly add const-1
-        if(GetNumFanins(fo) == 0 && IsPo(fo)) {
-          vRefs[GetConst0()]++;
-          vvFaninEdges[fo].push_back(Node2Edge(GetConst0(), true));
-        }
+        assert(!IsPo(fo));
+        RemoveFanin(fo, idx);
         if(fPropagating && GetNumFanins(fo) <= 1) {
-          vTrav[fo] = iTrav;
-        }
-      } else {
-        // add const-0
-        vRefs[GetConst0()]++;
-        vvFaninEdges[fo][idx] = Node2Edge(GetConst0(), 0);
-        if(fPropagating) {
           vTrav[fo] = iTrav;
         }
       }
     });
+    // substitute with constant
+    Action action;
+    action.type = REMOVE_CONST;
+    action.id = id;
+    ForEachFanoutRidx(id, true, [&](int fo, bool foc, int idx) {
+      action.vFanouts.push_back(fo);
+      vRefs[GetConst0()]++;
+      vvFaninEdges[fo][idx] = Node2Edge(GetConst0(), c ^ foc);
+      if(fPropagating) {
+        vTrav[fo] = iTrav;
+      }
+    });
     // remove node
     vRefs[id] = 0;
+    ForEachFanin(id, [&](int fi, bool c) {
+      vRefs[fi]--;
+      action.vFanins.push_back(fi);
+    });
     vvFaninEdges[id].clear();
     if(!fPropagating) {
       itr it = std::find(lsInts.begin(), lsInts.end(), id);
