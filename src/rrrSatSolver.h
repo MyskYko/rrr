@@ -4,45 +4,54 @@
 
 #include <sat/bsat/satSolver.h>
 
-#include "rrrTypes.h"
 #include "rrrParameter.h"
+#include "rrrTypes.h"
 
 namespace rrr {
 
   template <typename Ntk>
   class SatSolver {
   private:
+    // pointer to network
     Ntk *pNtk;
-    
+
+    // parameters
     int nVerbose;
+    int nConflictLimit;
+
+    // data
     sat_solver *pSat;
-    int status;
-    int target;
-    std::vector<int> vVars;
+    bool status; // false indicates trivial UNSAT
+    int  target; // node for which miter has been encoded
+    std::vector<int> vVars; // SAT variable for each node
     std::vector<int> vLits; // temporary storage
-
-    std::vector<VarValue> vValues;
-
+    std::vector<VarValue> vValues; // values in satisfied problem
     bool fUpdate;
 
+    // statistics
     int nCalls;
     int nSats;
     int nUnsats;
 
+    // callback
     void ActionCallback(Action const &action);
 
+    // encode
     void EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate = -1) const;
     void EncodeMiter(sat_solver *p, std::vector<int> &v, int id); // create a careset miter where the counterpart has the output of target negated
     void SetTarget(int id);
     
   public:
+    // constructors
     SatSolver(Ntk *pNtk, Parameter const *pPar);
     ~SatSolver();
     void UpdateNetwork(Ntk *pNtk_);
+    
+    // checks
+    SatResult CheckRedundancy(int id, int idx);
+    SatResult CheckFeasibility(int id, int fi, bool c);
 
-    bool CheckRedundancy(int id, int idx);
-    bool CheckFeasibility(int id, int fi, bool c);
-
+    // cex
     std::vector<VarValue> GetCex();
   };
 
@@ -90,9 +99,9 @@ namespace rrr {
     }
   }
 
-  /* }}} Create action callback end */
+  /* }}} */
   
-  /* {{{ Perform encoding */
+  /* {{{ Encode */
 
   template <typename Ntk>
   void SatSolver<Ntk>::EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate) const {
@@ -100,6 +109,10 @@ namespace rrr {
     int x = -1, y = -1;
     bool cx, cy;
     assert(pNtk->GetNodeType(id) == AND);
+    std::string delim;
+    if(nVerbose) {
+      std::cout << "node " << std::setw(3) << id << ": ";
+    }
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
       if(x == -1) {
         x = v[fi];
@@ -110,7 +123,8 @@ namespace rrr {
       } else {
         int z = sat_solver_addvar(p);
         if(nVerbose) {
-          std::cout << z << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
+          std::cout << delim << z << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
+          delim = std::string(10, ' ');
         }
         RetValue = sat_solver_add_and(p, z, x, y, cx, cy, 0);
         assert(RetValue);
@@ -122,19 +136,19 @@ namespace rrr {
     });
     if(x == -1) {
       if(nVerbose) {
-        std::cout << v[id] << " = !0" << std::endl;
+        std::cout << delim << v[id] << " = !0" << std::endl;
       }
       RetValue = sat_solver_add_const(p, v[id], 0);
       assert(RetValue);
     } else if(y == -1) {
       if(nVerbose) {
-        std::cout << v[id] << " = " << (cx? "!": "") << x << std::endl;
+        std::cout << delim << v[id] << " = " << (cx? "!": "") << x << std::endl;
       }
       RetValue = sat_solver_add_buffer(p, v[id], x, cx);
       assert(RetValue);
     } else {
       if(nVerbose) {
-        std::cout << v[id] << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
+        std::cout << delim << v[id] << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
       }
       RetValue = sat_solver_add_and(p, v[id], x, y, cx, cy, 0);
       assert(RetValue);
@@ -147,7 +161,7 @@ namespace rrr {
     // reset
     v.clear();
     sat_solver_restart(p);
-    status = 1;
+    status = true;
     // assign vars for the base
     int nNodes = pNtk->GetNumNodes();
     sat_solver_setnvars(p, nNodes);
@@ -159,6 +173,9 @@ namespace rrr {
     RetValue = sat_solver_add_const(p, v[0], 1);
     assert(RetValue);
     // encode first circuit
+    if(nVerbose) {
+      std::cout << "encoding network" << std::endl;
+    }
     pNtk->ForEachInt([&](int id) {
       EncodeNode(p, v, id);
     });
@@ -172,11 +189,17 @@ namespace rrr {
       vLits.push_back(v[fi]);
     });
     // encode an inverted copy
+    if(nVerbose) {
+      std::cout << "encoding an inverted copy" << std::endl;
+    }
     pNtk->ForEachTfo(id, false, [&](int fo) {
       v[fo] = sat_solver_addvar(p);
       EncodeNode(p, v, fo, id);
     });
-    // encode xors
+    // encode miter xors
+    if(nVerbose) {
+      std::cout << "encoding miter xors" << std::endl;
+    }
     int idx = 0;
     int n = 0;
     pNtk->ForEachPoDriver([&](int fi, bool c) {
@@ -196,6 +219,7 @@ namespace rrr {
     vLits.resize(n);
     // assign or of xors to 1
     if(nVerbose) {
+      std::cout << "adding miter output clause" << std::endl;
       std::cout << "(";
       std::string delim = "";
       for(int iLit: vLits) {
@@ -205,7 +229,7 @@ namespace rrr {
       std::cout << ")" << std::endl;
     }
     if(n == 0) {
-      status = 0;
+      status = false;
       return;
     }
     RetValue = sat_solver_addclause(p, vLits.data(), vLits.data() + n);
@@ -222,16 +246,17 @@ namespace rrr {
     EncodeMiter(pSat, vVars, target);
   }
 
-  /* }}} Perform encoding end */
+  /* }}} */
 
-  /* {{{ Constructor */
+  /* {{{ Constructors */
 
   template <typename Ntk>
   SatSolver<Ntk>::SatSolver(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     nVerbose(pPar->nSatSolverVerbose),
+    nConflictLimit(pPar->nConflictLimit),
     pSat(sat_solver_new()),
-    status(0),
+    status(false),
     target(-1),
     fUpdate(false),
     nCalls(0),
@@ -243,27 +268,29 @@ namespace rrr {
   template <typename Ntk>
   SatSolver<Ntk>::~SatSolver() {
     sat_solver_delete(pSat);
-    std::cout << "solver stats: SAT calls = " << nCalls << ", SAT = " << nSats << ", UNSAT = " << nUnsats << std::endl;
+    std::cout << "SAT solver stats: calls = " << nCalls << " (SAT = " << nSats << ", UNSAT = " << nUnsats << ", UNDET = " << nCalls - nSats - nUnsats << ")" << std::endl;
   }
 
   template <typename Ntk>
   void SatSolver<Ntk>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
-    assert(0);
+    status = false;
+    target = -1;
+    fUpdate = false;
   }
 
-  /* }}} Constructor end */
+  /* }}} */
 
-  /* {{{ Perform checks */
+  /* {{{ Checks */
   
   template <typename Ntk>
-  bool SatSolver<Ntk>::CheckRedundancy(int id, int idx) {
+  SatResult SatSolver<Ntk>::CheckRedundancy(int id, int idx) {
     SetTarget(id);
     if(!status) {
       if(nVerbose) {
-        std::cout << "trivially UNSAT" << std::endl;
+        std::cout << "trivially UNSATISFIABLE" << std::endl;
       }
-      return true;
+      return UNSAT;
     }
     vLits.clear();
     assert(pNtk->GetNodeType(id) == AND);    
@@ -275,7 +302,7 @@ namespace rrr {
       }
     });
     if(nVerbose) {
-      std::cout << "assumption: ";
+      std::cout << "solving with assumptions: ";
       std::string delim = "";
       for(int iLit: vLits) {
         std::cout << delim << (lit_sign(iLit)? "!": "") << lit_var(iLit);
@@ -284,13 +311,24 @@ namespace rrr {
       std::cout << std::endl;
     }
     nCalls++;
-    int res = sat_solver_solve(pSat, vLits.data(), vLits.data() + vLits.size(), 0 /*nConfLimit*/, 0 /*nInsLimit*/, 0 /*nConfLimitGlobal*/, 0 /*nInsLimitGlobal*/);
+    int res = sat_solver_solve(pSat, vLits.data(), vLits.data() + vLits.size(), nConflictLimit, 0 /*nInsLimit*/, 0 /*nConfLimitGlobal*/, 0 /*nInsLimitGlobal*/);
     if(res == l_False) {
+      if(nVerbose) {
+        std::cout << "UNSATISFIABLE" << std::endl;
+      }
       nUnsats++;
-      return true;
+      return UNSAT;
     }
-    //if(res == l_Undef) ;
+    if(res == l_Undef) {
+      if(nVerbose) {
+        std::cout << "UNDETERMINED" << std::endl;
+      }
+      return UNDET;
+    }
     assert(res == l_True);
+    if(nVerbose) {
+      std::cout << "SATISFIABLE" << std::endl;
+    }
     nSats++;
     vValues.clear();
     vValues.resize(pNtk->GetNumNodes());
@@ -313,24 +351,24 @@ namespace rrr {
       assert((vValues[fi] == TEMP_TRUE) ^ (idx == idx2) ^ c);
       vValues[fi] = DecideVarValue(vValues[fi]);
     });
-    return false;
+    return SAT;
   }
 
   template <typename Ntk>
-  bool SatSolver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  SatResult SatSolver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     SetTarget(id);
     if(!status) {
       if(nVerbose) {
-        std::cout << "trivially UNSAT" << std::endl;
+        std::cout << "trivially UNSATISFIABLE" << std::endl;
       }
-      return true;
+      return UNSAT;
     }
     vLits.clear();
     assert(pNtk->GetNodeType(id) == AND);
     vLits.push_back(toLit(vVars[id]));
     vLits.push_back(toLitCond(vVars[fi], !c));
     if(nVerbose) {
-      std::cout << "assumption: ";
+      std::cout << "solving with assumptions: ";
       std::string delim = "";
       for(int iLit: vLits) {
         std::cout << delim << (lit_sign(iLit)? "!": "") << lit_var(iLit);
@@ -339,13 +377,24 @@ namespace rrr {
       std::cout << std::endl;
     }
     nCalls++;
-    int res = sat_solver_solve(pSat, vLits.data(), vLits.data() + vLits.size(), 0 /*nConfLimit*/, 0 /*nInsLimit*/, 0 /*nConfLimitGlobal*/, 0 /*nInsLimitGlobal*/);
+    int res = sat_solver_solve(pSat, vLits.data(), vLits.data() + vLits.size(), nConflictLimit, 0 /*nInsLimit*/, 0 /*nConfLimitGlobal*/, 0 /*nInsLimitGlobal*/);
     if(res == l_False) {
+      if(nVerbose) {
+        std::cout << "UNSATISFIABLE" << std::endl;
+      }
       nUnsats++;
-      return true;
+      return UNSAT;
     }
-    //if(res == l_Undef) ;
+    if(res == l_Undef) {
+      if(nVerbose) {
+        std::cout << "UNDETERMINED" << std::endl;
+      }
+      return UNDET;
+    }
     assert(res == l_True);
+    if(nVerbose) {
+      std::cout << "SATISFIABLE" << std::endl;
+    }
     nSats++;
     vValues.clear();
     vValues.resize(pNtk->GetNumNodes());
@@ -368,10 +417,10 @@ namespace rrr {
     vValues[id] = DecideVarValue(vValues[id]);
     assert((vValues[fi] == TEMP_TRUE) ^ !c);
     vValues[fi] = DecideVarValue(vValues[fi]);
-    return false;
+    return SAT;
   }
   
-  /* }}} Perform checks end */
+  /* }}} */
 
   /* {{{ Cex */
 
@@ -484,6 +533,6 @@ namespace rrr {
     return vPartialCex;
   }
 
-  /* }}} Cex end */
+  /* }}} */
 
 }

@@ -56,16 +56,19 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " seems redundant" << std::endl;
       }
-      if(sol.CheckRedundancy(id, idx)) {
+      SatResult r = sol.CheckRedundancy(id, idx);
+      if(r == UNSAT) {
         if(nVerbose) {
           std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is redundant" << std::endl;
         }
         return true;
       }
-      if(nVerbose) {
-        std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
+      if(r == SAT) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
+        }
+        sim.AddCex(sol.GetCex());
       }
-      sim.AddCex(sol.GetCex());
     }
     return false;
   }
@@ -76,16 +79,19 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " seems feasible" << std::endl;
       }
-      if(sol.CheckFeasibility(id, fi, c)) {
+      SatResult r = sol.CheckFeasibility(id, fi, c);
+      if(r == UNSAT) {
         if(nVerbose) {
           std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is feasible" << std::endl;
         }
         return true;
       }
-      if(nVerbose) {
-        std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+      if(r == SAT) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+        }
+        sim.AddCex(sol.GetCex());
       }
-      sim.AddCex(sol.GetCex());
     }
     return false;
   }

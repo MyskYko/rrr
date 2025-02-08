@@ -13,6 +13,7 @@ namespace rrr {
     int nSatSolverVerbose = 0;
     bool fUseBddCspf = false;
     bool fUseBddMspf = false;
+    int nConflictLimit = 0;
   };
   
 }

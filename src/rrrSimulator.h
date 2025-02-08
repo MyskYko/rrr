@@ -186,7 +186,7 @@ namespace rrr {
     std::cout << std::bitset<64>(*x);
     x++;
     for(int i = 1; i < n; i++, x++) {
-      std::cout << std::endl << "          " << std::bitset<64>(*x);
+      std::cout << std::endl << std::string(10, ' ') << std::bitset<64>(*x);
     }
   }
   
@@ -575,7 +575,17 @@ namespace rrr {
   template <typename Ntk>
   void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
-    assert(0);
+    vValues.resize(nWords * pNtk->GetNumNodes());
+    target = -1;
+    care.resize(nWords);
+    tmp.resize(nWords);
+    iPivot = 0;
+    vAssignedStimuli.clear();
+    vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
+    fUpdate = false;
+    sUpdates.clear();
+    GenerateRandomStimuli();
+    Simulate();
   }
 
   /* }}} */
@@ -651,7 +661,7 @@ namespace rrr {
     return false;
   }
 
-  /* }}} Perform checks end */
+  /* }}} */
 
   /* {{{ Cex */
 
@@ -790,6 +800,6 @@ namespace rrr {
     nAdds++;
   }
   
-  /* }}} Cex end */
+  /* }}} */
   
 }

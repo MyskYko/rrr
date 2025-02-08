@@ -8,9 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "RWTSOAPQabcvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "RWTCSOAPQabcvh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -38,6 +38,10 @@ int main(int argc, char **argv) {
           break;
       case 'T':
           nTimeout = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'C':
+          nConflictLimit = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
       case 'S':

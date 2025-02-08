@@ -16,6 +16,12 @@ namespace rrr {
     LUT
   };
 
+  enum SatResult {
+    SAT,
+    UNSAT,
+    UNDET
+  };
+
   enum VarValue: char {
     UNDEF,
     TRUE,
