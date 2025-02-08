@@ -8,32 +8,36 @@
 #include "rrrParameter.h"
 #include "rrrTypes.h"
 
-
 namespace rrr {
 
   template <typename Ntk>
   class BddMspfAnalyzer {
   private:
+    // aliases
     using lit = int;
     static constexpr lit LitMax = 0xffffffff;
 
+    // pointer to network
     Ntk *pNtk;
-    int nVerbose;
-    NewBdd::Man *pBdd;
     
+    // parameters
+    int nVerbose;
+    
+    // data
+    NewBdd::Man *pBdd;
     std::vector<lit> vFs;
     std::vector<lit> vGs;
     std::vector<std::vector<lit>> vvCs;
-
     bool fUpdate;
     std::vector<bool> vUpdates;
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
-
     std::vector<bool> vVisits;
-
+    
+    // backups
     std::vector<BddMspfAnalyzer> vBackups;
 
+    // BDD utils
     void IncRef(lit x) const;
     void DecRef(lit x) const;
     void Assign(lit &x, lit y) const;
@@ -43,13 +47,17 @@ namespace rrr {
     void DelVecVec(std::vector<std::vector<lit>> &v) const;
     lit  Xor(lit x, lit y) const;
 
+    // callback
     void ActionCallback(Action const &action);
 
+    // allocation
     void Allocate();
 
+    // simulation
     bool SimulateNode(int id, std::vector<lit> &v) const;
     void Simulate();
-    
+
+    // PF computation
     bool ComputeReconvergentG(int id);
     bool ComputeG(int id);
     void ComputeC(int id);
@@ -57,21 +65,24 @@ namespace rrr {
     void MspfNode(int id);
     void Mspf(int id = -1);
 
+    // save & load
     void Save(int slot);
     void Load(int slot);
     void PopBack();
     
   public:
+    // constructors
     BddMspfAnalyzer();
     BddMspfAnalyzer(Ntk *pNtk, Parameter const *pPar);
     ~BddMspfAnalyzer();
     void UpdateNetwork(Ntk *pNtk_);
 
+    // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
   };
   
-  /* {{{ Bdd utils */
+  /* {{{ BDD utils */
   
   template <typename Ntk>
   inline void BddMspfAnalyzer<Ntk>::IncRef(lit x) const {
@@ -148,7 +159,7 @@ namespace rrr {
     return r;
   }
   
-  /* }}} Bdd utils end */
+  /* }}} */
 
   /* {{{ Callback */
 
@@ -265,7 +276,7 @@ namespace rrr {
     }
   }
   
-  /* }}} Create action callback end */
+  /* }}} */
 
   /* {{{ Allocation */
 
@@ -281,7 +292,7 @@ namespace rrr {
     vVisits.resize(nNodes);
   }
 
-  /* }}} Allocation end */
+  /* }}} */
   
   /* {{{ Simulation */
   
@@ -306,6 +317,9 @@ namespace rrr {
   
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::Simulate() {
+    if(nVerbose) {
+      std::cout << "symbolic simulation with BDD" << std::endl;
+    }
     pNtk->ForEachInt([&](int id) {
       if(vUpdates[id]) {
         if(SimulateNode(id, vFs)) {
@@ -319,9 +333,9 @@ namespace rrr {
     });
   }
 
-  /* }}} Simulation end */
+  /* }}} */
 
-  /* {{{ Mspf */
+  /* {{{ MSPF computation */
 
   template <typename pNtk>
   inline bool BddMspfAnalyzer<pNtk>::ComputeReconvergentG(int id) {
@@ -478,36 +492,6 @@ namespace rrr {
       vCUpdates[id] = false;
     }
     vVisits[id] = true;
-    return;
-    if(pNtk->IsReconvergent(id)) {
-      if(nVerbose) {
-        std::cout << "computing reconvergent node " << id << " G " << std::endl;
-      }
-      if(ComputeReconvergentG(id)) {
-        vCUpdates[id] = true;
-      }
-      vGUpdates[id] = false;
-    } else {
-      if(!vGUpdates[id] && !vCUpdates[id]) {
-        return;
-      }
-      if(vGUpdates[id]) {
-        if(nVerbose) {
-          std::cout << "computing node " << id << " G " << std::endl;
-        }
-        if(ComputeG(id)) {
-          vCUpdates[id] = true;
-        }
-        vGUpdates[id] = false;
-      }
-    }
-    if(vCUpdates[id]) {
-      if(nVerbose) {
-        std::cout << "computing node " << id << " C " << std::endl;
-      }
-      ComputeC(id);
-      vCUpdates[id] = false;
-    }
   }
 
   template <typename pNtk>
@@ -524,7 +508,7 @@ namespace rrr {
     }
   }
 
-  /* }}} Mspf end */
+  /* }}} */
 
   /* {{{ Save & load */
 
@@ -565,7 +549,7 @@ namespace rrr {
     vBackups.pop_back();
   }
 
-  /* }}} Save & load end */
+  /* }}} */
   
   /* {{{ Constructor */
 
@@ -624,9 +608,9 @@ namespace rrr {
     delete pBdd;
   }
 
-  /* }}} Constructor end */
+  /* }}} */
 
-  /* {{{ Perform checks */
+  /* {{{ Checks */
   
   template <typename Ntk>
   bool BddMspfAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
@@ -639,11 +623,20 @@ namespace rrr {
     case AND: {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
-      //std::cout << "f = " << vFs[fi] << ", g = " << vvCs[id][idx] << std::endl;
-      return pBdd->IsConst1(pBdd->Or(pBdd->LitNotCond(vFs[fi], c), vvCs[id][idx]));
+      lit x = pBdd->Or(pBdd->LitNotCond(vFs[fi], c), vvCs[id][idx]);
+      if(pBdd->IsConst1(x)) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is redundant" << std::endl;
+        }
+        return true;
+      }
+      break;
     }
     default:
       assert(0);
+    }
+    if(nVerbose) {
+      std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
     }
     return false;
   }
@@ -655,17 +648,29 @@ namespace rrr {
       fUpdate = false;
     }
     Mspf(id);
-    //std::cout << "f = " << vFs[id] << ", g = " << vGs[id] << ", h = " << vFs[fi] << std::endl;
-    lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);
-    IncRef(x);
-    if(pBdd->IsConst1(pBdd->Or(x, pBdd->LitNotCond(vFs[fi], c)))) {
+    switch(pNtk->GetNodeType(id)) {
+    case AND: {
+      lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);
+      IncRef(x);
+      lit y = pBdd->Or(x, pBdd->LitNotCond(vFs[fi], c));
       DecRef(x);
-      return true;
+      if(pBdd->IsConst1(y)) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is feasible" << std::endl;
+        }
+        return true;
+      }
+      break;
     }
-    DecRef(x);
+    default:
+      assert(0);
+    }
+    if(nVerbose) {
+      std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+    }
     return false;
   }
 
-  /* }}} Perform check end */
+  /* }}} */
   
 }

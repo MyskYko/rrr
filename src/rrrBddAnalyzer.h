@@ -8,31 +8,36 @@
 #include "rrrParameter.h"
 #include "rrrTypes.h"
 
-
 namespace rrr {
 
   template <typename Ntk>
   class BddAnalyzer {
   private:
+    // aliases
     using lit = int;
     static constexpr lit LitMax = 0xffffffff;
     static const bool fResim = false;
 
+    // pointer to network
     Ntk *pNtk;
+    
+    // parameters
     int nVerbose;
+    
+    // data
     NewBdd::Man *pBdd;
     int target;
-    
     std::vector<lit> vFs;
     std::vector<lit> vGs;
     std::vector<std::vector<lit>> vvCs;
-
     std::vector<bool> vUpdates;
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
 
+    // backups
     std::vector<BddAnalyzer> vBackups;
 
+    // BDD utils
     void IncRef(lit x) const;
     void DecRef(lit x) const;
     void Assign(lit &x, lit y) const;
@@ -42,33 +47,40 @@ namespace rrr {
     void DelVecVec(std::vector<std::vector<lit>> &v) const;
     lit  Xor(lit x, lit y) const;
 
+    // callback
     void ActionCallback(Action const &action);
 
+    // allocation
     void Allocate();
 
+    // simulation
     void SimulateNode(int id, std::vector<lit> &v) const;
     void Simulate();
     
+    // CSPF computation
     bool ComputeG(int id);
     void ComputeC(int id);
     void CspfNode(int id);
     void Cspf(int id = -1);
 
+    // save & load
     void Save(int slot);
     void Load(int slot);
     void PopBack();
 
   public:
+    // constructors
     BddAnalyzer();
     BddAnalyzer(Ntk *pNtk, Parameter const *pPar);
     ~BddAnalyzer();
     void UpdateNetwork(Ntk *pNtk_);
 
+    // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
   };
   
-  /* {{{ Bdd utils */
+  /* {{{ BDD utils */
   
   template <typename Ntk>
   inline void BddAnalyzer<Ntk>::IncRef(lit x) const {
@@ -145,7 +157,7 @@ namespace rrr {
     return r;
   }
   
-  /* }}} Bdd utils end */
+  /* }}} */
 
   /* {{{ Callback */
 
@@ -260,7 +272,7 @@ namespace rrr {
     vCUpdates.resize(nNodes);
   }
 
-  /* }}} Allocation end */
+  /* }}} */
   
   /* {{{ Simulation */
   
@@ -277,6 +289,9 @@ namespace rrr {
   
   template <typename Ntk>
   void BddAnalyzer<Ntk>::Simulate() {
+    if(nVerbose) {
+      std::cout << "symbolic simulation with BDD" << std::endl;
+    }
     pNtk->ForEachInt([&](int id) {
       if(vUpdates[id]) {
         lit x = vFs[id];
@@ -294,9 +309,9 @@ namespace rrr {
     });
   }
 
-  /* }}} Simulation end */
+  /* }}} */
 
-  /* {{{ Cspf */
+  /* {{{ CSPF computation */
   
   template <typename Ntk>
   inline bool BddAnalyzer<Ntk>::ComputeG(int id) {
@@ -390,7 +405,7 @@ namespace rrr {
     }
   }
 
-  /* }}} Cspf end */
+  /* }}} */
 
   /* {{{ Save & load */
 
@@ -431,7 +446,7 @@ namespace rrr {
 
   /* }}} Save & load end */
   
-  /* {{{ Constructor */
+  /* {{{ Constructors */
 
   template <typename Ntk>
   BddAnalyzer<Ntk>::BddAnalyzer() :
@@ -492,12 +507,13 @@ namespace rrr {
     DelVec(vFs);
     DelVec(vGs);
     DelVecVec(vvCs);
+    // TODO: show some stats on BDD, preferably deconstructor message?
     delete pBdd;
   }
 
-  /* }}} Constructor end */
+  /* }}} */
 
-  /* {{{ Perform checks */
+  /* {{{ Checks */
   
   template <typename Ntk>
   bool BddAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
@@ -509,10 +525,20 @@ namespace rrr {
     case AND: {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
-      return pBdd->IsConst1(pBdd->Or(pBdd->LitNotCond(vFs[fi], c), vvCs[id][idx]));
+      lit x = pBdd->Or(pBdd->LitNotCond(vFs[fi], c), vvCs[id][idx]);
+      if(pBdd->IsConst1(x)) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is redundant" << std::endl;
+        }
+        return true;
+      }
+      break;
     }
     default:
       assert(0);
+    }
+    if(nVerbose) {
+      std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
     }
     return false;
   }
@@ -524,17 +550,29 @@ namespace rrr {
       target = id;
     }
     Cspf(id);
-    //std::cout << "f = " << vFs[id] << ", g = " << vGs[id] << ", h = " << vFs[fi] << std::endl;
-    lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);
-    IncRef(x);
-    if(pBdd->IsConst1(pBdd->Or(x, pBdd->LitNotCond(vFs[fi], c)))) {
+    switch(pNtk->GetNodeType(id)) {
+    case AND: {
+      lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);
+      IncRef(x);
+      lit y = pBdd->Or(x, pBdd->LitNotCond(vFs[fi], c));
       DecRef(x);
-      return true;
+      if(pBdd->IsConst1(y)) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is feasible" << std::endl;
+        }
+        return true;
+      }
+      break;
     }
-    DecRef(x);
+    default:
+      assert(0);
+    }
+    if(nVerbose) {
+      std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+    }
     return false;
   }
 
-  /* }}} Perform check end */
+  /* }}} */
   
 }
