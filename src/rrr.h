@@ -16,18 +16,18 @@
 namespace rrr {
 
   template <typename Ntk>
-  void Perform(Ntk *pNtk, Parameter *pPar) {
+  void Perform(Ntk *pNtk, Parameter const *pPar) {
     // TODO: make pPar const
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     if(pPar->fUseBddCspf) {
-      Scheduler<rrr::Optimizer<Ntk, rrr::BddAnalyzer<Ntk>>> sch;
-      sch.Run(pNtk, pPar);
+      Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::BddAnalyzer<Ntk>>> sch(pNtk, pPar);
+      sch.Run();
     } else if(pPar->fUseBddMspf) {
-      Scheduler<rrr::Optimizer<Ntk, rrr::BddMspfAnalyzer<Ntk>>> sch;
-      sch.Run(pNtk, pPar);
+      Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::BddMspfAnalyzer<Ntk>>> sch(pNtk, pPar);
+      sch.Run();
     } else {
-      Scheduler<rrr::Optimizer<Ntk, rrr::Analyzer<Ntk, rrr::Simulator<Ntk>, rrr::Solver<Ntk>>>> sch;
-      sch.Run(pNtk, pPar);
+      Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::Analyzer<Ntk, rrr::Simulator<Ntk>, rrr::Solver<Ntk>>>> sch(pNtk, pPar);
+      sch.Run();
     }
   }
   

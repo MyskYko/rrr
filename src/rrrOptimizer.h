@@ -74,7 +74,7 @@ namespace rrr {
     
   public:
     // constructors
-    Optimizer(Ntk *pNtk, Parameter *pPar);
+    Optimizer(Ntk *pNtk, Parameter const *pPar);
     ~Optimizer();
     void UpdateNetwork(Ntk *pNtk_);
 
@@ -509,7 +509,7 @@ namespace rrr {
   /* {{{ Constructors */
   
   template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter *pPar) :
+  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     nVerbose(pPar->nOptimizerVerbose),
     target(-1) {

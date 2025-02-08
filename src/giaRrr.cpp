@@ -2,7 +2,6 @@
 
 #include "rrr.h"
 
-
 template <typename Ntk>
 Ntk *Aig2Ntk(Gia_Man_t *pGia) {
   int i;
@@ -52,7 +51,6 @@ Gia_Man_t *Ntk2Aig(Ntk *pNtk) {
   Gia_ManHashStop(pGia);
   return pGia;  
 }
-
 
 extern "C"
 Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf) {

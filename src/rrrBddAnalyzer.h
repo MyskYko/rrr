@@ -42,7 +42,7 @@ namespace rrr {
     void DelVecVec(std::vector<std::vector<lit>> &v) const;
     lit  Xor(lit x, lit y) const;
 
-    std::function<void(Action)> CreateActionCallback();
+    void ActionCallback(Action const &action);
 
     void Allocate();
 
@@ -60,7 +60,7 @@ namespace rrr {
 
   public:
     BddAnalyzer();
-    BddAnalyzer(Ntk *pNtk, Parameter *pPar);
+    BddAnalyzer(Ntk *pNtk, Parameter const *pPar);
     ~BddAnalyzer();
     void UpdateNetwork(Ntk *pNtk_);
 
@@ -147,107 +147,105 @@ namespace rrr {
   
   /* }}} Bdd utils end */
 
-  /* {{{ Create action callback */
+  /* {{{ Callback */
 
   template <typename Ntk>
-  std::function<void(Action)> BddAnalyzer<Ntk>::CreateActionCallback() {
-    return [&](Action action) {
-      switch(action.type) {
-      case REMOVE_FANIN:
-        vUpdates[action.id] = true;
-        vGUpdates[action.fi] = true;
-        DecRef(vvCs[action.id][action.idx]);
-        vvCs[action.id].erase(vvCs[action.id].begin() + action.idx);
-        break;
-      case REMOVE_UNUSED:
-        if(vGUpdates[action.id] || vCUpdates[action.id]) {
-          for(int fi: action.vFanins) {
-            vGUpdates[fi] = true;
-          }
-        }
-        Assign(vFs[action.id], LitMax);
-        Assign(vGs[action.id], LitMax);
-        DelVec(vvCs[action.id]);
-        break;
-      case REMOVE_BUFFER:
-        if(vUpdates[action.id]) {
-          for(int fo: action.vFanouts) {
-            vUpdates[fo] = true;
-            vCUpdates[fo] = true;
-          }
-        }
-        if(vGUpdates[action.id] || vCUpdates[action.id]) {
-          vGUpdates[action.fi] = true;
-        }
-        Assign(vFs[action.id], LitMax);
-        Assign(vGs[action.id], LitMax);
-        DelVec(vvCs[action.id]);
-        break;
-      case REMOVE_CONST:
-        if(vUpdates[action.id]) {
-          for(int fo: action.vFanouts) {
-            vUpdates[fo] = true;
-            vCUpdates[fo] = true;
-          }
-        }
+  void BddAnalyzer<Ntk>::ActionCallback(Action const &action) {
+    switch(action.type) {
+    case REMOVE_FANIN:
+      vUpdates[action.id] = true;
+      vGUpdates[action.fi] = true;
+      DecRef(vvCs[action.id][action.idx]);
+      vvCs[action.id].erase(vvCs[action.id].begin() + action.idx);
+      break;
+    case REMOVE_UNUSED:
+      if(vGUpdates[action.id] || vCUpdates[action.id]) {
         for(int fi: action.vFanins) {
           vGUpdates[fi] = true;
         }
-        Assign(vFs[action.id], LitMax);
-        Assign(vGs[action.id], LitMax);
-        DelVec(vvCs[action.id]);
-        break;
-      case ADD_FANIN:
-        vUpdates[action.id] = true;
-        vCUpdates[action.id] = true;
-        vvCs[action.id].insert(vvCs[action.id].begin() + action.idx, LitMax);
-        break;
-      case TRIVIAL_COLLAPSE: {
-        if(vGUpdates[action.fi] || vCUpdates[action.fi]) {
-          vCUpdates[action.id] = true;
+      }
+      Assign(vFs[action.id], LitMax);
+      Assign(vGs[action.id], LitMax);
+      DelVec(vvCs[action.id]);
+      break;
+    case REMOVE_BUFFER:
+      if(vUpdates[action.id]) {
+        for(int fo: action.vFanouts) {
+          vUpdates[fo] = true;
+          vCUpdates[fo] = true;
         }
-        std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
-        DecRef(*it);
-        it = vvCs[action.id].erase(it);
-        vvCs[action.id].insert(it,  vvCs[action.fi].begin(), vvCs[action.fi].end());
-        vvCs[action.fi].clear();
-        Assign(vFs[action.fi], LitMax);
-        Assign(vGs[action.fi], LitMax);
-        break;
       }
-      case TRIVIAL_DECOMPOSE: {
-        Allocate();
-        SimulateNode(action.fi, vFs);
-        assert(vGs[action.fi] == LitMax);
-        Assign(vGs[action.fi], vGs[action.id]);
-        std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
-        assert(vvCs[action.fi].empty());
-        vvCs[action.fi].insert(vvCs[action.fi].begin(), it, vvCs[action.id].end());
-        vvCs[action.id].erase(it, vvCs[action.id].end());
-        assert(vvCs[action.id].size() == action.idx);
-        vvCs[action.id].resize(action.idx + 1, LitMax);
-        Assign(vvCs[action.id][action.idx], vGs[action.fi]);
-        vUpdates[action.fi] = false;
-        vGUpdates[action.fi] = false;
-        vCUpdates[action.fi] = vCUpdates[action.id];
-        break;
+      if(vGUpdates[action.id] || vCUpdates[action.id]) {
+        vGUpdates[action.fi] = true;
       }
-      case SAVE:
-        Save(action.idx);
-        break;
-      case LOAD:
-        Load(action.idx);
-        break;
-      case POP_BACK:
-        PopBack();
-        break;
-      default:
-        assert(0);
+      Assign(vFs[action.id], LitMax);
+      Assign(vGs[action.id], LitMax);
+      DelVec(vvCs[action.id]);
+      break;
+    case REMOVE_CONST:
+      if(vUpdates[action.id]) {
+        for(int fo: action.vFanouts) {
+          vUpdates[fo] = true;
+          vCUpdates[fo] = true;
+        }
       }
-    };
+      for(int fi: action.vFanins) {
+        vGUpdates[fi] = true;
+      }
+      Assign(vFs[action.id], LitMax);
+      Assign(vGs[action.id], LitMax);
+      DelVec(vvCs[action.id]);
+      break;
+    case ADD_FANIN:
+      vUpdates[action.id] = true;
+      vCUpdates[action.id] = true;
+      vvCs[action.id].insert(vvCs[action.id].begin() + action.idx, LitMax);
+      break;
+    case TRIVIAL_COLLAPSE: {
+      if(vGUpdates[action.fi] || vCUpdates[action.fi]) {
+        vCUpdates[action.id] = true;
+      }
+      std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
+      DecRef(*it);
+      it = vvCs[action.id].erase(it);
+      vvCs[action.id].insert(it,  vvCs[action.fi].begin(), vvCs[action.fi].end());
+      vvCs[action.fi].clear();
+      Assign(vFs[action.fi], LitMax);
+      Assign(vGs[action.fi], LitMax);
+      break;
+    }
+    case TRIVIAL_DECOMPOSE: {
+      Allocate();
+      SimulateNode(action.fi, vFs);
+      assert(vGs[action.fi] == LitMax);
+      Assign(vGs[action.fi], vGs[action.id]);
+      std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
+      assert(vvCs[action.fi].empty());
+      vvCs[action.fi].insert(vvCs[action.fi].begin(), it, vvCs[action.id].end());
+      vvCs[action.id].erase(it, vvCs[action.id].end());
+      assert(vvCs[action.id].size() == action.idx);
+      vvCs[action.id].resize(action.idx + 1, LitMax);
+      Assign(vvCs[action.id][action.idx], vGs[action.fi]);
+      vUpdates[action.fi] = false;
+      vGUpdates[action.fi] = false;
+      vCUpdates[action.fi] = vCUpdates[action.id];
+      break;
+    }
+    case SAVE:
+      Save(action.idx);
+      break;
+    case LOAD:
+      Load(action.idx);
+      break;
+    case POP_BACK:
+      PopBack();
+      break;
+    default:
+      assert(0);
+    }
   }
   
-  /* }}} Create action callback end */
+  /* }}} */
 
   /* {{{ Allocation */
 
@@ -444,7 +442,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  BddAnalyzer<Ntk>::BddAnalyzer(Ntk *pNtk, Parameter *pPar) :
+  BddAnalyzer<Ntk>::BddAnalyzer(Ntk *pNtk, Parameter const *pPar) :
     nVerbose(pPar->nAnalyzerVerbose),
     pNtk(pNtk),
     target(-1) {
@@ -477,7 +475,7 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, 0);
       vGUpdates[fi]  = true;
     });
-    pNtk->AddCallback(CreateActionCallback());
+    pNtk->AddCallback(std::bind(&BddAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   template <typename Ntk>

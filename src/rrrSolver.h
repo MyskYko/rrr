@@ -5,7 +5,7 @@
 #include <sat/bsat/satSolver.h>
 
 #include "rrrTypes.h"
-
+#include "rrrParameter.h"
 
 namespace rrr {
 
@@ -29,14 +29,14 @@ namespace rrr {
     int nSats;
     int nUnsats;
 
-    std::function<void(Action)> CreateActionCallback();
+    void ActionCallback(Action const &action);
 
     void EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate = -1) const;
     void EncodeMiter(sat_solver *p, std::vector<int> &v, int id); // create a careset miter where the counterpart has the output of target negated
     void SetTarget(int id);
     
   public:
-    Solver(Ntk *pNtk);
+    Solver(Ntk *pNtk, Parameter const *pPar);
     ~Solver();
     void UpdateNetwork(Ntk *pNtk_);
 
@@ -47,49 +47,47 @@ namespace rrr {
   };
 
 
-  /* {{{ Create action callback */
+  /* {{{ Callback */
 
   template <typename Ntk>
-  std::function<void(Action)> Solver<Ntk>::CreateActionCallback() {
-    return [&](Action action) {
-      if(target == -1) {
-        return;
-      }
-      switch(action.type) {
-      case REMOVE_FANIN:
-        if(action.id != target) {
-          fUpdate = true;
-        }
-        break;
-      case REMOVE_UNUSED:
-        break;
-      case REMOVE_BUFFER:
-      case REMOVE_CONST:
-        if(action.id == target) {
-          target = -1;
-        }
-        break;
-      case ADD_FANIN:
-        if(action.id != target) {
-          fUpdate = true;
-        }
-        break;
-      case TRIVIAL_COLLAPSE:
-        break;
-      case TRIVIAL_DECOMPOSE:
+  void Solver<Ntk>::ActionCallback(Action const &action) {
+    if(target == -1) {
+      return;
+    }
+    switch(action.type) {
+    case REMOVE_FANIN:
+      if(action.id != target) {
         fUpdate = true;
-        break;
-      case SAVE:
-        break;
-      case LOAD:
-        target = -1;
-        break;
-      case POP_BACK:
-        break;
-      default:
-        assert(0);
       }
-    };
+      break;
+    case REMOVE_UNUSED:
+      break;
+    case REMOVE_BUFFER:
+    case REMOVE_CONST:
+      if(action.id == target) {
+        target = -1;
+      }
+      break;
+    case ADD_FANIN:
+      if(action.id != target) {
+        fUpdate = true;
+      }
+      break;
+    case TRIVIAL_COLLAPSE:
+      break;
+    case TRIVIAL_DECOMPOSE:
+      fUpdate = true;
+      break;
+    case SAVE:
+      break;
+    case LOAD:
+      target = -1;
+      break;
+    case POP_BACK:
+      break;
+    default:
+      assert(0);
+    }
   }
 
   /* }}} Create action callback end */
@@ -229,7 +227,7 @@ namespace rrr {
   /* {{{ Constructor */
 
   template <typename Ntk>
-  Solver<Ntk>::Solver(Ntk *pNtk) :
+  Solver<Ntk>::Solver(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     pSat(sat_solver_new()),
     status(0),
@@ -238,7 +236,7 @@ namespace rrr {
     nCalls(0),
     nSats(0),
     nUnsats(0) {
-    pNtk->AddCallback(CreateActionCallback());
+    pNtk->AddCallback(std::bind(&Solver<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   template <typename Ntk>

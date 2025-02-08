@@ -24,7 +24,7 @@ namespace rrr {
     TEMP_FALSE
   };
 
-  /* {{{ VarValue helper functions */
+  /* {{{ VarValue functions */
   
   static inline VarValue DecideVarValue(VarValue x) {
     switch(x) {
@@ -60,7 +60,7 @@ namespace rrr {
     }
   }
 
-  /* }}} VarValue helper functions end */
+  /* }}} */
 
   enum ActionType {
     NONE,
@@ -86,7 +86,7 @@ namespace rrr {
     std::vector<int> vFanouts;
   };
 
-  /* {{{ Action helper functions */
+  /* {{{ Action functions */
 
   static inline void PrintAction(Action action) {
     switch(action.type) {
@@ -154,13 +154,13 @@ namespace rrr {
     }
   }
 
-  /* }}} Action helper functions */
+  /* }}} */
 
-  /* {{{ Time */
-  
   using seconds = uint64_t;
   using clock_type = std::chrono::steady_clock;
   using time_point = std::chrono::time_point<clock_type>;
+  
+  /* {{{ Time functions */
   
   static inline time_point GetCurrentTime() {
     return clock_type::now();

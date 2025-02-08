@@ -11,7 +11,6 @@
 #include "rrrParameter.h"
 #include "rrrTypes.h"
 
-
 namespace rrr {
 
   template <typename Ntk>
@@ -52,7 +51,7 @@ namespace rrr {
     bool IsEq(int n, citr x, citr y) const;
     void Print(int n, citr x) const;
 
-    std::function<void(Action)> CreateActionCallback();
+    void ActionCallback(Action const &action);
 
     void SimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     bool ResimulateNode(std::vector<word> &v, int id, int to_negate = -1);
@@ -68,7 +67,7 @@ namespace rrr {
 
   public:
     Simulator();
-    Simulator(Ntk *pNtk, Parameter *pPar);
+    Simulator(Ntk *pNtk, Parameter const *pPar);
     ~Simulator();
     void UpdateNetwork(Ntk *pNtk_);
 
@@ -175,66 +174,64 @@ namespace rrr {
   /* {{{ Create action handler */
   
   template <typename Ntk>
-  std::function<void(Action)> Simulator<Ntk>::CreateActionCallback() {
-    return [&](Action action) {
-      if(target == -1) {
-        return;
+  void Simulator<Ntk>::ActionCallback(Action const &action) {
+    if(target == -1) {
+      return;
+    }
+    switch(action.type) {
+    case REMOVE_FANIN:
+      if(action.id == target) {
+        fUpdate = true;
+      } else {
+        stUpdates.insert(action.id);
       }
-      switch(action.type) {
-      case REMOVE_FANIN:
-        if(action.id == target) {
-          fUpdate = true;
-        } else {
-          stUpdates.insert(action.id);
-        }
-        break;
-      case REMOVE_UNUSED:
-        break;
-      case REMOVE_BUFFER:
-      case REMOVE_CONST:
-        if(action.id == target) {
-          if(fUpdate) {
-            for(int fo: action.vFanouts) {
-              stUpdates.insert(fo);
-            }
-            fUpdate = false;
+      break;
+    case REMOVE_UNUSED:
+      break;
+    case REMOVE_BUFFER:
+    case REMOVE_CONST:
+      if(action.id == target) {
+        if(fUpdate) {
+          for(int fo: action.vFanouts) {
+            stUpdates.insert(fo);
           }
-          target = -1;
-        } else {
-          if(stUpdates.count(action.id)) {
-            stUpdates.erase(action.id);
-            for(int fo: action.vFanouts) {
-              stUpdates.insert(fo);
-            }
+          fUpdate = false;
+        }
+        target = -1;
+      } else {
+        if(stUpdates.count(action.id)) {
+          stUpdates.erase(action.id);
+          for(int fo: action.vFanouts) {
+            stUpdates.insert(fo);
           }
         }
-        break;
-      case ADD_FANIN:
-        if(action.id == target) {
-          fUpdate = true;
-        } else {
-          stUpdates.insert(action.id);
-        }
-        break;
-      case TRIVIAL_COLLAPSE:
-        break;
-      case TRIVIAL_DECOMPOSE:
-        vValues.resize(nWords * pNtk->GetNumNodes());
-        SimulateNode(vValues, action.fi);
-        break;
-      case SAVE:
-        Save(action.idx);
-        break;
-      case LOAD:
-        Load(action.idx);
-        break;
-      case POP_BACK:
-        // Do nothing: it may be good to keep the word vector allocated
-        break;
-      default:
-        assert(0);
       }
-    };
+      break;
+    case ADD_FANIN:
+      if(action.id == target) {
+        fUpdate = true;
+      } else {
+        stUpdates.insert(action.id);
+      }
+      break;
+    case TRIVIAL_COLLAPSE:
+      break;
+    case TRIVIAL_DECOMPOSE:
+      vValues.resize(nWords * pNtk->GetNumNodes());
+      SimulateNode(vValues, action.fi);
+      break;
+    case SAVE:
+      Save(action.idx);
+      break;
+    case LOAD:
+      Load(action.idx);
+      break;
+    case POP_BACK:
+      // Do nothing: it may be good to keep the word vector allocated
+      break;
+    default:
+      assert(0);
+    }
   }
   
   /* }}} Create action handler end */
@@ -508,7 +505,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  Simulator<Ntk>::Simulator(Ntk *pNtk, Parameter *pPar) :
+  Simulator<Ntk>::Simulator(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     nWords(pPar->nWords),
     target(-1),
@@ -516,7 +513,7 @@ namespace rrr {
     fUpdate(false),
     nAdds(0),
     nResets(0) {
-    pNtk->AddCallback(CreateActionCallback());
+    pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
     vValues.resize(nWords * pNtk->GetNumNodes());
     care.resize(nWords);
     tmp.resize(nWords);
