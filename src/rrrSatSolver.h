@@ -10,7 +10,7 @@
 namespace rrr {
 
   template <typename Ntk>
-  class Solver {
+  class SatSolver {
   private:
     static const bool fVerbose = false;
     
@@ -36,8 +36,8 @@ namespace rrr {
     void SetTarget(int id);
     
   public:
-    Solver(Ntk *pNtk, Parameter const *pPar);
-    ~Solver();
+    SatSolver(Ntk *pNtk, Parameter const *pPar);
+    ~SatSolver();
     void UpdateNetwork(Ntk *pNtk_);
 
     bool CheckRedundancy(int id, int idx);
@@ -50,7 +50,7 @@ namespace rrr {
   /* {{{ Callback */
 
   template <typename Ntk>
-  void Solver<Ntk>::ActionCallback(Action const &action) {
+  void SatSolver<Ntk>::ActionCallback(Action const &action) {
     if(target == -1) {
       return;
     }
@@ -95,7 +95,7 @@ namespace rrr {
   /* {{{ Perform encoding */
 
   template <typename Ntk>
-  void Solver<Ntk>::EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate) const {
+  void SatSolver<Ntk>::EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate) const {
     int RetValue;
     int x = -1, y = -1;
     bool cx, cy;
@@ -142,7 +142,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void Solver<Ntk>::EncodeMiter(sat_solver *p, std::vector<int> &v, int id) {
+  void SatSolver<Ntk>::EncodeMiter(sat_solver *p, std::vector<int> &v, int id) {
     int RetValue;
     // reset
     v.clear();
@@ -213,7 +213,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void Solver<Ntk>::SetTarget(int id) {
+  void SatSolver<Ntk>::SetTarget(int id) {
     if(!fUpdate && id == target) {
       return;
     }
@@ -227,7 +227,7 @@ namespace rrr {
   /* {{{ Constructor */
 
   template <typename Ntk>
-  Solver<Ntk>::Solver(Ntk *pNtk, Parameter const *pPar) :
+  SatSolver<Ntk>::SatSolver(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     pSat(sat_solver_new()),
     status(0),
@@ -236,17 +236,17 @@ namespace rrr {
     nCalls(0),
     nSats(0),
     nUnsats(0) {
-    pNtk->AddCallback(std::bind(&Solver<Ntk>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   template <typename Ntk>
-  Solver<Ntk>::~Solver() {
+  SatSolver<Ntk>::~SatSolver() {
     sat_solver_delete(pSat);
     std::cout << "solver stats: SAT calls = " << nCalls << ", SAT = " << nSats << ", UNSAT = " << nUnsats << std::endl;
   }
 
   template <typename Ntk>
-  void Solver<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+  void SatSolver<Ntk>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
     assert(0);
   }
@@ -256,7 +256,7 @@ namespace rrr {
   /* {{{ Perform checks */
   
   template <typename Ntk>
-  bool Solver<Ntk>::CheckRedundancy(int id, int idx) {
+  bool SatSolver<Ntk>::CheckRedundancy(int id, int idx) {
     SetTarget(id);
     if(!status) {
       if(fVerbose) {
@@ -316,7 +316,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  bool Solver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  bool SatSolver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     SetTarget(id);
     if(!status) {
       if(fVerbose) {
@@ -375,7 +375,7 @@ namespace rrr {
   /* {{{ Cex */
 
   template <typename Ntk>
-  std::vector<VarValue> Solver<Ntk>::GetCex() {
+  std::vector<VarValue> SatSolver<Ntk>::GetCex() {
     if(fVerbose) {
       std::cout << "cex: ";
       pNtk->ForEachPi([&](int id) {

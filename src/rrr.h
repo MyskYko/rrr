@@ -10,7 +10,7 @@
 #include "rrrAnalyzer.h"
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
-#include "rrrSolver.h"
+#include "rrrSatSolver.h"
 #include "rrrSimulator.h"
 
 namespace rrr {
@@ -26,7 +26,7 @@ namespace rrr {
       Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::BddMspfAnalyzer<Ntk>>> sch(pNtk, pPar);
       sch.Run();
     } else {
-      Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::Analyzer<Ntk, rrr::Simulator<Ntk>, rrr::Solver<Ntk>>>> sch(pNtk, pPar);
+      Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::Analyzer<Ntk, rrr::Simulator<Ntk>, rrr::SatSolver<Ntk>>>> sch(pNtk, pPar);
       sch.Run();
     }
   }

@@ -16,12 +16,14 @@ namespace rrr {
   template <typename Ntk>
   class Simulator {
   private:
+    // aliases
     using word = unsigned long long;
     using itr = std::vector<word>::iterator;
     using citr = std::vector<word>::const_iterator;
-
     static constexpr word one = 0xffffffffffffffff;
-    static const bool fVerbose = false;
+
+    // parameters
+    int nVerbose;
 
     Ntk *pNtk;
     int nWords;
@@ -325,7 +327,7 @@ namespace rrr {
   void Simulator<Ntk>::Simulate() {
     pNtk->ForEachInt([&](int id) {
       SimulateNode(vValues, id);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nWords, vValues.begin() + id * nWords);
         std::cout << std::endl;
@@ -337,7 +339,7 @@ namespace rrr {
   void Simulator<Ntk>::Resimulate() {
     pNtk->ForEachTfosUpdate(stUpdates, false, [&](int fo) {
       bool fUpdated = ResimulateNode(vValues, fo);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
         Print(nWords, vValues.begin() + fo * nWords);
         std::cout << std::endl;
@@ -347,7 +349,7 @@ namespace rrr {
     /* alternative version that updates entire TFO
     pNtk->ForEachTfos(stUpdates, false, [&](int fo) {
       SimulateNode(vValues, fo);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
         Print(nWords, vValues.begin() + fo * nWords);
         std::cout << std::endl;
@@ -360,7 +362,7 @@ namespace rrr {
   void Simulator<Ntk>::SimulateOneWord(int offset) {
     pNtk->ForEachInt([&](int id) {
       SimulateOneWordNode(vValues, id, offset);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(1, vValues.begin() + id * nWords + offset);
         std::cout << std::endl;
@@ -375,7 +377,7 @@ namespace rrr {
       for(int i = 0; i < nWords; i++) {
         vValues[id * nWords + i] = rng();
       }
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nWords, vValues.begin() + id * nWords);
         std::cout << std::endl;
@@ -398,12 +400,12 @@ namespace rrr {
       stUpdates.clear();
     }
     target = id;
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "computing care of " << target << std::endl;
     }
     if(pNtk->IsPoDriver(target)) {
       Fill(nWords, care.begin());
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
         Print(nWords, care.begin());
         std::cout << std::endl;
@@ -413,7 +415,7 @@ namespace rrr {
     vValues2 = vValues;
     pNtk->ForEachTfo(target, false, [&](int id) {
       SimulateNode(vValues2, id, target);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nWords, vValues2.begin() + id * nWords);
         std::cout << std::endl;
@@ -422,7 +424,7 @@ namespace rrr {
     /* alternative version that updates only affected TFO
     pNtk->ForEachTfoUpdate(target, false, [&](int id) {
       bool fUpdated = ResimulateNode(vValues2, id, target);
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nWords, vValues2.begin() + id * nWords);
         std::cout << std::endl;
@@ -437,7 +439,7 @@ namespace rrr {
         care[i] = care[i] | (vValues[fi * nWords + i] ^ vValues2[fi * nWords + i]);
       }
     });
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "care " << std::setw(3) << target << ": ";
       Print(nWords, care.begin());
       std::cout << std::endl;
@@ -614,7 +616,7 @@ namespace rrr {
 
   template <typename Ntk>
   void Simulator<Ntk>::AddCex(std::vector<VarValue> const &vCex) {
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "cex: ";
       for(VarValue c: vCex) {
         std::cout << GetVarValueChar(c);
@@ -672,14 +674,14 @@ namespace rrr {
       while(!((*it >> iBit) & 1)) {
         iBit++;
       }
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "fusing word " << iWord << ", bit " << iBit << std::endl;
       }
     } else {
       // no bits are compatible, so reset at pivot
       iWord = iPivot / 64;
       iBit = iPivot % 64;
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "resetting word " << iWord << ", bit " << iBit << std::endl;
       }
       word mask = 1ull << iBit;
@@ -703,7 +705,7 @@ namespace rrr {
         vValues[id * nWords + iWord] &= ~mask;
       }
       vAssignedVectors[idx * nWords + iWord] |= mask;
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(1, vValues.begin() + id * nWords + iWord);
         std::cout << std::endl;
@@ -724,7 +726,7 @@ namespace rrr {
       });
       pNtk->ForEachTfo(target, false, [&](int id) {
         SimulateOneWordNode(vValues2, id, iWord, target);
-        if(fVerbose) {
+        if(nVerbose) {
           std::cout << "node " << std::setw(3) << id << ": ";
           Print(1, vValues2.begin() + id * nWords + iWord);
           std::cout << std::endl;
@@ -735,7 +737,7 @@ namespace rrr {
         assert(fi != target);
         care[iWord] = care[iWord] | (vValues[fi * nWords + iWord] ^ vValues2[fi * nWords + iWord]);
       });
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
         Print(1, care.begin() + iWord);
         std::cout << std::endl;

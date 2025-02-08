@@ -53,7 +53,7 @@ Gia_Man_t *Ntk2Aig(Ntk *pNtk) {
 }
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int fUseBddCspf, int fUseBddMspf) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf) {
   rrr::AndNetwork *pNtk = Aig2Ntk<rrr::AndNetwork>(pGia);
   rrr::Parameter Par;
   Par.iSeed = iSeed;
@@ -62,6 +62,8 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nSchedulerVerbose = nSchedulerVerbose;
   Par.nOptimizerVerbose = nOptimizerVerbose;
   Par.nAnalyzerVerbose = nAnalyzerVerbose;
+  Par.nSimulatorVerbose = nSimulatorVerbose;
+  Par.nSatSolverVerbose = nSatSolverVerbose;
   Par.fUseBddCspf = fUseBddCspf;
   Par.fUseBddMspf = fUseBddMspf;
   rrr::Perform(pNtk, &Par);
