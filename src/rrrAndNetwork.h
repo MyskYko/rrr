@@ -27,7 +27,7 @@ namespace rrr {
     // network data
     int nNodes; // number of allocated nodes
     std::vector<int> vPis;
-    std::list<int> lsInts; // internal nodes in topological order
+    std::list<int> lInts; // internal nodes in topological order
     std::set<int> sInts; // internal nodes as a set
     std::vector<int> vPos;
     std::vector<std::vector<int>> vvFaninEdges; // complementable edges, no duplicated fanins allowed (including complements), and nodes without fanins are treated as const-1
@@ -148,10 +148,10 @@ namespace rrr {
 
   void AndNetwork::SortInts(itr it) {
     ForEachFanin(*it, [&](int fi, bool c) {
-      itr it2 = std::find(it, lsInts.end(), fi);
-      if(it2 != lsInts.end()) {
-        lsInts.erase(it2);
-        it2 = lsInts.insert(it, fi);
+      itr it2 = std::find(it, lInts.end(), fi);
+      if(it2 != lInts.end()) {
+        lInts.erase(it2);
+        it2 = lInts.insert(it, fi);
         SortInts(it2);
       }
     });
@@ -196,7 +196,7 @@ namespace rrr {
   AndNetwork::AndNetwork(AndNetwork const &x) {
     nNodes       = x.nNodes;
     vPis         = x.vPis;
-    lsInts       = x.lsInts;
+    lInts       = x.lInts;
     sInts        = x.sInts;
     vPos         = x.vPos;
     vvFaninEdges = x.vvFaninEdges;
@@ -206,7 +206,7 @@ namespace rrr {
   AndNetwork &AndNetwork::operator=(AndNetwork const &x) {
     nNodes       = x.nNodes;
     vPis         = x.vPis;
-    lsInts       = x.lsInts;
+    lInts       = x.lInts;
     sInts        = x.sInts;
     vPos         = x.vPos;
     vvFaninEdges = x.vvFaninEdges;
@@ -229,7 +229,7 @@ namespace rrr {
     assert(id0 < nNodes);
     assert(id1 < nNodes);
     assert(id0 != id1);
-    lsInts.push_back(nNodes);
+    lInts.push_back(nNodes);
     sInts.insert(nNodes);
     vRefs[id0]++;
     vRefs[id1]++;
@@ -264,7 +264,7 @@ namespace rrr {
   }
   
   inline int AndNetwork::GetNumInts() const {
-    return lsInts.size();
+    return lInts.size();
   }
   
   inline int AndNetwork::GetNumPos() const {
@@ -284,12 +284,12 @@ namespace rrr {
   }
 
   inline std::vector<int> AndNetwork::GetInts() const {
-    return std::vector<int>(lsInts.begin(), lsInts.end());
+    return std::vector<int>(lInts.begin(), lInts.end());
   }
   
   inline std::vector<int> AndNetwork::GetPisInts() const {
     std::vector<int> vPisInts = vPis;
-    vPisInts.insert(vPisInts.end(), lsInts.begin(), lsInts.end());
+    vPisInts.insert(vPisInts.end(), lInts.begin(), lInts.end());
     return vPisInts;
   }
   
@@ -375,12 +375,12 @@ namespace rrr {
       EndTraversal();
       return false;
     }
-    citr it = lsInts.begin();
-    while(vTrav[*it] < iTravStart && it != lsInts.end()) {
+    citr it = lInts.begin();
+    while(vTrav[*it] < iTravStart && it != lInts.end()) {
       it++;
     }
     it++;
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
         int fi = Edge2Node(fi_edge);
         if(vTrav[fi] >= iTravStart) {
@@ -407,13 +407,13 @@ namespace rrr {
   }
   
   inline void AndNetwork::ForEachInt(std::function<void(int)> const &func) const {
-    for(int id: lsInts) {
+    for(int id: lInts) {
       func(id);
     }
   }
 
   inline void AndNetwork::ForEachIntReverse(std::function<void(int)> const &func) const {
-    for(critr it = lsInts.rbegin(); it != lsInts.rend(); it++) {
+    for(critr it = lInts.rbegin(); it != lInts.rend(); it++) {
       func(*it);
     }
   }
@@ -446,11 +446,11 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
-    citr it = std::find(lsInts.begin(), lsInts.end(), id);
-    assert(it != lsInts.end());
+    citr it = std::find(lInts.begin(), lInts.end(), id);
+    assert(it != lInts.end());
     it++;
     int nRefs = vRefs[id];
-    for(; nRefs != 0 && it != lsInts.end(); it++) {
+    for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
         func(*it, GetCompl(*it, idx));
@@ -475,11 +475,11 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
-    citr it = std::find(lsInts.begin(), lsInts.end(), id);
-    assert(it != lsInts.end());
+    citr it = std::find(lInts.begin(), lInts.end(), id);
+    assert(it != lInts.end());
     it++;
     int nRefs = vRefs[id];
-    for(; nRefs != 0 && it != lsInts.end(); it++) {
+    for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
         func(*it, GetCompl(*it, idx), idx);
@@ -507,10 +507,10 @@ namespace rrr {
     }
     StartTraversal();
     vTrav[id] = iTrav;
-    citr it = std::find(lsInts.begin(), lsInts.end(), id);
-    assert(it != lsInts.end());
+    citr it = std::find(lInts.begin(), lInts.end(), id);
+    assert(it != lInts.end());
     it++;
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
         if(vTrav[Edge2Node(fi_edge)] == iTrav) {
           func(*it);
@@ -537,10 +537,10 @@ namespace rrr {
     }
     StartTraversal();
     vTrav[id] = iTrav;
-    citr it = std::find(lsInts.begin(), lsInts.end(), id);
-    assert(it != lsInts.end());
+    citr it = std::find(lInts.begin(), lInts.end(), id);
+    assert(it != lInts.end());
     it++;
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
         if(vTrav[Edge2Node(fi_edge)] == iTrav) {
           vTrav[*it] = iTrav;
@@ -566,7 +566,7 @@ namespace rrr {
         }
       }
     }
-    for(critr it = lsInts.rbegin(); *it != id; it++) {
+    for(critr it = lInts.rbegin(); *it != id; it++) {
       assert(vTrav[*it] <= iTravTfo); // make sure func does not touch vTrav of preceding nodes
       if(vTrav[*it] == iTravTfo) {
         func(*it);
@@ -581,10 +581,10 @@ namespace rrr {
     }
     StartTraversal();
     vTrav[id] = iTrav;
-    citr it = std::find(lsInts.begin(), lsInts.end(), id);
-    assert(it != lsInts.end());
+    citr it = std::find(lInts.begin(), lInts.end(), id);
+    assert(it != lInts.end());
     it++;
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       for(int fi_edge: vvFaninEdges[*it]) {
         if(vTrav[Edge2Node(fi_edge)] == iTrav) {
           if(func(*it)) {
@@ -613,11 +613,11 @@ namespace rrr {
     for(int id: ids) {
       vTrav[id] = iTrav;
     }
-    citr it = lsInts.begin();
-    while(vTrav[*it] != iTrav && it != lsInts.end()) {
+    citr it = lInts.begin();
+    while(vTrav[*it] != iTrav && it != lInts.end()) {
       it++;
     }
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       if(vTrav[*it] == iTrav) {
         func(*it);
       } else {
@@ -648,11 +648,11 @@ namespace rrr {
     for(int id: ids) {
       vTrav[id] = iTrav;
     }
-    citr it = lsInts.begin();
-    while(vTrav[*it] != iTrav && it != lsInts.end()) {
+    citr it = lInts.begin();
+    while(vTrav[*it] != iTrav && it != lInts.end()) {
       it++;
     }
-    for(; it != lsInts.end(); it++) {
+    for(; it != lInts.end(); it++) {
       if(vTrav[*it] == iTrav) {
         if(!func(*it)) {
           vTrav[*it] = 0;
@@ -712,8 +712,8 @@ namespace rrr {
       vRefs[fi]--;
     });
     vvFaninEdges[id].clear();
-    itr it = std::find(lsInts.begin(), lsInts.end(), id);
-    lsInts.erase(it);
+    itr it = std::find(lInts.begin(), lInts.end(), id);
+    lInts.erase(it);
     sInts.erase(id);
     TakenAction(action);
     if(fRecursive) {
@@ -771,8 +771,8 @@ namespace rrr {
     vRefs[fi]--;
     vvFaninEdges[id].clear();
     if(!fPropagating) {
-      itr it = std::find(lsInts.begin(), lsInts.end(), id);
-      lsInts.erase(it);
+      itr it = std::find(lInts.begin(), lInts.end(), id);
+      lInts.erase(it);
     }
     sInts.erase(id);
     TakenAction(action);
@@ -812,8 +812,8 @@ namespace rrr {
     });
     vvFaninEdges[id].clear();
     if(!fPropagating) {
-      itr it = std::find(lsInts.begin(), lsInts.end(), id);
-      lsInts.erase(it);
+      itr it = std::find(lInts.begin(), lInts.end(), id);
+      lInts.erase(it);
     }
     sInts.erase(id);
     TakenAction(action);
@@ -828,11 +828,11 @@ namespace rrr {
     action.idx = vvFaninEdges[id].size();
     action.fi = fi;
     action.c = c;
-    itr it = std::find(lsInts.begin(), lsInts.end(), id);
-    itr it2 = std::find(it, lsInts.end(), fi);
-    if(it2 != lsInts.end()) {
-      lsInts.erase(it2);
-      it2 = lsInts.insert(it, fi);
+    itr it = std::find(lInts.begin(), lInts.end(), id);
+    itr it2 = std::find(it, lInts.end(), fi);
+    if(it2 != lInts.end()) {
+      lInts.erase(it2);
+      it2 = lInts.insert(it, fi);
       SortInts(it2);
     }
     vRefs[fi]++;
@@ -861,7 +861,7 @@ namespace rrr {
         // remove collapsed fanin
         vRefs[fi] = 0;
         vvFaninEdges[fi].clear();
-        lsInts.erase(std::find(lsInts.begin(), lsInts.end(), fi));
+        lInts.erase(std::find(lInts.begin(), lInts.end(), fi));
         sInts.erase(fi);
         TakenAction(action);
       } else {
@@ -888,8 +888,8 @@ namespace rrr {
       action.vFanins.push_back(Edge2Node(fi_edge1));
       vvFaninEdges[id].push_back(Node2Edge(new_fi, false));
       vRefs[new_fi]++;
-      itr it = std::find(lsInts.begin(), lsInts.end(), id);
-      lsInts.insert(it, new_fi);
+      itr it = std::find(lInts.begin(), lInts.end(), id);
+      lInts.insert(it, new_fi);
       sInts.insert(new_fi);
       TakenAction(action);
     }
@@ -908,23 +908,23 @@ namespace rrr {
           vTrav[id] = iTrav;
         }
       });
-      it = lsInts.begin();
-      while(vTrav[*it] != iTrav && it != lsInts.end()) {
+      it = lInts.begin();
+      while(vTrav[*it] != iTrav && it != lInts.end()) {
         it++;
       }
     } else {
       vTrav[id] = iTrav;
-      it = std::find(lsInts.begin(), lsInts.end(), id);
+      it = std::find(lInts.begin(), lInts.end(), id);
     }
     fPropagating = true;
-    while(it != lsInts.end()) {
+    while(it != lInts.end()) {
       if(vTrav[*it] == iTrav) {
         if(GetNumFanins(*it) == 1) {
           RemoveBuffer(*it);
         } else {
           RemoveConst(*it);
         }
-        it = lsInts.erase(it);
+        it = lInts.erase(it);
       } else {
         it++;
       }
@@ -937,10 +937,10 @@ namespace rrr {
     if(fPropagate) {
       Propagate();
     }
-    for(ritr it = lsInts.rbegin(); it != lsInts.rend();) {
+    for(ritr it = lInts.rbegin(); it != lInts.rend();) {
       if(vRefs[*it] == 0) {
         RemoveUnused(*it);
-        it = ritr(lsInts.erase(--it.base()));
+        it = ritr(lInts.erase(--it.base()));
       } else {
         it++;
       }

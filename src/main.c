@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "RWTSOAabcvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "RWTSOAPQabcvh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -50,6 +50,14 @@ int main(int argc, char **argv) {
           break;
       case 'A':
           nAnalyzerVerbose = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'P':
+          nSimulatorVerbose = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'Q':
+          nSatSolverVerbose = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
       case 'a':

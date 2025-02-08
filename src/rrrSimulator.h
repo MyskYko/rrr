@@ -2,11 +2,11 @@
 
 #include <iostream>
 #include <iomanip>
-#include <bitset>
 #include <vector>
 #include <set>
 #include <algorithm>
 #include <random>
+#include <bitset>
 
 #include "rrrParameter.h"
 #include "rrrTypes.h"
@@ -22,28 +22,36 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
 
+    // pointer to network
+    Ntk *pNtk;
+    
     // parameters
     int nVerbose;
-
-    Ntk *pNtk;
     int nWords;
-    int target;
+
+    // data
+    int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
-    std::vector<word> care;
+    std::vector<word> care; // careset
     std::vector<word> tmp;
 
+    // partial cex
     int iPivot;
-    std::vector<word> vAssignedVectors;
+    std::vector<word> vAssignedStimuli;
 
+    // updates
     bool fUpdate;
-    std::set<int> stUpdates;
+    std::set<int> sUpdates;
 
+    // backups
     std::vector<Simulator> vBackups;
 
+    // statistics
     int nAdds;
     int nResets;
-
+    
+    // vector computations
     void Clear(int n, itr x) const;
     void Fill(int n, itr x) const;
     void Copy(int n, itr dst, citr src, bool c) const;
@@ -53,34 +61,44 @@ namespace rrr {
     bool IsEq(int n, citr x, citr y) const;
     void Print(int n, citr x) const;
 
+    // callback
     void ActionCallback(Action const &action);
 
+    // simulation
     void SimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     bool ResimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     void SimulateOneWordNode(std::vector<word> &v, int id, int offset, int to_negate = -1);
     void Simulate();
     void Resimulate();
     void SimulateOneWord(int offset);
-    void SetRandomVectors();
-    void SetTarget(int id);
 
+    // generate stimuli
+    void GenerateRandomStimuli();
+
+    // careset computation
+    void ComputeCare(int id);
+
+    // save & load
     void Save(int slot);
     void Load(int slot);
 
   public:
+    // constructors
     Simulator();
     Simulator(Ntk *pNtk, Parameter const *pPar);
     ~Simulator();
     void UpdateNetwork(Ntk *pNtk_);
 
+    // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
 
+    // cex
     void AddCex(std::vector<VarValue> const &vCex);
   };
 
 
-  /* {{{ Compute vectors */
+  /* {{{ Vector computations */
   
   template <typename Ntk>
   inline void Simulator<Ntk>::Clear(int n, itr x) const {
@@ -165,15 +183,16 @@ namespace rrr {
 
   template <typename Ntk>
   inline void Simulator<Ntk>::Print(int n, citr x) const {
-    for(int i = 0; i < n; i++, x++) {
-      //std::cout << std::setfill('0') << std::setw(16) << std::hex << *x;
-      std::cout << std::bitset<64>(*x);
+    std::cout << std::bitset<64>(*x);
+    x++;
+    for(int i = 1; i < n; i++, x++) {
+      std::cout << std::endl << "          " << std::bitset<64>(*x);
     }
   }
   
-  /* }}} Compute vectors end */
+  /* }}} */
 
-  /* {{{ Create action handler */
+  /* {{{ Callback */
   
   template <typename Ntk>
   void Simulator<Ntk>::ActionCallback(Action const &action) {
@@ -185,7 +204,7 @@ namespace rrr {
       if(action.id == target) {
         fUpdate = true;
       } else {
-        stUpdates.insert(action.id);
+        sUpdates.insert(action.id);
       }
       break;
     case REMOVE_UNUSED:
@@ -195,16 +214,16 @@ namespace rrr {
       if(action.id == target) {
         if(fUpdate) {
           for(int fo: action.vFanouts) {
-            stUpdates.insert(fo);
+            sUpdates.insert(fo);
           }
           fUpdate = false;
         }
         target = -1;
       } else {
-        if(stUpdates.count(action.id)) {
-          stUpdates.erase(action.id);
+        if(sUpdates.count(action.id)) {
+          sUpdates.erase(action.id);
           for(int fo: action.vFanouts) {
-            stUpdates.insert(fo);
+            sUpdates.insert(fo);
           }
         }
       }
@@ -213,7 +232,7 @@ namespace rrr {
       if(action.id == target) {
         fUpdate = true;
       } else {
-        stUpdates.insert(action.id);
+        sUpdates.insert(action.id);
       }
       break;
     case TRIVIAL_COLLAPSE:
@@ -236,9 +255,9 @@ namespace rrr {
     }
   }
   
-  /* }}} Create action handler end */
+  /* }}} */
 
-  /* {{{ Perform simulation */
+  /* {{{ Simulation */
   
   template <typename Ntk>
   void Simulator<Ntk>::SimulateNode(std::vector<word> &v, int id, int to_negate) {
@@ -325,6 +344,9 @@ namespace rrr {
   
   template <typename Ntk>
   void Simulator<Ntk>::Simulate() {
+    if(nVerbose) {
+      std::cout << "simulating" << std::endl;
+    }
     pNtk->ForEachInt([&](int id) {
       SimulateNode(vValues, id);
       if(nVerbose) {
@@ -337,7 +359,10 @@ namespace rrr {
   
   template <typename Ntk>
   void Simulator<Ntk>::Resimulate() {
-    pNtk->ForEachTfosUpdate(stUpdates, false, [&](int fo) {
+    if(nVerbose) {
+      std::cout << "resimulating" << std::endl;
+    }
+    pNtk->ForEachTfosUpdate(sUpdates, false, [&](int fo) {
       bool fUpdated = ResimulateNode(vValues, fo);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
@@ -347,7 +372,7 @@ namespace rrr {
       return fUpdated;
     });
     /* alternative version that updates entire TFO
-    pNtk->ForEachTfos(stUpdates, false, [&](int fo) {
+    pNtk->ForEachTfos(sUpdates, false, [&](int fo) {
       SimulateNode(vValues, fo);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
@@ -360,6 +385,9 @@ namespace rrr {
 
   template <typename Ntk>
   void Simulator<Ntk>::SimulateOneWord(int offset) {
+    if(nVerbose) {
+      std::cout << "simulating word " << offset << std::endl;
+    }
     pNtk->ForEachInt([&](int id) {
       SimulateOneWordNode(vValues, id, offset);
       if(nVerbose) {
@@ -370,8 +398,15 @@ namespace rrr {
     });
   }
 
+  /* }}} */
+
+  /* {{{ Generate stimuli */
+
   template <typename Ntk>
-  void Simulator<Ntk>::SetRandomVectors() {
+  void Simulator<Ntk>::GenerateRandomStimuli() {
+    if(nVerbose) {
+      std::cout << "generating random stimuli" << std::endl;
+    }
     std::mt19937_64 rng;
     pNtk->ForEachPi([&](int id) {
       for(int i = 0; i < nWords; i++) {
@@ -383,25 +418,29 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
-    Clear(nWords * pNtk->GetNumPis(), vAssignedVectors.begin());
+    Clear(nWords * pNtk->GetNumPis(), vAssignedStimuli.begin());
   }
+
+  /* }}} */
+
+  /* {{{ Careset computation */
   
   template <typename Ntk>
-  void Simulator<Ntk>::SetTarget(int id) {
-    if(stUpdates.empty() && id == target) {
+  void Simulator<Ntk>::ComputeCare(int id) {
+    if(sUpdates.empty() && id == target) {
       return;
     }
     if(fUpdate) {
-      stUpdates.insert(target);
+      sUpdates.insert(target);
       fUpdate = false;
     }
-    if(!stUpdates.empty()) {
+    if(!sUpdates.empty()) {
       Resimulate();
-      stUpdates.clear();
+      sUpdates.clear();
     }
     target = id;
     if(nVerbose) {
-      std::cout << "computing care of " << target << std::endl;
+      std::cout << "computing careset of " << target << std::endl;
     }
     if(pNtk->IsPoDriver(target)) {
       Fill(nWords, care.begin());
@@ -446,7 +485,7 @@ namespace rrr {
     }
   }
   
-  /* }}} Perform simulation end */
+  /* }}} */
 
   /* {{{ Save & load */
 
@@ -456,7 +495,7 @@ namespace rrr {
       vBackups.resize(slot + 1);
     }
     vBackups[slot].nWords = nWords;
-    if(stUpdates.empty()) {
+    if(sUpdates.empty()) {
       vBackups[slot].target = target;
       vBackups[slot].care = care;
     } else {
@@ -464,17 +503,17 @@ namespace rrr {
       vBackups[slot].care = care;
     }
     if(fUpdate) {
-      stUpdates.insert(target);
+      sUpdates.insert(target);
       fUpdate = false;
     }
-    if(!stUpdates.empty()) {
+    if(!sUpdates.empty()) {
       Resimulate();
-      stUpdates.clear();
+      sUpdates.clear();
     }
     vBackups[slot].vValues = vValues;
     vBackups[slot].iPivot = iPivot;
-    vBackups[slot].vAssignedVectors = vAssignedVectors;
-    target = vBackups[slot].target; // assigned to -1 when care needs updating
+    vBackups[slot].vAssignedStimuli = vAssignedStimuli;
+    target = vBackups[slot].target; // assigned to -1 when careset needs updating
   }
 
   template <typename Ntk>
@@ -485,19 +524,20 @@ namespace rrr {
     vValues = vBackups[slot].vValues;
     care    = vBackups[slot].care;
     iPivot  = vBackups[slot].iPivot;
-    vAssignedVectors = vBackups[slot].vAssignedVectors;
+    vAssignedStimuli = vBackups[slot].vAssignedStimuli;
     fUpdate = false;
-    stUpdates.clear();
+    sUpdates.clear();
     tmp.resize(nWords);
   }
   
-  /* }}} Save & load end */
+  /* }}} */
   
-  /* {{{ Constructor */
+  /* {{{ Constructors */
   
   template <typename Ntk>
   Simulator<Ntk>::Simulator() :
     pNtk(NULL),
+    nVerbose(0),
     nWords(0),
     target(-1),
     iPivot(0),
@@ -509,6 +549,7 @@ namespace rrr {
   template <typename Ntk>
   Simulator<Ntk>::Simulator(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
+    nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
     target(-1),
     iPivot(0),
@@ -519,8 +560,8 @@ namespace rrr {
     vValues.resize(nWords * pNtk->GetNumNodes());
     care.resize(nWords);
     tmp.resize(nWords);
-    vAssignedVectors.resize(nWords * pNtk->GetNumPis());
-    SetRandomVectors();
+    vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
+    GenerateRandomStimuli();
     Simulate();
   }
 
@@ -537,13 +578,13 @@ namespace rrr {
     assert(0);
   }
 
-  /* }}} Constructor end */
+  /* }}} */
 
-  /* {{{ Perform checks */
+  /* {{{ Checks */
   
   template <typename Ntk>
   bool Simulator<Ntk>::CheckRedundancy(int id, int idx) {
-    SetTarget(id);
+    ComputeCare(id);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       itr x = vValues.end();
@@ -580,7 +621,7 @@ namespace rrr {
 
   template <typename Ntk>
   bool Simulator<Ntk>::CheckFeasibility(int id, int fi, bool c) {
-    SetTarget(id);
+    ComputeCare(id);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       itr x = vValues.end();
@@ -623,7 +664,7 @@ namespace rrr {
       }
       std::cout << std::endl;
     }
-    // recored care pi indices
+    // record care pi indices
     assert((int)vCex.size() == pNtk->GetNumPis());
     std::vector<int> vCarePiIdxs;
     for(int idx = 0; idx < pNtk->GetNumPis(); idx++) {
@@ -655,7 +696,7 @@ namespace rrr {
           c = true;
         }
         itr x = vValues.begin() + id * nWords + iWord;
-        itr y = vAssignedVectors.begin() + idx * nWords + iWord;
+        itr y = vAssignedStimuli.begin() + idx * nWords + iWord;
         And(1, tmp.begin(), x, y, !c, false);
         And(1, it, it, tmp.begin(), false, true);
         if(IsZero(1, it)) {
@@ -675,18 +716,18 @@ namespace rrr {
         iBit++;
       }
       if(nVerbose) {
-        std::cout << "fusing word " << iWord << ", bit " << iBit << std::endl;
+        std::cout << "fusing into stimulus word " << iWord << " bit " << iBit << std::endl;
       }
     } else {
       // no bits are compatible, so reset at pivot
       iWord = iPivot / 64;
       iBit = iPivot % 64;
       if(nVerbose) {
-        std::cout << "resetting word " << iWord << ", bit " << iBit << std::endl;
+        std::cout << "resetting stimulus word " << iWord << " bit " << iBit << std::endl;
       }
       word mask = 1ull << iBit;
       for(int idx = 0; idx < pNtk->GetNumPis(); idx++) {
-        vAssignedVectors[idx * nWords + iWord] &= ~mask;
+        vAssignedStimuli[idx * nWords + iWord] &= ~mask;
       }
       iPivot++;
       if(iPivot == 64 * nWords) {
@@ -694,7 +735,7 @@ namespace rrr {
       }
       nResets++;
     }
-    // update vector
+    // update stimulus
     for(int idx: vCarePiIdxs) {
       int id = pNtk->GetPi(idx);
       word mask = 1ull << iBit;
@@ -704,20 +745,23 @@ namespace rrr {
         assert(vCex[idx] == FALSE);
         vValues[id * nWords + iWord] &= ~mask;
       }
-      vAssignedVectors[idx * nWords + iWord] |= mask;
+      vAssignedStimuli[idx * nWords + iWord] |= mask;
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(1, vValues.begin() + id * nWords + iWord);
         std::cout << std::endl;
         std::cout << "asgn " << std::setw(3) << id << ": ";
-        Print(1, vAssignedVectors.begin() + idx * nWords + iWord);
+        Print(1, vAssignedStimuli.begin() + idx * nWords + iWord);
         std::cout << std::endl;
       }
     }
     // simulate
     SimulateOneWord(iWord);
-    // update care with new vector
+    // recompute care with new stimulus
     if(target != -1 && !pNtk->IsPoDriver(target)) {
+      if(nVerbose) {
+        std::cout << "recomputing careset of " << target << std::endl;
+      }
       pNtk->ForEachPi([&](int id) {
         vValues2[id * nWords + iWord] = vValues[id * nWords + iWord];
       });

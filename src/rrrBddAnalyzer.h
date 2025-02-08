@@ -18,8 +18,8 @@ namespace rrr {
     static constexpr lit LitMax = 0xffffffff;
     static const bool fResim = false;
 
-    int nVerbose;
     Ntk *pNtk;
+    int nVerbose;
     NewBdd::Man *pBdd;
     int target;
     
@@ -435,16 +435,16 @@ namespace rrr {
 
   template <typename Ntk>
   BddAnalyzer<Ntk>::BddAnalyzer() :
-    nVerbose(0),
     pNtk(NULL),
+    nVerbose(0),
     pBdd(NULL),
     target(-1) {
   }
   
   template <typename Ntk>
   BddAnalyzer<Ntk>::BddAnalyzer(Ntk *pNtk, Parameter const *pPar) :
-    nVerbose(pPar->nAnalyzerVerbose),
     pNtk(pNtk),
+    nVerbose(pPar->nAnalyzerVerbose),
     target(-1) {
     NewBdd::Param Par;
     Par.nObjsMaxLog = 25;

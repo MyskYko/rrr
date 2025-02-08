@@ -17,8 +17,8 @@ namespace rrr {
     using lit = int;
     static constexpr lit LitMax = 0xffffffff;
 
-    int nVerbose;
     Ntk *pNtk;
+    int nVerbose;
     NewBdd::Man *pBdd;
     
     std::vector<lit> vFs;
@@ -571,15 +571,15 @@ namespace rrr {
 
   template <typename Ntk>
   BddMspfAnalyzer<Ntk>::BddMspfAnalyzer() :
-    nVerbose(0),
     pNtk(NULL),
+    nVerbose(0),
     pBdd(NULL) {
   }
   
   template <typename Ntk>
   BddMspfAnalyzer<Ntk>::BddMspfAnalyzer(Ntk *pNtk, Parameter const *pPar) :
-    nVerbose(pPar->nAnalyzerVerbose),
     pNtk(pNtk),
+    nVerbose(pPar->nAnalyzerVerbose),
     fUpdate(false) {
     NewBdd::Param Par;
     Par.nObjsMaxLog = 25;

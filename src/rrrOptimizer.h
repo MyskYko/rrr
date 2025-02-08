@@ -6,8 +6,8 @@
 #include <random>
 #include <numeric>
 
-#include "rrrTypes.h"
 #include "rrrParameter.h"
+#include "rrrTypes.h"
 
 namespace rrr {
 

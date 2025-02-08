@@ -9,11 +9,11 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename Sol>
   class Analyzer {
   private:
-    // parameters
-    bool nVerbose;
-
     // pointer to network
     Ntk *pNtk;
+
+    // parameters
+    bool nVerbose;
 
     // data
     Sim sim;
@@ -33,8 +33,8 @@ namespace rrr {
   
   template <typename Ntk, typename Sim, typename Sol>
   Analyzer<Ntk, Sim, Sol>::Analyzer(Ntk *pNtk, Parameter const *pPar) :
-    nVerbose(pPar->nAnalyzerVerbose),
     pNtk(pNtk),
+    nVerbose(pPar->nAnalyzerVerbose),
     sim(pNtk, pPar),
     sol(pNtk, pPar) {
   }

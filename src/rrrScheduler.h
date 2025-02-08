@@ -3,8 +3,8 @@
 #include <iostream>
 #include <iomanip>
 
-#include "rrrTypes.h"
 #include "rrrParameter.h"
+#include "rrrTypes.h"
 
 namespace rrr {
 

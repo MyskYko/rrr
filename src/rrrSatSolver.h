@@ -12,9 +12,9 @@ namespace rrr {
   template <typename Ntk>
   class SatSolver {
   private:
-    static const bool fVerbose = false;
-    
     Ntk *pNtk;
+    
+    int nVerbose;
     sat_solver *pSat;
     int status;
     int target;
@@ -109,7 +109,7 @@ namespace rrr {
         cy = c ^ (fi == to_negate);
       } else {
         int z = sat_solver_addvar(p);
-        if(fVerbose) {
+        if(nVerbose) {
           std::cout << z << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
         }
         RetValue = sat_solver_add_and(p, z, x, y, cx, cy, 0);
@@ -121,19 +121,19 @@ namespace rrr {
       }
     });
     if(x == -1) {
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << v[id] << " = !0" << std::endl;
       }
       RetValue = sat_solver_add_const(p, v[id], 0);
       assert(RetValue);
     } else if(y == -1) {
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << v[id] << " = " << (cx? "!": "") << x << std::endl;
       }
       RetValue = sat_solver_add_buffer(p, v[id], x, cx);
       assert(RetValue);
     } else {
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << v[id] << " = " << (cx? "!": "") << x << " & " << (cy? "!": "") << y << std::endl;
       }
       RetValue = sat_solver_add_and(p, v[id], x, y, cx, cy, 0);
@@ -183,7 +183,7 @@ namespace rrr {
       assert(fi != id);
       if(v[fi] != vLits[idx]) {
         int x = sat_solver_addvar(p);
-        if(fVerbose) {
+        if(nVerbose) {
           std::cout << x << " = " << v[fi] << " ^ " << vLits[idx] << std::endl;
         }
         RetValue = sat_solver_add_xor(p, x, v[fi], vLits[idx], 0);
@@ -195,7 +195,7 @@ namespace rrr {
     });
     vLits.resize(n);
     // assign or of xors to 1
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "(";
       std::string delim = "";
       for(int iLit: vLits) {
@@ -229,6 +229,7 @@ namespace rrr {
   template <typename Ntk>
   SatSolver<Ntk>::SatSolver(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
+    nVerbose(pPar->nSatSolverVerbose),
     pSat(sat_solver_new()),
     status(0),
     target(-1),
@@ -259,7 +260,7 @@ namespace rrr {
   bool SatSolver<Ntk>::CheckRedundancy(int id, int idx) {
     SetTarget(id);
     if(!status) {
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "trivially UNSAT" << std::endl;
       }
       return true;
@@ -273,7 +274,7 @@ namespace rrr {
         vLits.push_back(toLitCond(vVars[fi], c));
       }
     });
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "assumption: ";
       std::string delim = "";
       for(int iLit: vLits) {
@@ -319,7 +320,7 @@ namespace rrr {
   bool SatSolver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     SetTarget(id);
     if(!status) {
-      if(fVerbose) {
+      if(nVerbose) {
         std::cout << "trivially UNSAT" << std::endl;
       }
       return true;
@@ -328,7 +329,7 @@ namespace rrr {
     assert(pNtk->GetNodeType(id) == AND);
     vLits.push_back(toLit(vVars[id]));
     vLits.push_back(toLitCond(vVars[fi], !c));
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "assumption: ";
       std::string delim = "";
       for(int iLit: vLits) {
@@ -376,7 +377,7 @@ namespace rrr {
 
   template <typename Ntk>
   std::vector<VarValue> SatSolver<Ntk>::GetCex() {
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "cex: ";
       pNtk->ForEachPi([&](int id) {
         std::cout << GetVarValueChar(vValues[id]);
@@ -432,7 +433,7 @@ namespace rrr {
         assert(0);
       }
     });
-    if(fVerbose) {
+    if(nVerbose) {
       std::cout << "pex: ";
       pNtk->ForEachPi([&](int id) {
         std::cout << GetVarValueChar(vValues[id]);
