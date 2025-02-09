@@ -17,7 +17,6 @@ namespace rrr {
 
   template <typename Ntk>
   void Perform(Ntk *pNtk, Parameter const *pPar) {
-    // TODO: make pPar const
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     if(pPar->fUseBddCspf) {
       Scheduler<Ntk, rrr::Optimizer<Ntk, rrr::BddAnalyzer<Ntk>>> sch(pNtk, pPar);
