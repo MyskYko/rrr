@@ -57,7 +57,6 @@ namespace rrr {
     std::vector<VarValue> GetCex();
   };
 
-
   /* {{{ Callback */
 
   template <typename Ntk>
@@ -281,6 +280,7 @@ namespace rrr {
     status = false;
     target = -1;
     fUpdate = false;
+    pNtk->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   /* }}} */

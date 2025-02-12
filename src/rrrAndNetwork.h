@@ -61,15 +61,19 @@ namespace rrr {
 
   public:
     // constructors
-    AndNetwork(int nReserve = 1);
+    AndNetwork();
     AndNetwork(AndNetwork const &x);
     AndNetwork &operator=(AndNetwork const &x);
 
     // initialization APIs (should not be called after optimization has started)
+    void Clear();
+    void Reserve(int nReserve);
     int  AddPi();
     int  AddPo(int id, bool c);
     int  AddAnd(int id0, int id1, bool c0, bool c1);
-    
+    template <typename Ntk>
+    void Read(Ntk *pFrom, std::function<void(Ntk *, AndNetwork *)> const &Reader);
+
     // network properties
     bool UseComplementedEdges() const;
     int  GetNumNodes() const; // number of allocated nodes (max id + 1)
@@ -185,24 +189,24 @@ namespace rrr {
 
   /* {{{ Constructors */
 
-  AndNetwork::AndNetwork(int nReserve) :
+  AndNetwork::AndNetwork() :
     nNodes(0),
     fLockTrav(false),
     iTrav(0),
     fPropagating(false) {
-    vvFaninEdges.reserve(nReserve);
-    vRefs.reserve(nReserve);
-    // add const-0 node
+    // add constant node
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
-    assert(nNodes != std::numeric_limits<int>::max());
     nNodes++;
   }
 
-  AndNetwork::AndNetwork(AndNetwork const &x) {
+  AndNetwork::AndNetwork(AndNetwork const &x) :
+    fLockTrav(false),
+    iTrav(0),
+    fPropagating(false) {
     nNodes       = x.nNodes;
     vPis         = x.vPis;
-    lInts       = x.lInts;
+    lInts        = x.lInts;
     sInts        = x.sInts;
     vPos         = x.vPos;
     vvFaninEdges = x.vvFaninEdges;
@@ -212,7 +216,7 @@ namespace rrr {
   AndNetwork &AndNetwork::operator=(AndNetwork const &x) {
     nNodes       = x.nNodes;
     vPis         = x.vPis;
-    lInts       = x.lInts;
+    lInts        = x.lInts;
     sInts        = x.sInts;
     vPos         = x.vPos;
     vvFaninEdges = x.vvFaninEdges;
@@ -224,6 +228,31 @@ namespace rrr {
 
   /* {{{ Initialization APIs */
 
+  void AndNetwork::Clear() {
+    nNodes = 0;
+    vPis.clear();
+    lInts.clear();
+    sInts.clear();
+    vPos.clear();
+    vvFaninEdges.clear();
+    vRefs.clear();
+    fLockTrav = false;
+    iTrav = 0;
+    vTrav.clear();
+    fPropagating = false;
+    vCallbacks.clear();
+    vBackups.clear();
+    // add constant node
+    vvFaninEdges.emplace_back();
+    vRefs.push_back(0);
+    nNodes++;
+  }
+
+  void AndNetwork::Reserve(int nReserve) {
+    vvFaninEdges.reserve(nReserve);
+    vRefs.reserve(nReserve);
+  }
+  
   inline int AndNetwork::AddPi() {
     vPis.push_back(nNodes);
     vvFaninEdges.emplace_back();
@@ -256,6 +285,12 @@ namespace rrr {
     return nNodes++;
   }
 
+  template <typename Ntk>
+  void AndNetwork::Read(Ntk *pFrom, std::function<void(Ntk *, AndNetwork *)> const &Reader) {
+    Clear();
+    Reader(pFrom, this);
+  }
+  
   /* }}} */
   
   /* {{{ Network properties */

@@ -6,6 +6,8 @@
 #include "rrrParameter.h"
 #include "rrrTypes.h"
 
+#include "rrrAbc.h"
+
 namespace rrr {
 
   template <typename Ntk, typename Opt>
@@ -46,6 +48,17 @@ namespace rrr {
     //pNtk->Print();
     time_point start = GetCurrentTime();
     Opt opt(pNtk, &Par);
+    opt.Run(Par.nTimeout);
+    // create gia
+    Gia_Man_t *pGia = CreateGia(pNtk);
+    // call abc
+    Gia_Man_t *pNew = Abc9Execute(pGia, "&dc2");
+    Gia_ManStop(pGia);
+    // create network
+    pNtk->Read(pNew, GiaReader<Ntk>);
+    Gia_ManStop(pNew);
+    pNtk->Print();
+    opt.UpdateNetwork(pNtk);
     opt.Run(Par.nTimeout);
     time_point end = GetCurrentTime();
     double elapsed_seconds = Duration(start, end);

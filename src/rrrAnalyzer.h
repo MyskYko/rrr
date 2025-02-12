@@ -42,8 +42,8 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename Sol>
   void Analyzer<Ntk, Sim, Sol>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
-    sim->UpdateNetwork(pNtk);
-    sol->UpdateNetwork(pNtk);
+    sim.UpdateNetwork(pNtk);
+    sol.UpdateNetwork(pNtk);
   }
 
   /* }}} */

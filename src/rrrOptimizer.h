@@ -802,6 +802,7 @@ namespace rrr {
   void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
     target = -1;
+    pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     pAna->UpdateNetwork(pNtk);
   }
   

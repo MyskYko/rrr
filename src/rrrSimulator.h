@@ -577,6 +577,7 @@ namespace rrr {
   template <typename Ntk>
   void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
+    pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
     vValues.resize(nWords * pNtk->GetNumNodes());
     target = -1;
     care.resize(nWords);
