@@ -116,10 +116,10 @@ namespace rrr {
     void ForEachTfo(int id, bool fPos, std::function<void(int)> const &func);
     void ForEachTfoReverse(int id, bool fPos, std::function<void(int)> const &func);
     void ForEachTfoUpdate(int id, bool fPos, std::function<bool(int)> const &func);
-    template <template <typename> typename Container>
-    void ForEachTfos(Container<int> const &ids, bool fPos, std::function<void(int)> const &func);
-    template <template <typename> typename Container>
-    void ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func);
+    template <template <typename...> typename Container, typename ... Ts>
+    void ForEachTfos(Container<Ts...> const &ids, bool fPos, std::function<void(int)> const &func);
+    template <template <typename...> typename Container, typename ... Ts>
+    void ForEachTfosUpdate(Container<Ts...> const &ids, bool fPos, std::function<bool(int)> const &func);
 
     // Actions
     void RemoveFanin(int id, int idx);
@@ -269,7 +269,7 @@ namespace rrr {
     sInts.insert(nNodes);
     vRefs[id0]++;
     vRefs[id1]++;
-    vvFaninEdges.emplace_back((std::initializer_list<int>){Node2Edge(id0, c0), Node2Edge(id1, c1)});
+    vvFaninEdges.emplace_back(std::initializer_list<int>({Node2Edge(id0, c0), Node2Edge(id1, c1)}));
     vRefs.push_back(0);
     assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
@@ -279,7 +279,7 @@ namespace rrr {
     assert(id < nNodes);
     vPos.push_back(nNodes);
     vRefs[id]++;
-    vvFaninEdges.emplace_back((std::initializer_list<int>){Node2Edge(id, c)});
+    vvFaninEdges.emplace_back(std::initializer_list<int>({Node2Edge(id, c)}));
     vRefs.push_back(0);
     assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
@@ -683,8 +683,8 @@ namespace rrr {
     EndTraversal();
   }
 
-  template <template <typename> typename Container>
-  inline void AndNetwork::ForEachTfos(Container<int> const &ids, bool fPos, std::function<void(int)> const &func) {
+  template <template <typename...> typename Container, typename ... Ts>
+  inline void AndNetwork::ForEachTfos(Container<Ts...> const &ids, bool fPos, std::function<void(int)> const &func) {
     // this includes ids themselves
     StartTraversal();
     for(int id: ids) {
@@ -718,8 +718,8 @@ namespace rrr {
     EndTraversal();
   }
   
-  template <template <typename> typename Container>
-  inline void AndNetwork::ForEachTfosUpdate(Container<int> const &ids, bool fPos, std::function<bool(int)> const &func) {
+  template <template <typename...> typename Container, typename ... Ts>
+  inline void AndNetwork::ForEachTfosUpdate(Container<Ts...> const &ids, bool fPos, std::function<bool(int)> const &func) {
     // this includes ids themselves
     StartTraversal();
     for(int id: ids) {
