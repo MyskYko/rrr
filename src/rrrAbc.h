@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "aig/gia/gia.h"
 #include "base/main/main.h"
 #include "base/cmd/cmd.h"
@@ -55,19 +57,20 @@ namespace rrr {
     return pGia;  
   }
 
-  Gia_Man_t *Abc9Execute(Gia_Man_t *pGia, char const *Command) {
+  template <typename Ntk>
+  void Abc9Execute(Ntk *pNtk, std::string Command) {
     Abc_Frame_t *pAbc = Abc_FrameGetGlobalFrame();
-    Abc_FrameUpdateGia(pAbc, Gia_ManDup(pGia));
+    Abc_FrameUpdateGia(pAbc, CreateGia(pNtk));
     if(Abc_FrameIsBatchMode()) {
-      int r = Cmd_CommandExecute(pAbc, Command);
+      int r = Cmd_CommandExecute(pAbc, Command.c_str());
       assert(r == 0);
     } else {
       Abc_FrameSetBatchMode(1);
-      int r = Cmd_CommandExecute(pAbc, Command);
+      int r = Cmd_CommandExecute(pAbc, Command.c_str());
       assert(r == 0);
       Abc_FrameSetBatchMode(0);
     }
-    return Gia_ManDup(Abc_FrameReadGia(pAbc));
+    pNtk->Read(Abc_FrameReadGia(pAbc), GiaReader<Ntk>);
   }
 
 }

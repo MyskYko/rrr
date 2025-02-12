@@ -176,7 +176,7 @@ namespace rrr {
 
   /* }}} */
 
-  using seconds = uint64_t;
+  using seconds = int64_t;
   using clock_type = std::chrono::steady_clock;
   using time_point = std::chrono::time_point<clock_type>;
   
@@ -187,11 +187,15 @@ namespace rrr {
   }
 
   static inline seconds DurationInSeconds(time_point start, time_point end) {
-    return (std::chrono::duration_cast<std::chrono::seconds>(end - start)).count();
+    seconds t = (std::chrono::duration_cast<std::chrono::seconds>(end - start)).count();
+    assert(t >= 0);
+    return t;
   }
 
   static inline double Duration(time_point start, time_point end) {
-    return (std::chrono::duration<double>(end - start)).count();
+    double t = (std::chrono::duration<double>(end - start)).count();
+    assert(t >= 0);
+    return t;
   }
 
   /* }}} */

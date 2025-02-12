@@ -86,12 +86,14 @@ namespace rrr {
     
   public:
     // constructors
-    Optimizer(Ntk *pNtk, Parameter const *pPar);
+    Optimizer(Ntk *pNtk, Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
     ~Optimizer();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // run
     void Run(seconds nTimeout_ = 0);
+    void Randomize();
+    
   };
 
   /* {{{ Callback */
@@ -777,19 +779,13 @@ namespace rrr {
   /* {{{ Constructors */
   
   template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter const *pPar) :
+  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
     pNtk(pNtk),
     nVerbose(pPar->nOptimizerVerbose),
+    CostFunction(CostFunction),
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
     target(-1) {
-    CostFunction = [&](Ntk *pNtk) {
-      int nTwoInputSize = 0;
-      pNtk->ForEachInt([&](int id) {
-        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
-      });
-      return nTwoInputSize;
-    };
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     pAna = new Ana(pNtk, pPar);
     rng.seed(pPar->iSeed);
@@ -813,7 +809,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Run(uint64_t nTimeout_) {
+  void Optimizer<Ntk, Ana>::Run(seconds nTimeout_) {
     nTimeout = nTimeout_;
     start = GetCurrentTime();
     switch(nFlow) {
@@ -857,6 +853,13 @@ namespace rrr {
     }
   }
 
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::Randomize() {
+    nSortType = rng() % 18;
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+  }
+  
   /* }}} */
   
 }
