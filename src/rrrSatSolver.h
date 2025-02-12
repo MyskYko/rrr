@@ -47,7 +47,7 @@ namespace rrr {
     // constructors
     SatSolver(Ntk *pNtk, Parameter const *pPar);
     ~SatSolver();
-    void UpdateNetwork(Ntk *pNtk_);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame);
     
     // checks
     SatResult CheckRedundancy(int id, int idx);
@@ -275,7 +275,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void SatSolver<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+  void SatSolver<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
     status = false;
     target = -1;

@@ -87,7 +87,7 @@ namespace rrr {
     Simulator();
     Simulator(Ntk *pNtk, Parameter const *pPar);
     ~Simulator();
-    void UpdateNetwork(Ntk *pNtk_);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -575,19 +575,19 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+  void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
     pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
     vValues.resize(nWords * pNtk->GetNumNodes());
     target = -1;
-    care.resize(nWords);
-    tmp.resize(nWords);
     iPivot = 0;
-    vAssignedStimuli.clear();
-    vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
     fUpdate = false;
     sUpdates.clear();
-    GenerateRandomStimuli();
+    if(!fSame) { // reset stimuli if network function changed
+      vAssignedStimuli.clear();
+      vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
+      GenerateRandomStimuli();
+    }
     Simulate();
   }
 

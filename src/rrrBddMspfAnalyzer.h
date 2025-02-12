@@ -75,7 +75,7 @@ namespace rrr {
     BddMspfAnalyzer();
     BddMspfAnalyzer(Ntk *pNtk, Parameter const *pPar);
     ~BddMspfAnalyzer();
-    void UpdateNetwork(Ntk *pNtk_);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -615,7 +615,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddMspfAnalyzer<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+  void BddMspfAnalyzer<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     // clear
     while(!vBackups.empty()) {
       PopBack();
@@ -630,6 +630,7 @@ namespace rrr {
     vCUpdates.clear();
     vVisits.clear();
     // alloc
+    bool fUseReo = false;
     if(pBdd->GetNumVars() != pNtk->GetNumPis()) {
       // need to reset manager
       delete pBdd;
@@ -640,9 +641,11 @@ namespace rrr {
       Par.nGbc = 1;
       Par.nReo = 4000;
       pBdd = new NewBdd::Man(pNtk->GetNumPis(), Par);
-    } else {
-      // turning on reordering just in case; probably create a toggle option later
-      pBdd->TurnOnReo(4000);
+      fUseReo = true;
+    } else if(!fSame) {
+      // turning on reordering if network function changed
+      pBdd->TurnOnReo();
+      fUseReo = true;
     }
     Allocate();
     // prepare
@@ -656,8 +659,10 @@ namespace rrr {
       vUpdates[id] = true;
     });
     Simulate();
-    pBdd->Reorder();
-    pBdd->TurnOffReo();
+    if(fUseReo) {
+      pBdd->Reorder();
+      pBdd->TurnOffReo();
+    }
     pNtk->ForEachInt([&](int id) {
       vvCs[id].resize(pNtk->GetNumFanins(id), LitMax);
     });

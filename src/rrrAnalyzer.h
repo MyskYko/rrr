@@ -22,7 +22,7 @@ namespace rrr {
   public:
     // constructors
     Analyzer(Ntk *pNtk, Parameter const *pPar);
-    void UpdateNetwork(Ntk *pNtk_);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -40,10 +40,10 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Sim, typename Sol>
-  void Analyzer<Ntk, Sim, Sol>::UpdateNetwork(Ntk *pNtk_) {
+  void Analyzer<Ntk, Sim, Sol>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
-    sim.UpdateNetwork(pNtk);
-    sol.UpdateNetwork(pNtk);
+    sim.UpdateNetwork(pNtk, fSame);
+    sol.UpdateNetwork(pNtk, fSame);
   }
 
   /* }}} */

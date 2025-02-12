@@ -28,6 +28,7 @@ namespace rrr {
     int nVerbose;
     std::function<double(Ntk *)> CostFunction;
     int nSortType;
+    int nFlow;
     seconds nTimeout; // assigned upon Run
 
     // data
@@ -87,7 +88,7 @@ namespace rrr {
     // constructors
     Optimizer(Ntk *pNtk, Parameter const *pPar);
     ~Optimizer();
-    void UpdateNetwork(Ntk *pNtk_);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // run
     void Run(seconds nTimeout_ = 0);
@@ -780,6 +781,7 @@ namespace rrr {
     pNtk(pNtk),
     nVerbose(pPar->nOptimizerVerbose),
     nSortType(pPar->nSortType),
+    nFlow(pPar->nOptimizerFlow),
     target(-1) {
     CostFunction = [&](Ntk *pNtk) {
       int nTwoInputSize = 0;
@@ -799,11 +801,11 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_) {
+  void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
-    pAna->UpdateNetwork(pNtk);
+    pAna->UpdateNetwork(pNtk, fSame);
   }
   
   /* }}} */
@@ -814,16 +816,45 @@ namespace rrr {
   void Optimizer<Ntk, Ana>::Run(uint64_t nTimeout_) {
     nTimeout = nTimeout_;
     start = GetCurrentTime();
-    RemoveRedundancy();
-    ApplyReverseTopologically([&](int id) {
-      std::vector<int> vCands = pNtk->GetPisInts();
-      SingleResub(id, vCands);
-    });
-    ApplyReverseTopologically([&](int id) {
-      std::vector<int> vCands = pNtk->GetPisInts();
-      //std::vector<int> vCands = pNtk->GetInts();
-      MultiResub(id, vCands);
-    });
+    switch(nFlow) {
+    case 0:
+      RemoveRedundancy();
+      ApplyReverseTopologically([&](int id) {
+        std::vector<int> vCands = pNtk->GetPisInts();
+        SingleResub(id, vCands);
+      });
+      break;
+    case 1:
+      RemoveRedundancy();
+      ApplyReverseTopologically([&](int id) {
+        std::vector<int> vCands = pNtk->GetInts();
+        MultiResub(id, vCands);
+      });
+      break;
+    case 2: {
+      RemoveRedundancy();
+      double dCost = CostFunction(pNtk);
+      while(true) {
+        ApplyReverseTopologically([&](int id) {
+          std::vector<int> vCands = pNtk->GetPisInts();
+          SingleResub(id, vCands);
+        });
+        ApplyReverseTopologically([&](int id) {
+          std::vector<int> vCands = pNtk->GetInts();
+          MultiResub(id, vCands);
+        });
+        double dNewCost = CostFunction(pNtk);
+        if(dNewCost < dCost) {
+          dCost = dNewCost;
+        } else {
+          break;
+        }
+      }
+      break;
+    }
+    default:
+      assert(0);
+    }
   }
 
   /* }}} */

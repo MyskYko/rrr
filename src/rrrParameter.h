@@ -15,6 +15,8 @@ namespace rrr {
     bool fUseBddMspf = false;
     int nConflictLimit = 0;
     int nSortType = 0;
+    int nOptimizerFlow = 0;
+    int nSchedulerFlow = 0;
   };
   
 }
