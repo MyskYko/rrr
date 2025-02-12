@@ -89,6 +89,8 @@ namespace rrr {
     case TRIVIAL_DECOMPOSE:
       fUpdate = true;
       break;
+    case SORT_FANINS:
+      break;
     case SAVE:
       break;
     case LOAD:

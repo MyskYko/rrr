@@ -77,6 +77,7 @@ namespace rrr {
     ADD_FANIN,
     TRIVIAL_COLLAPSE,
     TRIVIAL_DECOMPOSE,
+    SORT_FANINS,
     SAVE,
     LOAD,
     POP_BACK
@@ -89,6 +90,7 @@ namespace rrr {
     int fi = -1;
     bool c = false;
     std::vector<int> vFanins;
+    std::vector<int> vIndices;
     std::vector<int> vFanouts;
   };
 
@@ -117,6 +119,9 @@ namespace rrr {
     case TRIVIAL_DECOMPOSE:
       std::cout << "trivial decompose";
       break;
+    case SORT_FANINS:
+      std::cout << "sort fanins";
+      break;
     case SAVE:
       std::cout << "save";
       break;
@@ -144,6 +149,15 @@ namespace rrr {
       std::cout << "\t" << "fanins: ";
       std::string delim = "";
       for(int fi: action.vFanins) {
+        std::cout << delim << fi;
+        delim = ", ";
+      }
+      std::cout << std::endl;
+    }
+    if(!action.vIndices.empty()) {
+      std::cout << "\t" << "indices: ";
+      std::string delim = "";
+      for(int fi: action.vIndices) {
         std::cout << delim << fi;
         delim = ", ";
       }

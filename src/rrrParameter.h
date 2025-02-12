@@ -1,7 +1,7 @@
 #pragma once
 
 namespace rrr {
-  
+
   struct Parameter {
     int iSeed = 0;
     int nWords = 10;
@@ -14,6 +14,7 @@ namespace rrr {
     bool fUseBddCspf = false;
     bool fUseBddMspf = false;
     int nConflictLimit = 0;
+    int nSortType = 0;
   };
   
 }

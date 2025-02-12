@@ -63,7 +63,7 @@ namespace rrr {
     void ComputeC(int id);
     bool ComputeCDebug(int id);
     void MspfNode(int id);
-    void Mspf(int id = -1);
+    void Mspf(int id = -1, bool fC = true);
 
     // save & load
     void Save(int slot);
@@ -260,6 +260,14 @@ namespace rrr {
       vUpdates[action.fi] = false;
       vGUpdates[action.fi] = false;
       vCUpdates[action.fi] = false;
+      break;
+    }
+    case SORT_FANINS: {
+      std::vector<lit> vCs = vvCs[action.id];
+      vvCs[action.id].clear();
+      for(int index: action.vIndices) {
+        vvCs[action.id].push_back(vCs[index]);
+      }
       break;
     }
     case SAVE:
@@ -495,12 +503,19 @@ namespace rrr {
   }
 
   template <typename pNtk>
-  void BddMspfAnalyzer<pNtk>::Mspf(int id) {
+  void BddMspfAnalyzer<pNtk>::Mspf(int id, bool fC) {
     if(id != -1) {
       pNtk->ForEachTfoReverse(id, false, [&](int fo) {
         MspfNode(fo);
       });
+      bool fCUpdate = vCUpdates[id];
+      if(!fC) {
+        vCUpdates[id] = false;
+      }
       MspfNode(id);
+      if(!fC) {
+        vCUpdates[id] = fCUpdate;
+      }
     } else {
       pNtk->ForEachIntReverse([&](int id) {
         MspfNode(id);
@@ -647,7 +662,7 @@ namespace rrr {
       Simulate();
       fUpdate = false;
     }
-    Mspf(id);
+    Mspf(id, false);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);

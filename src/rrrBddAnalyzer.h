@@ -16,7 +16,6 @@ namespace rrr {
     // aliases
     using lit = int;
     static constexpr lit LitMax = 0xffffffff;
-    static const bool fResim = false;
 
     // pointer to network
     Ntk *pNtk;
@@ -30,6 +29,7 @@ namespace rrr {
     std::vector<lit> vFs;
     std::vector<lit> vGs;
     std::vector<std::vector<lit>> vvCs;
+    bool fResim;
     std::vector<bool> vUpdates;
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
@@ -61,7 +61,7 @@ namespace rrr {
     bool ComputeG(int id);
     void ComputeC(int id);
     void CspfNode(int id);
-    void Cspf(int id = -1);
+    void Cspf(int id = -1, bool fC = true);
 
     // save & load
     void Save(int slot);
@@ -243,6 +243,25 @@ namespace rrr {
       vCUpdates[action.fi] = vCUpdates[action.id];
       break;
     }
+    case SORT_FANINS: {
+      std::vector<lit> vCs = vvCs[action.id];
+      vvCs[action.id].clear();
+      for(int index: action.vIndices) {
+        vvCs[action.id].push_back(vCs[index]);
+      }
+      if(!fResim && target != -1 && target != action.id) {
+        pNtk->ForEachTfo(target, false, [&](int fo) {
+          if(fResim) {
+            return;
+          }
+          if(fo == action.id) {
+            fResim = true;
+          }
+        });
+      }
+      vCUpdates[action.id] = true;
+      break;
+    }
     case SAVE:
       Save(action.idx);
       break;
@@ -392,12 +411,19 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Cspf(int id) {
+  void BddAnalyzer<Ntk>::Cspf(int id, bool fC) {
     if(id != -1) {
       pNtk->ForEachTfoReverse(id, false, [&](int fo) {
         CspfNode(fo);
       });
+      bool fCUpdate = vCUpdates[id];
+      if(!fC) {
+        vCUpdates[id] = false;
+      }
       CspfNode(id);
+      if(!fC) {
+        vCUpdates[id] = fCUpdate;
+      }
     } else {
       pNtk->ForEachIntReverse([&](int id) {
         CspfNode(id);
@@ -453,14 +479,16 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(0),
     pBdd(NULL),
-    target(-1) {
+    target(-1),
+    fResim(false) {
   }
   
   template <typename Ntk>
   BddAnalyzer<Ntk>::BddAnalyzer(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     nVerbose(pPar->nAnalyzerVerbose),
-    target(-1) {
+    target(-1),
+    fResim(false) {
     NewBdd::Param Par;
     Par.nObjsMaxLog = 25;
     Par.nCacheMaxLog = 20;
@@ -545,11 +573,11 @@ namespace rrr {
   
   template <typename Ntk>
   bool BddAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
-    if(target != id) {
+    if(target != id) { // simualte if there has been update in non-tfo of this node
       Simulate();
       target = id;
     }
-    Cspf(id);
+    Cspf(id, false);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);

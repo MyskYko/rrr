@@ -241,6 +241,8 @@ namespace rrr {
       vValues.resize(nWords * pNtk->GetNumNodes());
       SimulateNode(vValues, action.fi);
       break;
+    case SORT_FANINS:
+      break;
     case SAVE:
       Save(action.idx);
       break;

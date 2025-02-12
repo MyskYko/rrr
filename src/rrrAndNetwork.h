@@ -89,6 +89,9 @@ namespace rrr {
     bool IsPo(int id) const;
     NodeType GetNodeType(int id) const;
     bool IsPoDriver(int id) const;
+    int  GetPiIndex(int id) const;
+    int  GetIntIndex(int id) const;
+    int  GetPoIndex(int id) const;
     int  GetNumFanins(int id) const;
     int  GetNumFanouts(int id) const;
     int  GetFanin(int id, int idx) const;
@@ -122,6 +125,7 @@ namespace rrr {
     void AddFanin(int id, int fi, bool c);
     void TrivialCollapse(int id);
     void TrivialDecompose(int id);
+    void SortFanins(int id, std::function<bool(int, bool, int, bool)> const &cost);
 
     // Network cleanup
     void Propagate(int id = -1); // all nodes unless specified
@@ -143,6 +147,7 @@ namespace rrr {
     // TODO: reuse already allocated but dead nodes? or perform garbage collection?
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
+    assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
   }
 
@@ -190,6 +195,7 @@ namespace rrr {
     // add const-0 node
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
+    assert(nNodes != std::numeric_limits<int>::max());
     nNodes++;
   }
 
@@ -222,6 +228,7 @@ namespace rrr {
     vPis.push_back(nNodes);
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
+    assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
   }
   
@@ -235,6 +242,7 @@ namespace rrr {
     vRefs[id1]++;
     vvFaninEdges.emplace_back((std::initializer_list<int>){Node2Edge(id0, c0), Node2Edge(id1, c1)});
     vRefs.push_back(0);
+    assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
   }
 
@@ -244,6 +252,7 @@ namespace rrr {
     vRefs[id]++;
     vvFaninEdges.emplace_back((std::initializer_list<int>){Node2Edge(id, c)});
     vRefs.push_back(0);
+    assert(nNodes != std::numeric_limits<int>::max());
     return nNodes++;
   }
 
@@ -260,14 +269,17 @@ namespace rrr {
   }
 
   inline int AndNetwork::GetNumPis() const {
+    assert(vPis.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
     return vPis.size();
   }
   
   inline int AndNetwork::GetNumInts() const {
+    assert(lInts.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
     return lInts.size();
   }
   
   inline int AndNetwork::GetNumPos() const {
+    assert(vPos.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
     return vPos.size();
   }
 
@@ -330,6 +342,36 @@ namespace rrr {
       }
     }
     return false;
+  }
+
+  int AndNetwork::GetPiIndex(int id) const {
+    assert(IsPi(id));
+    assert(vPis.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    std::vector<int>::const_iterator it = std::find(vPis.begin(), vPis.end(), id);
+    assert(it != vPis.end());
+    return std::distance(vPis.begin(), it);
+  }
+  
+  int AndNetwork::GetIntIndex(int id) const {
+    int index = 0;
+    citr it = lInts.begin();
+    for(; it != lInts.end(); it++) {
+      if(*it == id) {
+        break;
+      }
+      assert(index < (std::vector<int>::size_type)std::numeric_limits<int>::max());
+      index++;
+    }
+    assert(it != lInts.end());
+    return index;
+  }
+
+  int AndNetwork::GetPoIndex(int id) const {
+    assert(IsPo(id));
+    assert(vPos.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    std::vector<int>::const_iterator it = std::find(vPos.begin(), vPos.end(), id);
+    assert(it != vPos.end());
+    return std::distance(vPos.begin(), it);
   }
   
   inline int AndNetwork::GetNumFanins(int id) const {
@@ -893,6 +935,25 @@ namespace rrr {
       sInts.insert(new_fi);
       TakenAction(action);
     }
+  }
+
+  void AndNetwork::SortFanins(int id, std::function<bool(int, bool, int, bool)> const &comp) {
+    std::vector<int> vFaninEdges = vvFaninEdges[id];
+    std::sort(vvFaninEdges[id].begin(), vvFaninEdges[id].end(), [&](int i, int j) {
+      return comp(Edge2Node(i), EdgeIsCompl(i), Edge2Node(j), EdgeIsCompl(j));
+    });
+    if(vFaninEdges == vvFaninEdges[id]) {
+      return;
+    }
+    Action action;
+    action.type = SORT_FANINS;
+    action.id = id;
+    assert(vFaninEdges.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    for(int fanin_edge: vvFaninEdges[id]) {
+      std::vector<int>::const_iterator it = std::find(vFaninEdges.begin(), vFaninEdges.end(), fanin_edge);
+      action.vIndices.push_back(std::distance(vFaninEdges.cbegin(), it));
+    }
+    TakenAction(action);
   }
 
   /* }}} */
