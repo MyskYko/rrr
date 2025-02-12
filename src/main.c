@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYRWTCGSOAPQabcvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYRWTCGSOAPQabch" ) ) != EOF )
   {
       switch ( c )
       {
@@ -122,19 +122,33 @@ int main(int argc, char **argv) {
   
   return 0;
 
- usage:
-  Abc_Print( -2, "usage: rrr [-RWOA num] [-cvh]\n" );
-  Abc_Print( -2, "\t        perform optimization\n" );
-  Abc_Print( -2, "\t-R    : random number generator seed\n");
-  Abc_Print( -2, "\t-W    : number of simulation words\n");
-  Abc_Print( -2, "\t-O    : optimizer verbosity level\n");
-  Abc_Print( -2, "\t-A    : analyzer verbosity level\n");
-  Abc_Print( -2, "\t-c    : get core\n");
-  Abc_Print( -2, "\t-v    : verbosity\n");
-  Abc_Print( -2, "\t-h    : print the command usage\n");
+usage:
+      Abc_Print( -2, "usage: rrr [-XYRWTCGSOAPQ num] [-abh]\n" );
+      Abc_Print( -2, "\t        perform optimization\n" );
+      Abc_Print( -2, "\t-X num : method [default = %d]\n", nOptimizerFlow );
+      Abc_Print( -2, "\t                0: single-add resub\n" );
+      Abc_Print( -2, "\t                1: multi-add resub\n" );
+      Abc_Print( -2, "\t                2: repeat 0 and 1\n" );
+      Abc_Print( -2, "\t-Y num : flow [default = %d]\n", nSchedulerFlow );
+      Abc_Print( -2, "\t                0: apply method once\n" );
+      Abc_Print( -2, "\t                1: iterate like transtoch\n" );
+      Abc_Print( -2, "\t                2: iterate like deepsyn\n" );
+      Abc_Print( -2, "\t-R num : random number generator seed [default = %d]\n", iSeed );
+      Abc_Print( -2, "\t-W num : number of simulation words [default = %d]\n", nWords );
+      Abc_Print( -2, "\t-T num : timeout in seconds (0 = no timeout) [default = %d]\n", nTimeout );
+      Abc_Print( -2, "\t-C num : conflict limit [default = %d]\n", nConflictLimit );
+      Abc_Print( -2, "\t-G num : fanin cost function [default = %d]\n", nSortType );
+      Abc_Print( -2, "\t-S num : scheduler verbosity level [default = %d]\n", nSchedulerVerbose );
+      Abc_Print( -2, "\t-O num : optimizer verbosity level [default = %d]\n", nOptimizerVerbose );
+      Abc_Print( -2, "\t-A num : analyzer verbosity level [default = %d]\n", nAnalyzerVerbose );
+      Abc_Print( -2, "\t-P num : simulator verbosity level [default = %d]\n", nSimulatorVerbose );
+      Abc_Print( -2, "\t-Q num : SAT solver verbosity level [default = %d]\n", nSatSolverVerbose );
+      Abc_Print( -2, "\t-a     : use BDD-based analyzer (CSPF) [default = %s]\n", fUseBddCspf? "yes": "no" );
+      Abc_Print( -2, "\t-b     : use BDD-based analyzer (MSPF) [default = %s]\n", fUseBddMspf? "yes": "no" );
+      Abc_Print( -2, "\t-h     : print the command usage\n");
 
-  Abc_Stop();
-  return 1;
+    Abc_Stop();
+    return 1;
 }
 
 
