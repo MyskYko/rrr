@@ -57,7 +57,6 @@ namespace rrr {
     // create network
     pNtk->Read(pNew, GiaReader<Ntk>);
     Gia_ManStop(pNew);
-    pNtk->Print();
     opt.UpdateNetwork(pNtk);
     opt.Run(Par.nTimeout);
     time_point end = GetCurrentTime();

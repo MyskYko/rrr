@@ -363,10 +363,12 @@ namespace rrr {
     });
     if(pBdd->LitIsEq(vGs[id], x)) {
       DecRef(x);
+      DelVec(v);
       return false;
     }
     Assign(vGs[id], x);
     DecRef(x);
+    DelVec(v);
     return true;
   }
   
@@ -614,12 +616,71 @@ namespace rrr {
 
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+    // clear
+    while(!vBackups.empty()) {
+      PopBack();
+    }
+    DelVec(vFs);
+    DelVec(vGs);
+    DelVecVec(vvCs);
     pNtk = pNtk_;
-    assert(0);
+    fUpdate = false;
+    vUpdates.clear();
+    vGUpdates.clear();
+    vCUpdates.clear();
+    vVisits.clear();
+    // alloc
+    if(pBdd->GetNumVars() != pNtk->GetNumPis()) {
+      // need to reset manager
+      delete pBdd;
+      NewBdd::Param Par;
+      Par.nObjsMaxLog = 25;
+      Par.nCacheMaxLog = 20;
+      Par.fCountOnes = true;
+      Par.nGbc = 1;
+      Par.nReo = 4000;
+      pBdd = new NewBdd::Man(pNtk->GetNumPis(), Par);
+    } else {
+      // turning on reordering just in case; probably create a toggle option later
+      pBdd->TurnOnReo(4000);
+    }
+    Allocate();
+    // prepare
+    Assign(vFs[0], pBdd->Const0());
+    int idx = 0;
+    pNtk->ForEachPi([&](int id) {
+      Assign(vFs[id], pBdd->IthVar(idx));
+      idx++;
+    });
+    pNtk->ForEachInt([&](int id) {
+      vUpdates[id] = true;
+    });
+    Simulate();
+    pBdd->Reorder();
+    pBdd->TurnOffReo();
+    pNtk->ForEachInt([&](int id) {
+      vvCs[id].resize(pNtk->GetNumFanins(id), LitMax);
+    });
+    pNtk->ForEachPo([&](int id) {
+      vvCs[id].resize(1, LitMax);
+      Assign(vvCs[id][0], pBdd->Const0());
+      int fi = pNtk->GetFanin(id, 0);
+      vGUpdates[fi]  = true;
+    });
+    pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
   
   template <typename Ntk>
   BddMspfAnalyzer<Ntk>::~BddMspfAnalyzer() {
+    while(!vBackups.empty()) {
+      PopBack();
+    }
+    DelVec(vFs);
+    DelVec(vGs);
+    DelVecVec(vvCs);
+    if(pBdd) {
+      pBdd->PrintStats();
+    }
     delete pBdd;
   }
 
