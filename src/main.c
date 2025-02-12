@@ -19,7 +19,8 @@ Gia_Man_t *MinimizeTest(Gia_Man_t *pGia, PARAMS_DECL);
 
 int main(int argc, char **argv) {
   Abc_Start();
-  
+
+  Gia_Man_t *pNew;
   int c;
   PARAMS_DEF;
   int fCore = 0;
@@ -100,7 +101,7 @@ int main(int argc, char **argv) {
   Gia_Man_t *pGia = Gia_AigerRead(fname, 0, 0, 0);
   printf("start: %d nodes\n", Gia_ManAndNum(pGia));
 
-  Gia_Man_t *pNew = Gia_ManRrr(pGia, PARAMS);
+  pNew = Gia_ManRrr(pGia, PARAMS);
   printf("end:   %d nodes\n", Gia_ManAndNum(pNew));
 
   if(Cec_ManVerifyTwo(pGia, pNew, 0)) {
