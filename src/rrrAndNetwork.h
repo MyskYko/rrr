@@ -107,6 +107,7 @@ namespace rrr {
     void ForEachPi(std::function<void(int)> const &func) const;
     void ForEachInt(std::function<void(int)> const &func) const;
     void ForEachIntReverse(std::function<void(int)> const &func) const;
+    void ForEachPiInt(std::function<void(int)> const &func) const;
     void ForEachPo(std::function<void(int)> const &func) const;
     void ForEachPoDriver(std::function<void(int, bool)> const &func) const;
     void ForEachFanin(int id, std::function<void(int, bool)> const &func) const;
@@ -495,6 +496,15 @@ namespace rrr {
     }
   }
 
+  inline void AndNetwork::ForEachPiInt(std::function<void(int)> const &func) const {
+    for(int pi: vPis) {
+      func(pi);
+    }
+    for(int id: lInts) {
+      func(id);
+    }
+  }
+  
   inline void AndNetwork::ForEachPo(std::function<void(int)> const &func) const {
     for(int po: vPos) {
       func(po);
@@ -523,9 +533,12 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
-    citr it = std::find(lInts.begin(), lInts.end(), id);
-    assert(it != lInts.end());
-    it++;
+    citr it = lInts.begin();
+    if(IsInt(id)) {
+      it = std::find(it, lInts.end(), id);
+      assert(it != lInts.end());
+      it++;
+    }
     int nRefs = vRefs[id];
     for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);
@@ -552,9 +565,12 @@ namespace rrr {
     if(vRefs[id] == 0) {
       return;
     }
-    citr it = std::find(lInts.begin(), lInts.end(), id);
-    assert(it != lInts.end());
-    it++;
+    citr it = lInts.begin();
+    if(IsInt(id)) {
+      it = std::find(it, lInts.end(), id);
+      assert(it != lInts.end());
+      it++;
+    }
     int nRefs = vRefs[id];
     for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);

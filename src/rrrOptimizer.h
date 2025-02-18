@@ -29,6 +29,7 @@ namespace rrr {
     std::function<double(Ntk *)> CostFunction;
     int nSortType;
     int nFlow;
+    int nDistance;
     seconds nTimeout; // assigned upon Run
 
     // data
@@ -44,13 +45,14 @@ namespace rrr {
 
     // marks
     int target;
-    std::vector<bool> vMarks;
+    std::vector<bool> vTfoMarks;
     
     // callback
     void ActionCallback(Action const &action);
 
     // topology
     void MarkTfo(int id);
+    std::vector<int> GetNeighbors(int id, int nRadius);
 
     // time
     bool Timeout();
@@ -152,12 +154,48 @@ namespace rrr {
       return;
     }
     target = id;
-    vMarks.clear();
-    vMarks.resize(pNtk->GetNumNodes());
-    vMarks[id] = true;
+    vTfoMarks.clear();
+    vTfoMarks.resize(pNtk->GetNumNodes());
+    vTfoMarks[id] = true;
     pNtk->ForEachTfo(id, false, [&](int fo) {
-      vMarks[fo] = true;
+      vTfoMarks[fo] = true;
     });
+  }
+
+  template <typename Ntk, typename Ana>
+  inline std::vector<int> Optimizer<Ntk, Ana>::GetNeighbors(int id, int nRadius) {
+    // mark neighbors
+    std::vector<int> vPrevs, vNexts;
+    std::vector<bool> vMarks(pNtk->GetNumNodes());
+    vNexts.push_back(id);
+    vMarks[id] = true;
+    for(int i = 0; i < nRadius; i++) {
+      vPrevs.swap(vNexts);
+      vNexts.clear();
+      for(int id: vPrevs) {
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(!vMarks[fi]) {
+            vNexts.push_back(fi);
+            vMarks[fi] = true;
+          }
+        });
+        pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
+          if(!vMarks[fo]) {
+            vNexts.push_back(fo);
+            vMarks[fo] = true;
+          }
+        });
+      }
+    }
+    // return neighbors in topological order
+    std::vector<int> v;
+    vMarks[id] = false;
+    pNtk->ForEachPiInt([&](int id) {
+      if(vMarks[id]) {
+        v.push_back(id);
+      }
+    });
+    return v;
   }
 
   /* }}} */
@@ -605,14 +643,14 @@ namespace rrr {
   T Optimizer<Ntk, Ana>::SingleAdd(int id, T begin, T end) {
     MarkTfo(id);
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      vMarks[fi] = true;
+      vTfoMarks[fi] = true;
     });
     T it = begin;
     for(; it != end; it++) {
       if(!pNtk->IsInt(*it) && !pNtk->IsPi(*it)) {
         continue;
       }
-      if(vMarks[*it]) {
+      if(vTfoMarks[*it]) {
         continue;
       }
       if(pAna->CheckFeasibility(id, *it, false)) {
@@ -626,7 +664,7 @@ namespace rrr {
       break;
     }
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      vMarks[fi] = false;
+      vTfoMarks[fi] = false;
     });
     return it;
   }
@@ -635,14 +673,14 @@ namespace rrr {
   int Optimizer<Ntk, Ana>::MultiAdd(int id, std::vector<int> const &vCands, int nMax) {
     MarkTfo(id);
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      vMarks[fi] = true;
+      vTfoMarks[fi] = true;
     });
     int nAdded = 0;
     for(int cand: vCands) {
       if(!pNtk->IsInt(cand) && !pNtk->IsPi(cand)) {
         continue;
       }
-      if(vMarks[cand]) {
+      if(vTfoMarks[cand]) {
         continue;
       }
       if(pAna->CheckFeasibility(id, cand, false)) {
@@ -659,7 +697,7 @@ namespace rrr {
       }
     }
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      vMarks[fi] = false;
+      vTfoMarks[fi] = false;
     });
     return nAdded;
   }
@@ -785,6 +823,7 @@ namespace rrr {
     CostFunction(CostFunction),
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
+    nDistance(pPar->nDistance),
     target(-1) {
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     pAna = new Ana(pNtk, pPar);
@@ -816,14 +855,24 @@ namespace rrr {
     case 0:
       RemoveRedundancy();
       ApplyReverseTopologically([&](int id) {
-        std::vector<int> vCands = pNtk->GetPisInts();
+        std::vector<int> vCands;
+        if(nDistance) {
+          vCands = GetNeighbors(id, nDistance);
+        } else {
+          vCands = pNtk->GetPisInts();
+        }
         SingleResub(id, vCands);
       });
       break;
     case 1:
       RemoveRedundancy();
       ApplyReverseTopologically([&](int id) {
-        std::vector<int> vCands = pNtk->GetInts();
+        std::vector<int> vCands;
+        if(nDistance) {
+          vCands = GetNeighbors(id, nDistance);
+        } else {
+          vCands = pNtk->GetPisInts();
+        }
         MultiResub(id, vCands);
       });
       break;
@@ -832,11 +881,22 @@ namespace rrr {
       double dCost = CostFunction(pNtk);
       while(true) {
         ApplyReverseTopologically([&](int id) {
-          std::vector<int> vCands = pNtk->GetPisInts();
+          std::vector<int> vCands;
+          if(nDistance) {
+            vCands = GetNeighbors(id, nDistance);
+          } else {
+            vCands = pNtk->GetPisInts();
+          }
           SingleResub(id, vCands);
         });
         ApplyReverseTopologically([&](int id) {
-          std::vector<int> vCands = pNtk->GetInts();
+          std::vector<int> vCands;
+          if(nDistance) {
+            vCands = GetNeighbors(id, nDistance);
+          } else {
+            vCands = pNtk->GetPisInts();
+            // vCands = pNtk->GetInts();
+          }
           MultiResub(id, vCands);
         });
         double dNewCost = CostFunction(pNtk);

@@ -17,6 +17,7 @@ namespace rrr {
     int nSortType = 0;
     int nOptimizerFlow = 0;
     int nSchedulerFlow = 0;
+    int nDistance = 0;
   };
   
 }
