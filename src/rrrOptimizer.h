@@ -93,8 +93,7 @@ namespace rrr {
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
     // run
-    void Run(seconds nTimeout_ = 0);
-    void Randomize();
+    void Run(int iSeed, seconds nTimeout_ = 0);
     
   };
 
@@ -827,7 +826,6 @@ namespace rrr {
     target(-1) {
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     pAna = new Ana(pNtk, pPar);
-    rng.seed(pPar->iSeed);
   }
   
   template <typename Ntk, typename Ana>
@@ -848,7 +846,13 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Run(seconds nTimeout_) {
+  void Optimizer<Ntk, Ana>::Run(int iSeed, seconds nTimeout_) {
+    // randomize
+    rng.seed(iSeed);
+    nSortType = rng() % 18;
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+    // run
     nTimeout = nTimeout_;
     start = GetCurrentTime();
     switch(nFlow) {
@@ -911,13 +915,6 @@ namespace rrr {
     default:
       assert(0);
     }
-  }
-
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Randomize() {
-    nSortType = rng() % 18;
-    vRandPiOrder.clear();
-    vRandCosts.clear();
   }
   
   /* }}} */

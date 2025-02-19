@@ -89,9 +89,10 @@ namespace rrr {
     Opt opt(pNtk, &Par, CostFunction);
     switch(nFlow) {
     case 0:
-      opt.Run(GetRemainingTime());
+      opt.Run(Par.iSeed, GetRemainingTime());
       break;
     case 1: { // transtoch
+      std::mt19937 rng(Par.iSeed /* + restart ite */ );
       double dCost = CostFunction(pNtk);
       double dBestCost = dCost;
       Ntk best(*pNtk);
@@ -114,8 +115,7 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Randomize();
-          opt.Run(GetRemainingTime());
+          opt.Run(rng(), GetRemainingTime());
           Abc9Execute(pNtk, "&dc2");
           double dNewCost = CostFunction(pNtk);
           if(nVerbose) {
@@ -186,9 +186,8 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Randomize();
           opt.UpdateNetwork(pNtk, true);
-          opt.Run(GetRemainingTime());
+          opt.Run(rng(), GetRemainingTime());
           if(rng() & 1) {
             Abc9Execute(pNtk, "&dc2");
           } else {
