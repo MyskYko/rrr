@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
   Gia_ManStop(pGia);
   Gia_ManStop(pNew);
   
+  Abc_Stop();
   return 0;
 
 usage:

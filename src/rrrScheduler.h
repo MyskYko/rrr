@@ -378,6 +378,7 @@ namespace rrr {
             dCost = dNewCost;
             *pNtk = *job.pNtk;
           }
+          delete job.pNtk;
         }
       }
     } else {
@@ -393,6 +394,7 @@ namespace rrr {
             dCost = dNewCost;
             *pNtk = *job.pNtk;
           }
+          delete job.pNtk;
         }
       }
 #ifdef ABC_USE_PTHREADS
