@@ -2,7 +2,14 @@
 
 #include <iostream>
 #include <iomanip>
+#include <queue>
 #include <random>
+
+#ifdef ABC_USE_PTHREADS
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#endif
 
 #include "rrrParameter.h"
 #include "rrrTypes.h"
@@ -14,88 +21,118 @@ namespace rrr {
   template <typename Ntk, typename Opt>
   class Scheduler {
   private:
+    // job
+    struct Job;
+    
     // pointer to network
     Ntk *pNtk;
 
     // parameters
     int nVerbose;
+    int iSeed;
     int nFlow;
+    int nRestarts;
+    bool fMultiThreading;
+    seconds nTimeout;
+    std::function<double(Ntk *)> CostFunction;
 
-    // copy of parameter (maybe updated during the run)
+    // copy of parameter (maybe updated during the run). probably unnecessary.
     Parameter Par;
-
+    
     // data
     time_point start;
+    std::queue<Job> qPendingJobs;
+    Opt *pOpt; // used only in case of single thread execution
+#ifdef ABC_USE_PTHREADS
+    bool fTerminate;
+    std::vector<std::thread> vThreads;
+    std::priority_queue<Job> qFinishedJobs;
+    std::mutex mutexPendingJobs;
+    std::mutex mutexFinishedJobs;
+    std::condition_variable condPendingJobs;
+    std::condition_variable condFinishedJobs;
+#endif
 
     // time
-    seconds GetRemainingTime();
+    seconds GetRemainingTime() const;
 
+    // run job
+    void RunJob(Opt &opt, Job const &job) const;
+
+#ifdef ABC_USE_PTHREADS
+    // thread
+    void Thread(Parameter const *pPar);
+#endif
+    
   public:
-    // constructor
+    // constructors
     Scheduler(Ntk *pNtk, Parameter const *pPar);
-
+    ~Scheduler();
+    
     // run
     void Run();
   };
 
-  /* {{{ time */
+  /* {{{ Job */
+  
+  template <typename Ntk, typename Opt>
+  struct Scheduler<Ntk, Opt>::Job {
+    // data
+    int id;
+    Ntk *pNtk;
+    int iSeed;
+    
+    // constructor
+    Job(int id, Ntk *pNtk, int iSeed) :
+      id(id),
+      pNtk(pNtk),
+      iSeed(iSeed) {
+    }
+    
+    // smaller id comes first in priority_queue
+    bool operator<(const Job& other) const {
+      return id > other.id;
+    }
+  };
+  
+  /* }}} */
+
+  /* {{{ Time */
 
   template <typename Ntk, typename Opt>
-  seconds Scheduler<Ntk, Opt>::GetRemainingTime() {
-    if(Par.nTimeout == 0) {
+  seconds Scheduler<Ntk, Opt>::GetRemainingTime() const {
+    if(nTimeout == 0) {
       return 0;
     }
     time_point current = GetCurrentTime();
-    seconds nTimeout = Par.nTimeout - DurationInSeconds(start, current);
-    if(nTimeout == 0) { // avoid glitch
+    seconds nRemainingTime = nTimeout - DurationInSeconds(start, current);
+    if(nRemainingTime == 0) { // avoid glitch
       return -1;
     }
-    return nTimeout;
+    return nRemainingTime;
   }
 
   /* }}} */
 
-  /* {{{ Constructor */
-  
-  template <typename Ntk, typename Opt>
-  Scheduler<Ntk, Opt>::Scheduler(Ntk *pNtk, Parameter const *pPar) :
-    pNtk(pNtk),
-    nVerbose(pPar->nSchedulerVerbose),
-    nFlow(pPar->nSchedulerFlow),
-    Par(*pPar) {
-    // TODO: allocations and other preparations should be done here
-  }
+  /* {{{ Run job */
 
-  /* }}} */
-
-  /* {{{ Run */
-  
-  // TODO: have multiplie optimizers running on different windows/partitions
-  // TODO: run ABC on those windows or even on the entire network, maybe as a separate class
-  
   template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::Run() {
-    start = GetCurrentTime();
-    // prepare cost function
-    std::function<double(Ntk *)> CostFunction;
-    CostFunction = [](Ntk *pNtk) {
-      int nTwoInputSize = 0;
-      pNtk->ForEachInt([&](int id) {
-        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
-      });
-      return nTwoInputSize;
-    };
+  void Scheduler<Ntk, Opt>::RunJob(Opt &opt, Job const &job) const {
+    opt.UpdateNetwork(job.pNtk);
     // start flow
-    Opt opt(pNtk, &Par, CostFunction);
     switch(nFlow) {
     case 0:
-      opt.Run(Par.iSeed, GetRemainingTime());
+      if(job.id != 0) {
+        // TODO: randomization should be triggered by a different flag
+        opt.Randomize(job.iSeed);
+      }
+      opt.Run(GetRemainingTime());
       break;
     case 1: { // transtoch
-      std::mt19937 rng(Par.iSeed /* + restart ite */ );
-      double dCost = CostFunction(pNtk);
+      std::mt19937 rng(job.iSeed);
+      double dCost = CostFunction(job.pNtk);
       double dBestCost = dCost;
-      Ntk best(*pNtk);
+      Ntk best(*job.pNtk);
       if(nVerbose) {
         std::cout << "start: cost = " << dCost << std::endl;
       }
@@ -104,9 +141,9 @@ namespace rrr {
           break;
         }
         if(i != 0) {
-          Abc9Execute(pNtk, "&if -K 6; &mfs; &st");
-          dCost = CostFunction(pNtk);
-          opt.UpdateNetwork(pNtk, true);
+          Abc9Execute(job.pNtk, "&if -K 6; &mfs; &st");
+          dCost = CostFunction(job.pNtk);
+          opt.UpdateNetwork(job.pNtk, true);
           if(nVerbose) {
             std::cout << "hop " << std::setw(3) << i << ": cost = " << dCost << std::endl;
           }
@@ -115,15 +152,16 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Run(rng(), GetRemainingTime());
-          Abc9Execute(pNtk, "&dc2");
-          double dNewCost = CostFunction(pNtk);
+          opt.Randomize(rng());
+          opt.Run(GetRemainingTime());
+          Abc9Execute(job.pNtk, "&dc2");
+          double dNewCost = CostFunction(job.pNtk);
           if(nVerbose) {
             std::cout << "\tite " << std::setw(3) << j << ": cost = " << dNewCost << std::endl;
           }
           if(dNewCost < dCost) {
             dCost = dNewCost;
-            opt.UpdateNetwork(pNtk, true);
+            opt.UpdateNetwork(job.pNtk, true);
           } else {
             break;
           }
@@ -134,17 +172,17 @@ namespace rrr {
           i = 0;
         }
       }
-      *pNtk = best;
+      *job.pNtk = best;
       if(nVerbose) {
         std::cout << "end: cost = " << dBestCost << std::endl;
       }
       break;
     }
     case 2: { // deep
-      double dCost = CostFunction(pNtk);
-      Ntk best(*pNtk);
+      std::mt19937 rng(job.iSeed);
       int n = 0;
-      std::mt19937 rng(Par.iSeed);
+      double dCost = CostFunction(job.pNtk);
+      Ntk best(*job.pNtk);
       if(nVerbose) {
         std::cout << "start: cost = " << dCost << std::endl;
       }
@@ -177,36 +215,37 @@ namespace rrr {
         if(fFx)
           Command += "; &fx; &st";
         Command += pComp;
-        Abc9Execute(pNtk, Command);
+        Abc9Execute(job.pNtk, Command);
         if(nVerbose) {
-          std::cout << "ite " << std::setw(6) << i << ": cost = " << CostFunction(pNtk) << std::endl;
+          std::cout << "ite " << std::setw(6) << i << ": cost = " << CostFunction(job.pNtk) << std::endl;
         }
         // rrr
         for(int j = 0; j < n; j++) {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.UpdateNetwork(pNtk, true);
-          opt.Run(rng(), GetRemainingTime());
+          opt.UpdateNetwork(job.pNtk, true);
+          opt.Randomize(rng());
+          opt.Run(GetRemainingTime());
           if(rng() & 1) {
-            Abc9Execute(pNtk, "&dc2");
+            Abc9Execute(job.pNtk, "&dc2");
           } else {
-            Abc9Execute(pNtk, "&put; " + pCompress2rs + "; &get");
+            Abc9Execute(job.pNtk, "&put; " + pCompress2rs + "; &get");
           }
           if(nVerbose) {
-            std::cout << "\trrr " << std::setw(6) << j << ": cost = " << CostFunction(pNtk) << std::endl;
+            std::cout << "\trrr " << std::setw(6) << j << ": cost = " << CostFunction(job.pNtk) << std::endl;
           }
         }
         // eval
-        double dNewCost = CostFunction(pNtk);
+        double dNewCost = CostFunction(job.pNtk);
         if(dNewCost < dCost) {
           dCost = dNewCost;
-          best = *pNtk;
+          best = *job.pNtk;
         } else {
           n++;
         }
       }
-      *pNtk = best;
+      *job.pNtk = best;
       if(nVerbose) {
         std::cout << "end: cost = " << dCost << std::endl;
       }
@@ -215,6 +254,150 @@ namespace rrr {
     default:
       assert(0);
     }
+  }
+  
+  /* }}} */
+
+  /* {{{ Thread */
+
+  template <typename Ntk, typename Opt>
+  void Scheduler<Ntk, Opt>::Thread(Parameter const *pPar) {
+    Opt opt(pPar, CostFunction);
+    while(true) {
+      Job job(-1, NULL, 0); // place holder
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        while(!fTerminate && qPendingJobs.empty()) {
+          condPendingJobs.wait(l);
+        }
+        if(fTerminate) {
+          assert(qPendingJobs.empty());
+          return;
+        }
+        job = std::move(qPendingJobs.front());
+        qPendingJobs.pop();
+      }
+      assert(job.id != -1);
+      RunJob(opt, job);
+      {
+        std::unique_lock<std::mutex> l(mutexFinishedJobs);
+        qFinishedJobs.push(job);
+        condFinishedJobs.notify_one();
+      }
+    }
+  }
+
+  /* }}} */
+  
+  /* {{{ Constructors */
+  
+  template <typename Ntk, typename Opt>
+  Scheduler<Ntk, Opt>::Scheduler(Ntk *pNtk, Parameter const *pPar) :
+    pNtk(pNtk),
+    nVerbose(pPar->nSchedulerVerbose),
+    iSeed(pPar->iSeed),
+    nFlow(pPar->nSchedulerFlow),
+    nRestarts(pPar->nRestarts),
+    fMultiThreading(pPar->nThreads > 1),
+    nTimeout(pPar->nTimeout),
+    Par(*pPar),
+    pOpt(NULL) {
+    // prepare cost function
+    CostFunction = [](Ntk *pNtk) {
+      int nTwoInputSize = 0;
+      pNtk->ForEachInt([&](int id) {
+        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
+      });
+      return nTwoInputSize;
+    };
+#ifdef ABC_USE_PTHREADS
+    fTerminate = false;
+    if(fMultiThreading) {
+      vThreads.reserve(pPar->nThreads);
+      for(int i = 0; i < pPar->nThreads; i++) {
+        vThreads.emplace_back(std::bind(&Scheduler::Thread, this, pPar));
+      }
+      return;
+    }
+#endif
+    assert(!fMultiThreading);
+    pOpt = new Opt(pPar, CostFunction);
+  }
+
+  template <typename Ntk, typename Opt>
+  Scheduler<Ntk, Opt>::~Scheduler() {
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        fTerminate = true;
+        condPendingJobs.notify_all();
+      }
+      for(std::thread &t: vThreads) {
+        t.join();
+      }
+    }
+#endif
+    if(pOpt) {
+      delete pOpt;
+    }
+  }
+
+  /* }}} */
+
+  /* {{{ Run */
+  
+  template <typename Ntk, typename Opt>
+  void Scheduler<Ntk, Opt>::Run() {
+    start = GetCurrentTime();
+    // populate queue
+    double dCost;
+    if(nRestarts > 0) {
+      dCost = CostFunction(pNtk);
+      for(int i = 0; i < 1 + nRestarts; i++) {
+        qPendingJobs.emplace(i, new Ntk(*pNtk), iSeed + i);
+      }
+    } else {
+      qPendingJobs.emplace(0, pNtk, iSeed);
+    }
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      for(int i = 0; i < 1 + nRestarts; i++) { // ensure order
+        Job job(-1, NULL, 0); // place holder
+        {
+          std::unique_lock<std::mutex> l(mutexFinishedJobs);
+          while(qFinishedJobs.empty() || qFinishedJobs.top().id != i) {
+            condFinishedJobs.wait(l);
+          }
+          job = std::move(qFinishedJobs.top());
+          qFinishedJobs.pop();
+        }
+        if(nRestarts > 0) {
+          double dNewCost = CostFunction(job.pNtk);
+          if(dNewCost < dCost) {
+            dCost = dNewCost;
+            *pNtk = *job.pNtk;
+          }
+        }
+      }
+    } else {
+#endif
+      // if single thread
+      while(!qPendingJobs.empty()) {
+        Job job = std::move(qPendingJobs.front());
+        qPendingJobs.pop();
+        RunJob(*pOpt, job);
+        if(nRestarts > 0) {
+          double dNewCost = CostFunction(job.pNtk);
+          if(dNewCost < dCost) {
+            dCost = dNewCost;
+            *pNtk = *job.pNtk;
+          }
+        }
+      }
+#ifdef ABC_USE_PTHREADS
+    }
+#endif
     time_point end = GetCurrentTime();
     double elapsed_seconds = Duration(start, end);
     if(nVerbose) {

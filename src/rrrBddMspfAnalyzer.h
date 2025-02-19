@@ -73,7 +73,7 @@ namespace rrr {
   public:
     // constructors
     BddMspfAnalyzer();
-    BddMspfAnalyzer(Ntk *pNtk, Parameter const *pPar);
+    BddMspfAnalyzer(Parameter const *pPar);
     ~BddMspfAnalyzer();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
@@ -578,40 +578,11 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  BddMspfAnalyzer<Ntk>::BddMspfAnalyzer(Ntk *pNtk, Parameter const *pPar) :
-    pNtk(pNtk),
+  BddMspfAnalyzer<Ntk>::BddMspfAnalyzer(Parameter const *pPar) :
+    pNtk(NULL),
     nVerbose(pPar->nAnalyzerVerbose),
+    pBdd(NULL),
     fUpdate(false) {
-    NewBdd::Param Par;
-    Par.nObjsMaxLog = 25;
-    Par.nCacheMaxLog = 20;
-    Par.fCountOnes = true;
-    Par.nGbc = 1;
-    Par.nReo = 4000;
-    pBdd = new NewBdd::Man(pNtk->GetNumPis(), Par);
-    Allocate();
-    Assign(vFs[0], pBdd->Const0());
-    int idx = 0;
-    pNtk->ForEachPi([&](int id) {
-      Assign(vFs[id], pBdd->IthVar(idx));
-      idx++;
-    });
-    pNtk->ForEachInt([&](int id) {
-      vUpdates[id] = true;
-    });
-    Simulate();
-    pBdd->Reorder();
-    pBdd->TurnOffReo();
-    pNtk->ForEachInt([&](int id) {
-      vvCs[id].resize(pNtk->GetNumFanins(id), LitMax);
-    });
-    pNtk->ForEachPo([&](int id) {
-      vvCs[id].resize(1, LitMax);
-      Assign(vvCs[id][0], pBdd->Const0());
-      int fi = pNtk->GetFanin(id, 0);
-      vGUpdates[fi]  = true;
-    });
-    pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   template <typename Ntk>
@@ -631,7 +602,7 @@ namespace rrr {
     vVisits.clear();
     // alloc
     bool fUseReo = false;
-    if(pBdd->GetNumVars() != pNtk->GetNumPis()) {
+    if(!pBdd || pBdd->GetNumVars() != pNtk->GetNumPis()) {
       // need to reset manager
       delete pBdd;
       NewBdd::Param Par;

@@ -85,7 +85,7 @@ namespace rrr {
   public:
     // constructors
     Simulator();
-    Simulator(Ntk *pNtk, Parameter const *pPar);
+    Simulator(Parameter const *pPar);
     ~Simulator();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
@@ -549,8 +549,8 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  Simulator<Ntk>::Simulator(Ntk *pNtk, Parameter const *pPar) :
-    pNtk(pNtk),
+  Simulator<Ntk>::Simulator(Parameter const *pPar) :
+    pNtk(NULL),
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
     target(-1),
@@ -558,13 +558,8 @@ namespace rrr {
     fUpdate(false),
     nAdds(0),
     nResets(0) {
-    pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
-    vValues.resize(nWords * pNtk->GetNumNodes());
     care.resize(nWords);
     tmp.resize(nWords);
-    vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
-    GenerateRandomStimuli();
-    Simulate();
   }
 
   template <typename Ntk>

@@ -45,7 +45,7 @@ namespace rrr {
     
   public:
     // constructors
-    SatSolver(Ntk *pNtk, Parameter const *pPar);
+    SatSolver(Parameter const *pPar);
     ~SatSolver();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
     
@@ -254,8 +254,8 @@ namespace rrr {
   /* {{{ Constructors */
 
   template <typename Ntk>
-  SatSolver<Ntk>::SatSolver(Ntk *pNtk, Parameter const *pPar) :
-    pNtk(pNtk),
+  SatSolver<Ntk>::SatSolver(Parameter const *pPar) :
+    pNtk(NULL),
     nVerbose(pPar->nSatSolverVerbose),
     nConflictLimit(pPar->nConflictLimit),
     pSat(sat_solver_new()),
@@ -265,7 +265,6 @@ namespace rrr {
     nCalls(0),
     nSats(0),
     nUnsats(0) {
-    pNtk->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   template <typename Ntk>

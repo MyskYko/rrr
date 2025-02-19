@@ -33,7 +33,7 @@ namespace rrr {
     seconds nTimeout; // assigned upon Run
 
     // data
-    Ana *pAna;
+    Ana ana;
     std::mt19937 rng;
     std::vector<int> vTmp;
     std::map<int, std::set<int>> mapNewFanins;
@@ -88,12 +88,12 @@ namespace rrr {
     
   public:
     // constructors
-    Optimizer(Ntk *pNtk, Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
-    ~Optimizer();
-    void UpdateNetwork(Ntk *pNtk_, bool fSame);
+    Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
+    void UpdateNetwork(Ntk *pNtk_, bool fSame = false);
 
     // run
-    void Run(int iSeed, seconds nTimeout_ = 0);
+    void Run(seconds nTimeout_ = 0);
+    void Randomize(int iSeed);
     
   };
 
@@ -483,7 +483,7 @@ namespace rrr {
         }
       }
       // reduce
-      if(pAna->CheckRedundancy(id, idx)) {
+      if(ana.CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
         fRemoved = true;
@@ -512,7 +512,7 @@ namespace rrr {
         }
       }
       // reduce
-      if(pAna->CheckRedundancy(id, idx)) {
+      if(ana.CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
         if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
@@ -652,9 +652,9 @@ namespace rrr {
       if(vTfoMarks[*it]) {
         continue;
       }
-      if(pAna->CheckFeasibility(id, *it, false)) {
+      if(ana.CheckFeasibility(id, *it, false)) {
         pNtk->AddFanin(id, *it, false);
-      } else if(pNtk->UseComplementedEdges() && pAna->CheckFeasibility(id, *it, true)) {
+      } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, *it, true)) {
         pNtk->AddFanin(id, *it, true);
       } else {
         continue;
@@ -682,9 +682,9 @@ namespace rrr {
       if(vTfoMarks[cand]) {
         continue;
       }
-      if(pAna->CheckFeasibility(id, cand, false)) {
+      if(ana.CheckFeasibility(id, cand, false)) {
         pNtk->AddFanin(id, cand, false);
-      } else if(pNtk->UseComplementedEdges() && pAna->CheckFeasibility(id, cand, true)) {
+      } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, cand, true)) {
         pNtk->AddFanin(id, cand, true);
       } else {
         continue;
@@ -816,21 +816,16 @@ namespace rrr {
   /* {{{ Constructors */
   
   template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::Optimizer(Ntk *pNtk, Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
-    pNtk(pNtk),
+  Optimizer<Ntk, Ana>::Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
+    pNtk(NULL),
     nVerbose(pPar->nOptimizerVerbose),
     CostFunction(CostFunction),
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
     nDistance(pPar->nDistance),
+    ana(pPar),
     target(-1) {
-    pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
-    pAna = new Ana(pNtk, pPar);
-  }
-  
-  template <typename Ntk, typename Ana>
-  Optimizer<Ntk, Ana>::~Optimizer() {
-    delete pAna;
+    rng.seed(pPar->iSeed);
   }
   
   template <typename Ntk, typename Ana>
@@ -838,7 +833,7 @@ namespace rrr {
     pNtk = pNtk_;
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
-    pAna->UpdateNetwork(pNtk, fSame);
+    ana.UpdateNetwork(pNtk, fSame);
   }
   
   /* }}} */
@@ -846,13 +841,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Run(int iSeed, seconds nTimeout_) {
-    // randomize
-    rng.seed(iSeed);
-    nSortType = rng() % 18;
-    vRandPiOrder.clear();
-    vRandCosts.clear();
-    // run
+  void Optimizer<Ntk, Ana>::Run(seconds nTimeout_) {
     nTimeout = nTimeout_;
     start = GetCurrentTime();
     switch(nFlow) {
@@ -915,6 +904,14 @@ namespace rrr {
     default:
       assert(0);
     }
+  }
+  
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::Randomize(int iSeed) {
+    rng.seed(iSeed);
+    nSortType = rng() % 18;
+    vRandPiOrder.clear();
+    vRandCosts.clear();
   }
   
   /* }}} */
