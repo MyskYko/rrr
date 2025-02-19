@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <string>
 #include <queue>
 #include <random>
 
@@ -57,8 +58,11 @@ namespace rrr {
     // time
     seconds GetRemainingTime() const;
 
+    // abc
+    void CallAbc(Ntk *pNtk, std::string Command);
+
     // run job
-    void RunJob(Opt &opt, Job const &job) const;
+    void RunJob(Opt &opt, Job const &job);
 
 #ifdef ABC_USE_PTHREADS
     // thread
@@ -118,7 +122,25 @@ namespace rrr {
   /* {{{ Run job */
 
   template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::RunJob(Opt &opt, Job const &job) const {
+  inline void Scheduler<Ntk, Opt>::CallAbc(Ntk *pNtk, std::string Command) {
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexAbc);
+        Abc9Execute(pNtk, Command);
+      }
+      return;
+    }
+#endif
+    Abc9Execute(pNtk, Command);
+  }
+
+  /* }}} */
+  
+  /* {{{ Run job */
+
+  template <typename Ntk, typename Opt>
+  void Scheduler<Ntk, Opt>::RunJob(Opt &opt, Job const &job) {
     opt.UpdateNetwork(job.pNtk);
     // start flow
     switch(nFlow) {
@@ -139,7 +161,7 @@ namespace rrr {
           break;
         }
         if(i != 0) {
-          Abc9Execute(job.pNtk, "&if -K 6; &mfs; &st");
+          CallAbc(job.pNtk, "&if -K 6; &mfs; &st");
           dCost = CostFunction(job.pNtk);
           opt.UpdateNetwork(job.pNtk, true);
           if(nVerbose) {
@@ -152,7 +174,7 @@ namespace rrr {
           }
           opt.Randomize(rng());
           opt.Run(GetRemainingTime());
-          Abc9Execute(job.pNtk, "&dc2");
+          CallAbc(job.pNtk, "&dc2");
           double dNewCost = CostFunction(job.pNtk);
           if(nVerbose) {
             std::cout << "\tite " << std::setw(3) << j << ": cost = " << dNewCost << std::endl;
@@ -166,7 +188,7 @@ namespace rrr {
         }
         if(dCost < dBestCost) {
           dBestCost = dCost;
-          best = *pNtk;
+          best = *job.pNtk;
           i = 0;
         }
       }
@@ -213,7 +235,7 @@ namespace rrr {
         if(fFx)
           Command += "; &fx; &st";
         Command += pComp;
-        Abc9Execute(job.pNtk, Command);
+        CallAbc(job.pNtk, Command);
         if(nVerbose) {
           std::cout << "ite " << std::setw(6) << i << ": cost = " << CostFunction(job.pNtk) << std::endl;
         }
@@ -226,9 +248,9 @@ namespace rrr {
           opt.Randomize(rng());
           opt.Run(GetRemainingTime());
           if(rng() & 1) {
-            Abc9Execute(job.pNtk, "&dc2");
+            CallAbc(job.pNtk, "&dc2");
           } else {
-            Abc9Execute(job.pNtk, "&put; " + pCompress2rs + "; &get");
+            CallAbc(job.pNtk, "&put; " + pCompress2rs + "; &get");
           }
           if(nVerbose) {
             std::cout << "\trrr " << std::setw(6) << j << ": cost = " << CostFunction(job.pNtk) << std::endl;
