@@ -47,6 +47,7 @@ namespace rrr {
     bool fTerminate;
     std::vector<std::thread> vThreads;
     std::priority_queue<Job> qFinishedJobs;
+    std::mutex mutexAbc;
     std::mutex mutexPendingJobs;
     std::mutex mutexFinishedJobs;
     std::condition_variable condPendingJobs;
@@ -122,10 +123,7 @@ namespace rrr {
     // start flow
     switch(nFlow) {
     case 0:
-      if(job.id != 0) {
-        // TODO: randomization should be triggered by a different flag
-        opt.Randomize(job.iSeed);
-      }
+      opt.ResetSeed(job.iSeed);
       opt.Run(GetRemainingTime());
       break;
     case 1: { // transtoch

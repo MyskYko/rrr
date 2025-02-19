@@ -93,6 +93,7 @@ namespace rrr {
 
     // run
     void Run(seconds nTimeout_ = 0);
+    void ResetSeed(int iSeed);
     void Randomize(int iSeed);
     
   };
@@ -825,7 +826,6 @@ namespace rrr {
     nDistance(pPar->nDistance),
     ana(pPar),
     target(-1) {
-    rng.seed(pPar->iSeed);
   }
   
   template <typename Ntk, typename Ana>
@@ -905,13 +905,18 @@ namespace rrr {
       assert(0);
     }
   }
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ResetSeed(int iSeed) {
+    rng.seed(iSeed);
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+  }
   
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::Randomize(int iSeed) {
-    rng.seed(iSeed);
+    ResetSeed(iSeed);
     nSortType = rng() % 18;
-    vRandPiOrder.clear();
-    vRandCosts.clear();
   }
   
   /* }}} */
