@@ -162,42 +162,6 @@ namespace rrr {
     });
   }
 
-  template <typename Ntk, typename Ana>
-  inline std::vector<int> Optimizer<Ntk, Ana>::GetNeighbors(int id, int nRadius) {
-    // mark neighbors
-    std::vector<int> vPrevs, vNexts;
-    std::vector<bool> vMarks(pNtk->GetNumNodes());
-    vNexts.push_back(id);
-    vMarks[id] = true;
-    for(int i = 0; i < nRadius; i++) {
-      vPrevs.swap(vNexts);
-      vNexts.clear();
-      for(int id: vPrevs) {
-        pNtk->ForEachFanin(id, [&](int fi, bool c) {
-          if(!vMarks[fi]) {
-            vNexts.push_back(fi);
-            vMarks[fi] = true;
-          }
-        });
-        pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
-          if(!vMarks[fo]) {
-            vNexts.push_back(fo);
-            vMarks[fo] = true;
-          }
-        });
-      }
-    }
-    // return neighbors in topological order
-    std::vector<int> v;
-    vMarks[id] = false;
-    pNtk->ForEachPiInt([&](int id) {
-      if(vMarks[id]) {
-        v.push_back(id);
-      }
-    });
-    return v;
-  }
-
   /* }}} */
 
   /* {{{ Time */
@@ -850,7 +814,7 @@ namespace rrr {
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
-          vCands = GetNeighbors(id, nDistance);
+          vCands = pNtk->GetNeighbors(id, nDistance);
         } else {
           vCands = pNtk->GetPisInts();
         }
@@ -862,7 +826,7 @@ namespace rrr {
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
-          vCands = GetNeighbors(id, nDistance);
+          vCands = pNtk->GetNeighbors(id, nDistance);
         } else {
           vCands = pNtk->GetPisInts();
         }
@@ -876,7 +840,7 @@ namespace rrr {
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
-            vCands = GetNeighbors(id, nDistance);
+            vCands = pNtk->GetNeighbors(id, nDistance);
           } else {
             vCands = pNtk->GetPisInts();
           }
@@ -885,7 +849,7 @@ namespace rrr {
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
-            vCands = GetNeighbors(id, nDistance);
+            vCands = pNtk->GetNeighbors(id, nDistance);
           } else {
             vCands = pNtk->GetPisInts();
             // vCands = pNtk->GetInts();

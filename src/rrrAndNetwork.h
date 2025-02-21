@@ -102,6 +102,7 @@ namespace rrr {
     bool GetCompl(int id, int idx) const;
     int  FindFanin(int id, int fi) const;
     bool IsReconvergent(int id);
+    std::vector<int> GetNeighbors(int id, int nHops);
 
     // network traversal
     void ForEachPi(std::function<void(int)> const &func) const;
@@ -472,6 +473,40 @@ namespace rrr {
     }
     EndTraversal();
     return false;
+  }
+
+  inline std::vector<int> AndNetwork::GetNeighbors(int id, int nHops) {
+    StartTraversal();
+    vTrav[id] = iTrav;
+    std::vector<int> vPrevs, vNexts;
+    vNexts.push_back(id);
+    for(int i = 0; i < nHops; i++) {
+      vPrevs.swap(vNexts);
+      for(int id: vPrevs) {
+        ForEachFanin(id, [&](int fi, bool c) {
+          if(vTrav[fi] != iTrav) {
+            vNexts.push_back(fi);
+            vTrav[fi] = iTrav;
+          }
+        });
+        ForEachFanout(id, false, [&](int fo, bool c) {
+          if(vTrav[fo] != iTrav) {
+            vNexts.push_back(fo);
+            vTrav[fo] = iTrav;
+          }
+        });
+      }
+      vPrevs.clear();
+    }
+    EndTraversal();
+    std::vector<int> v;
+    vTrav[id] = 0;
+    ForEachPiInt([&](int id) {
+      if(vTrav[id] == iTrav) {
+        v.push_back(id);
+      }
+    });
+    return v;
   }
 
   /* }}} */
