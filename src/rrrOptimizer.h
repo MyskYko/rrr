@@ -9,6 +9,7 @@
 
 #include "rrrParameter.h"
 #include "rrrTypes.h"
+#include "rrrUtils.h"
 
 namespace rrr {
 

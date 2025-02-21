@@ -3,15 +3,14 @@
 #include <cassert>
 
 #include "rrrParameter.h"
-#include "rrrTypes.h"
 #include "rrrAndNetwork.h"
-#include "rrrScheduler.h"
-#include "rrrOptimizer.h"
+#include "rrrSatSolver.h"
+#include "rrrSimulator.h"
 #include "rrrAnalyzer.h"
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
-#include "rrrSatSolver.h"
-#include "rrrSimulator.h"
+#include "rrrOptimizer.h"
+#include "rrrScheduler.h"
 
 namespace rrr {
 
