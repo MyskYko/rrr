@@ -53,7 +53,6 @@ namespace rrr {
 
     // topology
     void MarkTfo(int id);
-    std::vector<int> GetNeighbors(int id, int nRadius);
 
     // time
     bool Timeout();
@@ -815,7 +814,7 @@ namespace rrr {
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
-          vCands = pNtk->GetNeighbors(id, nDistance);
+          vCands = pNtk->GetNeighbors(id, true, nDistance);
         } else {
           vCands = pNtk->GetPisInts();
         }
@@ -827,7 +826,7 @@ namespace rrr {
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
-          vCands = pNtk->GetNeighbors(id, nDistance);
+          vCands = pNtk->GetNeighbors(id, true, nDistance);
         } else {
           vCands = pNtk->GetPisInts();
         }
@@ -841,7 +840,7 @@ namespace rrr {
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
-            vCands = pNtk->GetNeighbors(id, nDistance);
+            vCands = pNtk->GetNeighbors(id, true, nDistance);
           } else {
             vCands = pNtk->GetPisInts();
           }
@@ -850,7 +849,7 @@ namespace rrr {
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
-            vCands = pNtk->GetNeighbors(id, nDistance);
+            vCands = pNtk->GetNeighbors(id, true, nDistance);
           } else {
             vCands = pNtk->GetPisInts();
             // vCands = pNtk->GetInts();

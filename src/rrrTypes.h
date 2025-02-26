@@ -39,7 +39,8 @@ namespace rrr {
     SORT_FANINS,
     SAVE,
     LOAD,
-    POP_BACK
+    POP_BACK,
+    INSERT
   };
 
   struct Action {

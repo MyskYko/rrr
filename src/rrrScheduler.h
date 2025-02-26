@@ -17,6 +17,8 @@
 
 #include "rrrAbc.h"
 
+#include "rrrPartitioner.h"
+
 namespace rrr {
 
   template <typename Ntk, typename Opt>
@@ -36,12 +38,10 @@ namespace rrr {
     bool fMultiThreading;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
-
-    // copy of parameter (maybe updated during the run). probably unnecessary.
-    Parameter Par;
     
     // data
     time_point start;
+    Partitioner<Ntk> par;
     std::queue<Job> qPendingJobs;
     Opt *pOpt; // used only in case of single thread execution
 #ifdef ABC_USE_PTHREADS
@@ -320,7 +320,7 @@ namespace rrr {
     nRestarts(pPar->nRestarts),
     fMultiThreading(pPar->nThreads > 1),
     nTimeout(pPar->nTimeout),
-    Par(*pPar),
+    par(pPar),
     pOpt(NULL) {
     // prepare cost function
     CostFunction = [](Ntk *pNtk) {

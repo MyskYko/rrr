@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 #include <string>
 #include <cassert>
 
@@ -12,10 +13,24 @@ namespace rrr {
   template <typename T>
   std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
     std::string delim;
+    os << "[";
     for(T const &e: v) {
       os << delim << e;
       delim = ", ";
     }
+    os << "]";
+    return os;
+  }
+  
+  template <typename T>
+  std::ostream& operator<<(std::ostream& os, const std::set<T>& s) {
+    std::string delim;
+    os << "{";
+    for(T const &e: s) {
+      os << delim << e;
+      delim = ", ";
+    }
+    os << "}";
     return os;
   }
   
