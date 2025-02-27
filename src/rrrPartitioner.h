@@ -3,6 +3,8 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <tuple>
+#include <random>
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
@@ -17,46 +19,51 @@ namespace rrr {
 
     // parameters
     int nVerbose;
-    static constexpr bool fExcludeLoops = false;
 
     // data
-    std::map<Ntk *, std::pair<std::vector<int>, std::vector<int>>> mSubNtk2Io;
+    std::map<Ntk *, std::tuple<std::set<int>, std::vector<int>, std::vector<int>>> mSubNtk2Io;
+    std::set<int> sBlocked;
+
+    // subroutines
+    Ntk *ExtractDisjoint(int id);
     
   public:
     // constructors
     Partitioner(Parameter const *pPar);
     void UpdateNetwork(Ntk *pNtk);
 
-    Ntk *Extract();
+    // APIs
+    Ntk *Extract(int iSeed);
     void Insert(Ntk *pSubNtk);
   };
 
-  /* {{{ Constructors */
-  
-  template <typename Ntk>
-  Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
-    nVerbose(pPar->nSchedulerVerbose) {
-  }
+  /* {{{ Subroutines */
 
   template <typename Ntk>
-  void Partitioner<Ntk>::UpdateNetwork(Ntk *pNtk_) {
-    pNtk = pNtk_;
-  }
-
-  /* }}} */
-
-  template <typename Ntk>
-  Ntk *Partitioner<Ntk>::Extract() {
-    // TODO: pick a center node from candidates that do not belong to any other ongoing windows (for example, set of nodes as sBlocked)
-    int id = 100;
+  Ntk *Partitioner<Ntk>::ExtractDisjoint(int id) {
     // collect neighbor
+    assert(!sBlocked.count(id));
+    if(nVerbose) {
+      std::cout << "extracting with a center node " << id << std::endl;
+    }
+    // TODO: gradually increase radius until it hits window size limit
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, 2);
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     sNodes.insert(id);
     if(nVerbose) {
       std::cout << "neighbors: " << sNodes << std::endl;
     }
-    // TODO: remove nodes that are already blocked
+    // remove nodes that are already blocked
+    for(std::set<int>::iterator it = sNodes.begin(); it != sNodes.end();) {
+      if(sBlocked.count(*it)) {
+        it = sNodes.erase(it);
+      } else {
+        it++;
+      }
+    }
+    if(nVerbose) {
+      std::cout << "disjoint neighbors: " << sNodes << std::endl;
+    }
     // get tentative window IO
     std::set<int> sInputs, sOutputs;
     for(int id: sNodes) {
@@ -79,10 +86,58 @@ namespace rrr {
       std::cout << "\tinputs: " << sInputs << std::endl;
       std::cout << "\toutputs: " << sOutputs << std::endl;
     }
-    // prevent potential loops
-    if(!fExcludeLoops) {
-      // by including inner nodes
-      std::set<int> sFanouts;
+    // prevent potential loops while ensuring disjointness
+    // first by including inner nodes
+    std::set<int> sFanouts;
+    for(int id: sOutputs) {
+      pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
+        if(!sNodes.count(fo)) {
+          sFanouts.insert(fo);
+        }
+      });
+    }
+    std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
+    while(!vInners.empty()) {
+      if(nVerbose) {
+        std::cout << "inners: " << vInners << std::endl;
+      }
+      bool fOverlap = false;
+      for(int i: vInners) {
+        if(sBlocked.count(i)) {
+          fOverlap = true;
+          break;
+        }
+      }
+      if(fOverlap) {
+        break;
+      }
+      sNodes.insert(vInners.begin(), vInners.end());
+      if(nVerbose) {
+        std::cout << "new neighbors: " << sNodes << std::endl;
+      }
+      sInputs.clear();
+      sOutputs.clear();
+      for(int id: sNodes) {
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(!sNodes.count(fi)) {
+            sInputs.insert(fi);
+          }
+        });
+        bool fOutput = false;
+        pNtk->ForEachFanout(id, true, [&](int fo, bool c) {
+          if(!sNodes.count(fo)) {
+            fOutput = true;
+          }
+        });
+        if(fOutput) {
+          sOutputs.insert(id);
+        }
+      }
+      if(nVerbose) {
+        std::cout << "\tnew inputs: " << sInputs << std::endl;
+        std::cout << "\tnew outputs: " << sOutputs << std::endl;
+      }
+      sFanouts.clear();
       for(int id: sOutputs) {
         pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
           if(!sNodes.count(fo)) {
@@ -90,54 +145,15 @@ namespace rrr {
           }
         });
       }
-      std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
-      while(!vInners.empty()) {
-        if(nVerbose) {
-          std::cout << "inners: " << vInners << std::endl;
-        }
-        sNodes.insert(vInners.begin(), vInners.end());
-        if(nVerbose) {
-          std::cout << "new neighbors: " << sNodes << std::endl;
-        }
-        sInputs.clear();
-        sOutputs.clear();
-        for(int id: sNodes) {
-          pNtk->ForEachFanin(id, [&](int fi, bool c) {
-            if(!sNodes.count(fi)) {
-              sInputs.insert(fi);
-            }
-          });
-          bool fOutput = false;
-          pNtk->ForEachFanout(id, true, [&](int fo, bool c) {
-            if(!sNodes.count(fo)) {
-              fOutput = true;
-            }
-          });
-          if(fOutput) {
-            sOutputs.insert(id);
-          }
-        }
-        if(nVerbose) {
-          std::cout << "\tnew inputs: " << sInputs << std::endl;
-          std::cout << "\tnew outputs: " << sOutputs << std::endl;
-        }
-        sFanouts.clear();;
-        for(int id: sOutputs) {
-          pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
-            if(!sNodes.count(fo)) {
-              sFanouts.insert(fo);
-            }
-          });
-        }
-        vInners = pNtk->GetInners(sFanouts, sInputs);
-      }
-    } else {
-      // by removing TFI of outputs reachable to inputs
+      vInners = pNtk->GetInners(sFanouts, sInputs);
+    }
+    if(!vInners.empty()) {
+      // fall back method by removing TFI of outputs reachable to inputs
       for(int id: sOutputs) {
         if(!sNodes.count(id)) { // already removed
           continue;
         }
-        std::set<int> sFanouts;
+        sFanouts.clear();
         pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
           if(!sNodes.count(fo)) {
             sFanouts.insert(fo);
@@ -154,6 +170,12 @@ namespace rrr {
           });
           if(nVerbose) {
             std::cout << "new neighbors: " << sNodes << std::endl;
+          }
+          if(sNodes.empty()) {
+            if(nVerbose) {
+              std::cout << "IS EMPTY" << std::endl;
+            }
+            return NULL;
           }
           // recompute inputs
           sInputs.clear();
@@ -181,21 +203,76 @@ namespace rrr {
         std::cout << "\tnew outputs: " << sOutputs << std::endl;
       }
     }
-    // TODO: ensure outputs of neigher windows can reach each other's inputs
+    // ensure outputs of both windows do not reach each other's inputs at the same time
+    for(auto const &entry: mSubNtk2Io) {
+      if(!pNtk->IsReachable(sOutputs, std::get<1>(std::get<1>(entry)))) {
+        continue;
+      }
+      if(!pNtk->IsReachable(std::get<2>(std::get<1>(entry)), sInputs)) {
+        continue;
+      }
+      if(nVerbose) {
+        std::cout << "POTENTIAL LOOPS" << std::endl;
+      }
+      return NULL;
+    }
     // extract by inputs, internals, and outputs (no checks needed in ntk side)
     std::vector<int> vInputs(sInputs.begin(), sInputs.end());
     std::vector<int> vOutputs(sOutputs.begin(), sOutputs.end());
     Ntk *pSubNtk = pNtk->Extract(sNodes, vInputs, vOutputs);
     // return subntk to be modified, while remember IOs
-    mSubNtk2Io.emplace(pSubNtk, std::make_pair(std::move(vInputs), std::move(vOutputs)));
+    for(int i: sNodes) {
+      sBlocked.insert(i);
+    }
+    mSubNtk2Io.emplace(pSubNtk, std::make_tuple(std::move(sNodes), std::move(vInputs), std::move(vOutputs)));
     return pSubNtk;
+  }
+  
+  /* }}} */
+
+  /* {{{ Constructors */
+  
+  template <typename Ntk>
+  Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
+    nVerbose(pPar->nSchedulerVerbose) {
+  }
+
+  template <typename Ntk>
+  void Partitioner<Ntk>::UpdateNetwork(Ntk *pNtk_) {
+    pNtk = pNtk_;
+  }
+
+  /* }}} */
+
+  /* {{{ APIs */
+  
+  template <typename Ntk>
+  Ntk *Partitioner<Ntk>::Extract(int iSeed) {
+    // pick a center node from candidates that do not belong to any other ongoing windows
+    std::mt19937 rng(iSeed);
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    for(int id: vInts) {
+      if(!sBlocked.count(id)) {
+        Ntk *pSubNtk = ExtractDisjoint(id);
+        if(pSubNtk) {
+          return pSubNtk;
+        }
+      }
+    }
+    return NULL;
   }
 
   template <typename Ntk>
   void Partitioner<Ntk>::Insert(Ntk *pSubNtk) {
-    pNtk->Insert(pSubNtk, std::get<0>(mSubNtk2Io[pSubNtk]), std::get<1>(mSubNtk2Io[pSubNtk]));
+    for(int i: std::get<0>(mSubNtk2Io[pSubNtk])) {
+      sBlocked.erase(i);
+    }
+    pNtk->Insert(pSubNtk, std::get<1>(mSubNtk2Io[pSubNtk]), std::get<2>(mSubNtk2Io[pSubNtk]));
     delete pSubNtk;
     mSubNtk2Io.erase(pSubNtk);
   }
+
+  /* }}} */
   
 }

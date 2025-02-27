@@ -106,7 +106,8 @@ namespace rrr {
     int  FindFanin(int id, int fi) const;
     bool IsReconvergent(int id);
     std::vector<int> GetNeighbors(int id, bool fPis, int nHops);
-    bool IsReachable(std::set<int> const &sSrcs, std::set<int> const &sDsts);
+    template <template <typename...> typename Container, typename ... Ts, template <typename...> typename Container2, typename ... Ts2>
+    bool IsReachable(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts);
     std::vector<int> GetInners(std::set<int> const &sSrcs, std::set<int> const &sDsts);
 
     // network traversal
@@ -546,20 +547,21 @@ namespace rrr {
     return v;
   }
 
-  inline bool AndNetwork::IsReachable(std::set<int> const &sSrcs, std::set<int> const &sDsts) {
-    if(sSrcs.empty() || sDsts.empty()) {
+  template <template <typename...> typename Container, typename ... Ts, template <typename...> typename Container2, typename ... Ts2>
+  inline bool AndNetwork::IsReachable(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts) {
+    if(srcs.empty() || dsts.empty()) {
       return false;
     }
     // mark destinations
     StartTraversal();
-    for(int id: sDsts) {
+    for(int id: dsts) {
       vTrav[id] = iTrav;
     }
     unsigned iTravStart = iTrav;
     iTrav++;
     assert(iTrav != 0); //TODO: handle this overflow
     // mark sources
-    for(int id: sSrcs) {
+    for(int id: srcs) {
       if(vTrav[id] == iTravStart) {
         EndTraversal();
         return true;
