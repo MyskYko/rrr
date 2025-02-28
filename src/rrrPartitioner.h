@@ -19,6 +19,7 @@ namespace rrr {
 
     // parameters
     int nVerbose;
+    int nWindowSize;
 
     // data
     std::map<Ntk *, std::tuple<std::set<int>, std::vector<int>, std::vector<int>>> mSubNtk2Io;
@@ -46,8 +47,20 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "extracting with a center node " << id << std::endl;
     }
-    // TODO: gradually increase radius until it hits window size limit
-    std::vector<int> vNodes = pNtk->GetNeighbors(id, false, 2);
+    int nRadius = 2;
+    std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
+    int nSize = vNodes.size();
+    // gradually increase radius until it hits window size limit
+    while(nSize < nWindowSize) {
+      std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
+      int nSizeNew = vNodesNew.size();
+      if(nSize == nSizeNew) { // already maximum
+        break;
+      }
+      vNodes = vNodesNew;
+      nSize = nSizeNew;
+      nRadius++;
+    }
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     sNodes.insert(id);
     if(nVerbose) {
@@ -234,7 +247,8 @@ namespace rrr {
   
   template <typename Ntk>
   Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
-    nVerbose(pPar->nSchedulerVerbose) {
+    nVerbose(pPar->nPartitionerVerbose),
+    nWindowSize(pPar->nWindowSize) {
   }
 
   template <typename Ntk>
