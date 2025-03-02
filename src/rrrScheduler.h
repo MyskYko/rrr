@@ -1,8 +1,5 @@
 #pragma once
 
-#include <iostream>
-#include <iomanip>
-#include <string>
 #include <queue>
 #include <random>
 
@@ -13,11 +10,9 @@
 #endif
 
 #include "rrrParameter.h"
-#include "rrrTypes.h"
-
-#include "rrrAbc.h"
-
+#include "rrrUtils.h"
 #include "rrrPartitioner.h"
+#include "rrrAbc.h"
 
 namespace rrr {
 
@@ -429,6 +424,7 @@ namespace rrr {
   
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::Run() {
+    pNtk->Print();
     start = GetCurrentTime();
     if(fPartitioning) {
       pNtk->Sweep();

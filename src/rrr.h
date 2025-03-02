@@ -1,16 +1,13 @@
 #pragma once
 
-#include <cassert>
-
-#include "rrrParameter.h"
 #include "rrrAndNetwork.h"
-#include "rrrSatSolver.h"
-#include "rrrSimulator.h"
-#include "rrrAnalyzer.h"
+#include "rrrScheduler.h"
+#include "rrrOptimizer.h"
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
-#include "rrrOptimizer.h"
-#include "rrrScheduler.h"
+#include "rrrAnalyzer.h"
+#include "rrrSatSolver.h"
+#include "rrrSimulator.h"
 
 namespace rrr {
 

@@ -1,14 +1,18 @@
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <set>
 #include <string>
+#include <functional>
 #include <cassert>
 
 #include "rrrTypes.h"
 
 namespace rrr {
+
+  /* {{{ Print helpers */
 
   template <typename T>
   std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
@@ -33,6 +37,18 @@ namespace rrr {
     os << "}";
     return os;
   }
+
+  void PrintComplementedEdges(std::function<void(std::function<void(int, bool)> const &)> const &ForEachEdge) {
+    std::string delim;
+    std::cout << "[";
+    ForEachEdge([&] (int id, bool c) {
+      std::cout << delim << (c? "!": "") << id;
+      delim = ", ";
+    });
+    std::cout << "]";
+  }
+
+  /* }}} */
   
   /* {{{ VarValue functions */
   

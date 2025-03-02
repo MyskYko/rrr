@@ -1,19 +1,13 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
-#include <list>
-#include <set>
-#include <map>
 #include <utility>
-#include <initializer_list>
-#include <string>
-#include <functional>
+#include <list>
+#include <map>
 #include <algorithm>
 #include <limits>
 
 #include "rrrParameter.h"
-#include "rrrTypes.h"
+#include "rrrUtils.h"
 
 namespace rrr {
 
@@ -109,7 +103,8 @@ namespace rrr {
     std::vector<int> GetNeighbors(int id, bool fPis, int nHops);
     template <template <typename...> typename Container, typename ... Ts, template <typename...> typename Container2, typename ... Ts2>
     bool IsReachable(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts);
-    std::vector<int> GetInners(std::set<int> const &sSrcs, std::set<int> const &sDsts);
+    template <template <typename...> typename Container, typename ... Ts, template <typename...> typename Container2, typename ... Ts2>
+    std::vector<int> GetInners(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts);
 
     // network traversal
     void ForEachPi(std::function<void(int)> const &func) const;
@@ -606,9 +601,10 @@ namespace rrr {
     return false;
   }
 
-  inline std::vector<int> AndNetwork::GetInners(std::set<int> const &sSrcs, std::set<int> const &sDsts) {
+  template <template <typename...> typename Container, typename ... Ts, template <typename...> typename Container2, typename ... Ts2>
+  inline std::vector<int> AndNetwork::GetInners(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts) {
     // this includes sources and destinations that are connected
-    if(sSrcs.empty() || sDsts.empty()) {
+    if(srcs.empty() || dsts.empty()) {
       return std::vector<int>();
     }
     StartTraversal();
@@ -622,11 +618,11 @@ namespace rrr {
     iTrav++;
     assert(iTrav != 0); //TODO: handle this overflow
     // mark destinations (to prevent nodes between destinations to sources being included)
-    for(int id: sDsts) {
+    for(int id: dsts) {
       vTrav[id] = iDst;
     }
     // mark TFOs of sources until destinations, which will be marekd as inner
-    for(int id: sSrcs) {
+    for(int id: srcs) {
       if(vTrav[id] == iDst) {
         vTrav[id] = iInner;
       } else {
@@ -654,7 +650,7 @@ namespace rrr {
     }
     // traverse TFIs of connected destinations
     std::vector<int> vInners;
-    for(int id: sDsts) {
+    for(int id: dsts) {
       if(vTrav[id] == iInner) {
         vInners.push_back(id);
         vTrav[id] = iTrav;
@@ -1436,40 +1432,18 @@ namespace rrr {
   }
   
   void AndNetwork::Print() const {
-    std::cout << "pi: ";
-    std::string delim = "";
-    ForEachPi([&](int id) {
-      std::cout << delim << id;
-      delim = ", ";
-    });
-    std::cout << std::endl;
+    std::cout << "inputs: " << vPis << std::endl;
     ForEachInt([&](int id) {
       std::cout << "node " << id << ": ";
-      delim = "";
-      ForEachFanin(id, [&](int fi, bool c) {
-        std::cout << delim;
-        if(c) {
-          std::cout << "!";
-        }
-        std::cout << fi;
-        delim = ", ";
-      });
+      PrintComplementedEdges(std::bind(&AndNetwork::ForEachFanin, this, id, std::placeholders::_1));
       std::cout << " (ref = " << vRefs[id] << ")";
       std::cout << std::endl;
     });
-    std::cout << "po: ";
-    delim = "";
-    ForEachPoDriver([&](int fi, bool c) {
-      std::cout << delim;
-      if(c) {
-        std::cout << "!";
-      }
-      std::cout << fi;
-      delim = ", ";
-    });
+    std::cout << "outputs: ";
+    PrintComplementedEdges(std::bind(&AndNetwork::ForEachPoDriver, this, std::placeholders::_1));
     std::cout << std::endl;
   }
 
-  /* }}} Misc end */
+  /* }}} */
 
 }

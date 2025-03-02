@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <map>
 #include <iterator>
 #include <random>
@@ -8,7 +7,6 @@
 #include <limits>
 
 #include "rrrParameter.h"
-#include "rrrTypes.h"
 #include "rrrUtils.h"
 
 namespace rrr {

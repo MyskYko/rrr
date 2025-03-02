@@ -1,12 +1,8 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
-
-#include <aig/gia/giaNewBdd.h>
-
 #include "rrrParameter.h"
-#include "rrrTypes.h"
+#include "rrrUtils.h"
+#include "rrrBddManager.h"
 
 namespace rrr {
 

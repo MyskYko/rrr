@@ -1,14 +1,8 @@
 #pragma once
 
-#include <iostream>
-#include <iomanip>
-#include <vector>
-#include <functional>
-
 #include <sat/bsat/satSolver.h>
 
 #include "rrrParameter.h"
-#include "rrrTypes.h"
 #include "rrrUtils.h"
 
 namespace rrr {
