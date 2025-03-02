@@ -22,7 +22,7 @@ namespace rrr {
     int nWindowSize;
 
     // data
-    std::map<Ntk *, std::tuple<std::set<int>, std::vector<int>, std::vector<int>>> mSubNtk2Io;
+    std::map<Ntk *, std::tuple<std::set<int>, std::vector<int>, std::vector<bool>, std::vector<int>>> mSubNtk2Io;
     std::set<int> sBlocked;
 
     // subroutines
@@ -218,15 +218,20 @@ namespace rrr {
     }
     // ensure outputs of both windows do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
-      if(!pNtk->IsReachable(sOutputs, std::get<1>(std::get<1>(entry)))) {
+      if(!pNtk->IsReachable(sOutputs, std::get<1>(entry.second))) {
         continue;
       }
-      if(!pNtk->IsReachable(std::get<2>(std::get<1>(entry)), sInputs)) {
+      if(!pNtk->IsReachable(std::get<3>(entry.second), sInputs)) {
         continue;
       }
       if(nVerbose) {
         std::cout << "POTENTIAL LOOPS" << std::endl;
       }
+      return NULL;
+    }
+    if(sNodes.size() < nWindowSize / 2) {
+      // too small
+      // TODO: fix this parameterized
       return NULL;
     }
     // extract by inputs, internals, and outputs (no checks needed in ntk side)
@@ -237,7 +242,7 @@ namespace rrr {
     for(int i: sNodes) {
       sBlocked.insert(i);
     }
-    mSubNtk2Io.emplace(pSubNtk, std::make_tuple(std::move(sNodes), std::move(vInputs), std::move(vOutputs)));
+    mSubNtk2Io.emplace(pSubNtk, std::make_tuple(std::move(sNodes), std::move(vInputs), std::vector<bool>(vInputs.size()), std::move(vOutputs)));
     return pSubNtk;
   }
   
@@ -282,7 +287,28 @@ namespace rrr {
     for(int i: std::get<0>(mSubNtk2Io[pSubNtk])) {
       sBlocked.erase(i);
     }
-    pNtk->Insert(pSubNtk, std::get<1>(mSubNtk2Io[pSubNtk]), std::get<2>(mSubNtk2Io[pSubNtk]));
+    std::pair<std::vector<int>, std::vector<bool>> vNewSignals = pNtk->Insert(pSubNtk, std::get<1>(mSubNtk2Io[pSubNtk]), std::get<2>(mSubNtk2Io[pSubNtk]), std::get<3>(mSubNtk2Io[pSubNtk]));
+    std::vector<int> &vOldOutputs = std::get<3>(mSubNtk2Io[pSubNtk]);
+    std::vector<int> &vNewOutputs = vNewSignals.first;
+    std::vector<bool> &vNewCompls = vNewSignals.second;
+    // need to remap updated outputs that are used as inputs in other windows
+    std::map<int, int> mOutput2Idx;
+    for(int idx = 0; idx < (int)vOldOutputs.size(); idx++) {
+      mOutput2Idx[vOldOutputs[idx]] = idx;
+    }
+    for(auto &entry: mSubNtk2Io) {
+      if(entry.first != pSubNtk) {
+        std::vector<int> &vInputs = std::get<1>(entry.second);
+        std::vector<bool> &vCompls = std::get<2>(entry.second);
+        for(int i = 0; i < (int)vInputs.size(); i++) {
+          if(mOutput2Idx.count(vInputs[i])) {
+            int idx = mOutput2Idx[vInputs[i]];
+            vInputs[i] = vNewOutputs[idx];
+            vCompls[i] = vCompls[i] ^ vNewCompls[idx];
+          }
+        }
+      }
+    }
     delete pSubNtk;
     mSubNtk2Io.erase(pSubNtk);
   }

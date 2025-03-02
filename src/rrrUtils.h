@@ -109,6 +109,9 @@ namespace rrr {
     case POP_BACK:
       std::cout << "pop back";
       break;
+    case INSERT:
+      std::cout << "insert";
+      break;
     default:
       assert(0);
     }

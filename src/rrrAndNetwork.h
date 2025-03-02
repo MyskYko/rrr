@@ -5,6 +5,7 @@
 #include <list>
 #include <set>
 #include <map>
+#include <utility>
 #include <initializer_list>
 #include <string>
 #include <functional>
@@ -145,11 +146,11 @@ namespace rrr {
     void TrivialCollapse(int id);
     void TrivialDecompose(int id);
     void SortFanins(int id, std::function<bool(int, bool, int, bool)> const &cost);
-    void Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<int> const &vOutputs);
+    std::pair<std::vector<int>, std::vector<bool>> Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs);
 
     // Network cleanup
     void Propagate(int id = -1); // all nodes unless specified
-    void Sweep(bool fPropagate);
+    void Sweep(bool fPropagate = true);
 
     // save & load
     int  Save(int slot = -1); // slot is assigned automatically unless specified
@@ -1068,7 +1069,7 @@ namespace rrr {
     TakenAction(action);
     if(fRecursive) {
       for(int fi: action.vFanins) {
-        if(vRefs[fi] == 0) {
+        if(vRefs[fi] == 0 && IsInt(fi)) {
           RemoveUnused(fi, fRecursive, fSweeping);
         }
       }
@@ -1264,33 +1265,40 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<int> const &vOutputs) {
+  std::pair<std::vector<int>, std::vector<bool>> AndNetwork::Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs) {
     Reserve(nNodes + pNtk->GetNumInts());
-    std::map<int, int> m;
-    m[pNtk->GetConst0()] = GetConst0();
+    std::map<int, std::pair<int, bool>> m;
+    m[pNtk->GetConst0()] = std::make_pair(GetConst0(), false);
     assert(pNtk->GetNumPis() == (int)vInputs.size());
+    assert(vInputs.size() == vCompls.size());
     for(int i = 0; i < pNtk->GetNumPis(); i++) {
-      m[pNtk->GetPi(i)] = vInputs[i];
+      assert(IsInt(vInputs[i]) || IsPi(vInputs[i]));
+      m[pNtk->GetPi(i)] = std::make_pair(vInputs[i], vCompls[i]);
     }
     pNtk->ForEachInt([&](int id) {
-      m[id] = CreateNode();
-      lInts.push_back(m[id]);
-      sInts.insert(m[id]);
-      vvFaninEdges[m[id]].resize(pNtk->GetNumFanins(id));
+      int id2 = CreateNode();
+      lInts.push_back(id2);
+      sInts.insert(id2);
+      vvFaninEdges[id2].resize(pNtk->GetNumFanins(id));
       pNtk->ForEachFaninIdx(id, [&](int idx, int fi, bool c) {
         assert(m.count(fi));
-        vvFaninEdges[m[id]][idx] = Node2Edge(m[fi], c);
-        vRefs[m[fi]]++;
+        vvFaninEdges[id2][idx] = Node2Edge(m[fi].first, c ^ m[fi].second);
+        vRefs[m[fi].first]++;
       });
+      m[id] = std::make_pair(id2, false);
     });
     assert(pNtk->GetNumPos() == (int)vOutputs.size());
+    std::vector<int> vNewOutputs(pNtk->GetNumPos());
+    std::vector<bool> vNewCompls(pNtk->GetNumPos());
     for(int i = 0; i < pNtk->GetNumPos(); i++) {
       int id = vOutputs[i];
       int po = pNtk->GetPo(i);
       assert(m.count(pNtk->GetFanin(po, 0)));
-      int fi = m[pNtk->GetFanin(po, 0)];
-      bool c = pNtk->GetCompl(po, 0);
+      int fi = m[pNtk->GetFanin(po, 0)].first;
+      bool c = pNtk->GetCompl(po, 0) ^ m[pNtk->GetFanin(po, 0)].second;
       assert(id != fi);
+      vNewOutputs[i] = fi;
+      vNewCompls[i] = c;
       // remove if substitution would lead to duplication with the same polarity
       ForEachFanoutRidx(id, false, [&](int fo, bool foc, int idx) {
         int idx2 = FindFanin(fo, fi);
@@ -1321,7 +1329,13 @@ namespace rrr {
     }
     Action action;
     action.type = INSERT;
+    action.vFanins = vInputs;
+    action.vFanouts = vOutputs;
     TakenAction(action);
+    for(int id: vOutputs) {
+      RemoveUnused(id, true);
+    }
+    return std::make_pair(std::move(vNewOutputs), std::move(vNewCompls));
   }
 
   /* }}} */

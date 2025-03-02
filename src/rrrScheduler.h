@@ -295,7 +295,11 @@ namespace rrr {
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::CreateJob(Ntk *pNtk_, int iSeed_) {
     Job *pJob = new Job(nJobs++, pNtk_, iSeed_);
-    qPendingJobs.push(pJob);
+    {
+      std::unique_lock<std::mutex> l(mutexPendingJobs);
+      qPendingJobs.push(pJob);
+      condPendingJobs.notify_one();
+    }
   }
   
   template <typename Ntk, typename Opt>
@@ -427,8 +431,30 @@ namespace rrr {
   void Scheduler<Ntk, Opt>::Run() {
     start = GetCurrentTime();
     if(fPartitioning) {
+      pNtk->Sweep();
       par.UpdateNetwork(pNtk);
-      assert(0);
+      while(nJobs < nRestarts) {
+        Ntk *pSubNtk = par.Extract(iSeed + nJobs);
+        if(pSubNtk == NULL) {
+          if(nJobs == nFinishedJobs) {
+            std::cout << "failed to extract a window" << std::endl;
+            break;
+          }
+          OnJobEnd([&](Job *pJob) {
+            std::cout << "job " << pJob->id << " finished" << std::endl;
+            par.Insert(pJob->pNtk);
+          });
+        } else {
+          CreateJob(pSubNtk, iSeed + nJobs);
+          std::cout << "job " << nJobs - 1 << " created" << std::endl;
+        }
+      }
+      while(nFinishedJobs < nJobs) {
+        OnJobEnd([&](Job *pJob) {
+          std::cout << "job " << pJob->id << " finished" << std::endl;
+          par.Insert(pJob->pNtk);
+        });
+      }
     } else if(nRestarts > 0) {
       fDeterministic = false; // it is deterministic anyways
       double dCost = CostFunction(pNtk);
