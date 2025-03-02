@@ -7,7 +7,7 @@ namespace rrr {
     int nWords = 10;
     int nTimeout = 0;
     int nSchedulerVerbose = 1;
-    int nPartitionerVerbose = 1;
+    int nPartitionerVerbose = 0;
     int nOptimizerVerbose = 0;
     int nAnalyzerVerbose = 0;
     int nSimulatorVerbose = 0;
@@ -21,7 +21,7 @@ namespace rrr {
     int nDistance = 0;
     int nRestarts = 0;
     int nThreads = 0;
-    int nWindowSize = 100;
+    int nWindowSize = 0;
     bool fDeterministic = true;
   };
   
