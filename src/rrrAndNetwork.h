@@ -50,7 +50,7 @@ namespace rrr {
     // other private functions
     int  CreateNode();
     void SortInts(itr it);
-    void StartTraversal();
+    unsigned StartTraversal(int n = 1);
     void EndTraversal();
     void ForEachTfiRec(int id, std::function<void(int)> const &f);
     void TakenAction(Action const &action) const;
@@ -177,12 +177,20 @@ namespace rrr {
     });
   }
 
-  inline void AndNetwork::StartTraversal() {
+  inline unsigned AndNetwork::StartTraversal(int n) {
     assert(!fLockTrav);
     fLockTrav = true;
+    do {
+      for(int i = 0; i < n; i++) {
+        iTrav++;
+        if(iTrav == 0) {
+          vTrav.clear();
+          break;
+        }
+      }
+    } while(iTrav == 0);
     vTrav.resize(nNodes);
-    iTrav++;
-    assert(iTrav != 0); //TODO: handle this overflow
+    return iTrav - n + 1;
   }
   
   inline void AndNetwork::EndTraversal() {
@@ -462,16 +470,14 @@ namespace rrr {
     if(GetNumFanouts(id) <= 1) {
       return false;
     }
-    StartTraversal();
-    unsigned iTravStart = iTrav;
+    unsigned iTravStart = StartTraversal(GetNumFanouts(id));
+    int idx = 0;
     ForEachFanout(id, false, [&](int fo, bool c) {
-      vTrav[fo] = iTrav;
-      iTrav++;
-      assert(iTrav != 0); //TODO: handle this overflow
+      vTrav[fo] = iTravStart + idx;
+      idx++;
     });
-    iTrav--;
-    if(iTrav <= iTravStart) {
-      // less than one fanouts excluding POs
+    if(idx <= 1) {
+      // less than two fanouts excluding POs
       EndTraversal();
       return false;
     }
@@ -544,13 +550,10 @@ namespace rrr {
       return false;
     }
     // mark destinations
-    StartTraversal();
+    unsigned iTravStart = StartTraversal(2);
     for(int id: dsts) {
-      vTrav[id] = iTrav;
+      vTrav[id] = iTravStart;
     }
-    unsigned iTravStart = iTrav;
-    iTrav++;
-    assert(iTrav != 0); //TODO: handle this overflow
     // mark sources
     for(int id: srcs) {
       if(vTrav[id] == iTravStart) {
@@ -602,16 +605,10 @@ namespace rrr {
     if(srcs.empty() || dsts.empty()) {
       return std::vector<int>();
     }
-    StartTraversal();
-    unsigned iDst = iTrav;
-    iTrav++;
-    assert(iTrav != 0); //TODO: handle this overflow
-    unsigned iTfo = iTrav;
-    iTrav++;
-    assert(iTrav != 0); //TODO: handle this overflow
-    unsigned iInner = iTrav;
-    iTrav++;
-    assert(iTrav != 0); //TODO: handle this overflow
+    unsigned iTravStart = StartTraversal(4);
+    unsigned iDst = iTravStart;
+    unsigned iTfo = iTravStart + 1;
+    unsigned iInner = iTravStart + 2;
     // mark destinations (to prevent nodes between destinations to sources being included)
     for(int id: dsts) {
       vTrav[id] = iDst;
