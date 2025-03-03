@@ -424,7 +424,6 @@ namespace rrr {
   
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::Run() {
-    pNtk->Print();
     start = GetCurrentTime();
     if(fPartitioning) {
       pNtk->Sweep();
