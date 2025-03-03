@@ -290,11 +290,17 @@ namespace rrr {
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::CreateJob(Ntk *pNtk_, int iSeed_) {
     Job *pJob = new Job(nJobs++, pNtk_, iSeed_);
-    {
-      std::unique_lock<std::mutex> l(mutexPendingJobs);
-      qPendingJobs.push(pJob);
-      condPendingJobs.notify_one();
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        qPendingJobs.push(pJob);
+        condPendingJobs.notify_one();
+      }
+      return;
     }
+#endif
+    qPendingJobs.push(pJob);
   }
   
   template <typename Ntk, typename Opt>
@@ -331,6 +337,7 @@ namespace rrr {
 
   /* {{{ Thread */
 
+#ifdef ABC_USE_PTHREADS
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::Thread(Parameter const *pPar) {
     Opt opt(pPar, CostFunction);
@@ -357,6 +364,7 @@ namespace rrr {
       }
     }
   }
+#endif
 
   /* }}} */
   
@@ -411,11 +419,10 @@ namespace rrr {
       for(std::thread &t: vThreads) {
         t.join();
       }
+      return;
     }
 #endif
-    if(pOpt) {
-      delete pOpt;
-    }
+    delete pOpt;
   }
 
   /* }}} */
@@ -435,10 +442,12 @@ namespace rrr {
             std::cout << "failed to extract a window" << std::endl;
             break;
           }
-          OnJobEnd([&](Job *pJob) {
-            std::cout << "job " << pJob->id << " finished" << std::endl;
-            par.Insert(pJob->pNtk);
-          });
+          while(nFinishedJobs < nJobs) {
+            OnJobEnd([&](Job *pJob) {
+              std::cout << "job " << pJob->id << " finished" << std::endl;
+              par.Insert(pJob->pNtk);
+            });
+          }
         } else {
           CreateJob(pSubNtk, iSeed + nJobs);
           std::cout << "job " << nJobs - 1 << " created" << std::endl;

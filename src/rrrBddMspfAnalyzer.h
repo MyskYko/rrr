@@ -527,7 +527,7 @@ namespace rrr {
 
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::Save(int slot) {
-    if(slot >= vBackups.size()) {
+    if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
     CopyVec(vBackups[slot].vFs, vFs);
@@ -542,7 +542,7 @@ namespace rrr {
 
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::Load(int slot) {
-    assert(slot < vBackups.size());
+    assert(slot < int_size(vBackups));
     CopyVec(vFs, vBackups[slot].vFs);
     CopyVec(vGs, vBackups[slot].vGs);
     CopyVecVec(vvCs, vBackups[slot].vvCs);

@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
   return 0;
 
 usage:
-      Abc_Print( -2, "usage: rrr [-XYNJDRWTCGSOAPQ num] [-abh]\n" );
+      Abc_Print( -2, "usage: rrr [-XYNJKDRWTCGVPOAQS num] [-abdh]\n" );
       Abc_Print( -2, "\t        perform optimization\n" );
       Abc_Print( -2, "\t-X num : method [default = %d]\n", nOptimizerFlow );
       Abc_Print( -2, "\t                0: single-add resub\n" );

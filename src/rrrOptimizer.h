@@ -4,7 +4,6 @@
 #include <iterator>
 #include <random>
 #include <numeric>
-#include <limits>
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
@@ -181,8 +180,7 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   inline void Optimizer<Ntk, Ana>::SetRandPiOrder() {
-    assert(vRandPiOrder.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    if((int)vRandPiOrder.size() != pNtk->GetNumPis()) {
+    if(int_size(vRandPiOrder) != pNtk->GetNumPis()) {
       vRandPiOrder.clear();
       vRandPiOrder.resize(pNtk->GetNumPis());
       std::iota(vRandPiOrder.begin(), vRandPiOrder.end(), 0);
@@ -193,8 +191,7 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   inline void Optimizer<Ntk, Ana>::SetRandCosts() {
     std::uniform_real_distribution<> dis(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max());
-    assert(vRandCosts.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    while((int)vRandCosts.size() < pNtk->GetNumNodes()) {
+    while(int_size(vRandCosts) < pNtk->GetNumNodes()) {
       vRandCosts.push_back(dis(rng));
     }
   }

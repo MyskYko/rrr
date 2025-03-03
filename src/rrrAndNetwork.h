@@ -4,7 +4,6 @@
 #include <list>
 #include <map>
 #include <algorithm>
-#include <limits>
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
@@ -163,7 +162,7 @@ namespace rrr {
     // TODO: reuse already allocated but dead nodes? or perform garbage collection?
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
-    assert(nNodes != std::numeric_limits<int>::max());
+    assert(!check_int_max(nNodes));
     return nNodes++;
   }
 
@@ -281,7 +280,7 @@ namespace rrr {
     vPis.push_back(nNodes);
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
-    assert(nNodes != std::numeric_limits<int>::max());
+    assert(!check_int_max(nNodes));
     return nNodes++;
   }
   
@@ -295,7 +294,7 @@ namespace rrr {
     vRefs[id1]++;
     vvFaninEdges.emplace_back(std::initializer_list<int>({Node2Edge(id0, c0), Node2Edge(id1, c1)}));
     vRefs.push_back(0);
-    assert(nNodes != std::numeric_limits<int>::max());
+    assert(!check_int_max(nNodes));
     return nNodes++;
   }
 
@@ -305,7 +304,7 @@ namespace rrr {
     vRefs[id]++;
     vvFaninEdges.emplace_back(std::initializer_list<int>({Node2Edge(id, c)}));
     vRefs.push_back(0);
-    assert(nNodes != std::numeric_limits<int>::max());
+    assert(!check_int_max(nNodes));
     return nNodes++;
   }
 
@@ -328,18 +327,15 @@ namespace rrr {
   }
 
   inline int AndNetwork::GetNumPis() const {
-    assert(vPis.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    return vPis.size();
+    return int_size(vPis);
   }
   
   inline int AndNetwork::GetNumInts() const {
-    assert(lInts.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    return lInts.size();
+    return int_size(lInts);
   }
   
   inline int AndNetwork::GetNumPos() const {
-    assert(vPos.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    return vPos.size();
+    return int_size(vPos);
   }
 
   inline int AndNetwork::GetConst0() const {
@@ -409,20 +405,20 @@ namespace rrr {
 
   inline int AndNetwork::GetPiIndex(int id) const {
     assert(IsPi(id));
-    assert(vPis.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    assert(check_int_size(vPis));
     std::vector<int>::const_iterator it = std::find(vPis.begin(), vPis.end(), id);
     assert(it != vPis.end());
     return std::distance(vPis.begin(), it);
   }
   
   inline int AndNetwork::GetIntIndex(int id) const {
+    assert(check_int_size(lInts));
     int index = 0;
     citr it = lInts.begin();
     for(; it != lInts.end(); it++) {
       if(*it == id) {
         break;
       }
-      assert(index < (std::vector<int>::size_type)std::numeric_limits<int>::max());
       index++;
     }
     assert(it != lInts.end());
@@ -431,15 +427,14 @@ namespace rrr {
 
   inline int AndNetwork::GetPoIndex(int id) const {
     assert(IsPo(id));
-    assert(vPos.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    assert(check_int_size(vPos));
     std::vector<int>::const_iterator it = std::find(vPos.begin(), vPos.end(), id);
     assert(it != vPos.end());
     return std::distance(vPos.begin(), it);
   }
   
   inline int AndNetwork::GetNumFanins(int id) const {
-    //assert(vvFaninEdges[id].size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
-    return vvFaninEdges[id].size();
+    return int_size(vvFaninEdges[id]);
   }
 
   inline int AndNetwork::GetNumFanouts(int id) const {
@@ -998,7 +993,7 @@ namespace rrr {
   template <template <typename...> typename Container, typename ... Ts>
   AndNetwork *AndNetwork::Extract(Container<Ts...> const &ids, std::vector<int> const &vInputs, std::vector<int> const &vOutputs) {
     AndNetwork *pNtk = new AndNetwork;
-    pNtk->Reserve(vInputs.size() + ids.size() + vOutputs.size());
+    pNtk->Reserve(int_size(vInputs) + int_size(ids) + int_size(vOutputs));
     std::map<int, int> m;
     m[GetConst0()] = pNtk->GetConst0();
     for(int id: vInputs) {
@@ -1172,7 +1167,7 @@ namespace rrr {
     Action action;
     action.type = ADD_FANIN;
     action.id = id;
-    action.idx = vvFaninEdges[id].size();
+    action.idx = GetNumFanins(id);
     action.fi = fi;
     action.c = c;
     itr it = std::find(lInts.begin(), lInts.end(), id);
@@ -1222,7 +1217,7 @@ namespace rrr {
       Action action;
       action.type = TRIVIAL_DECOMPOSE;
       action.id = id;
-      action.idx = vvFaninEdges[id].size() - 2;
+      action.idx = GetNumFanins(id) - 2;
       int new_fi = CreateNode();
       action.fi = new_fi;
       int fi_edge1 = vvFaninEdges[id].back();
@@ -1253,7 +1248,7 @@ namespace rrr {
     Action action;
     action.type = SORT_FANINS;
     action.id = id;
-    assert(vFaninEdges.size() <= (std::vector<int>::size_type)std::numeric_limits<int>::max());
+    assert(check_int_size(vFaninEdges));
     for(int fanin_edge: vvFaninEdges[id]) {
       std::vector<int>::const_iterator it = std::find(vFaninEdges.begin(), vFaninEdges.end(), fanin_edge);
       action.vIndices.push_back(std::distance(vFaninEdges.cbegin(), it));
@@ -1265,7 +1260,7 @@ namespace rrr {
     Reserve(nNodes + pNtk->GetNumInts());
     std::map<int, std::pair<int, bool>> m;
     m[pNtk->GetConst0()] = std::make_pair(GetConst0(), false);
-    assert(pNtk->GetNumPis() == (int)vInputs.size());
+    assert(pNtk->GetNumPis() == int_size(vInputs));
     assert(vInputs.size() == vCompls.size());
     for(int i = 0; i < pNtk->GetNumPis(); i++) {
       assert(IsInt(vInputs[i]) || IsPi(vInputs[i]));
@@ -1283,7 +1278,7 @@ namespace rrr {
       });
       m[id] = std::make_pair(id2, false);
     });
-    assert(pNtk->GetNumPos() == (int)vOutputs.size());
+    assert(pNtk->GetNumPos() == int_size(vOutputs));
     std::vector<int> vNewOutputs(pNtk->GetNumPos());
     std::vector<bool> vNewCompls(pNtk->GetNumPos());
     for(int i = 0; i < pNtk->GetNumPos(); i++) {
@@ -1394,10 +1389,11 @@ namespace rrr {
     Action action;
     action.type = SAVE;
     if(slot < 0) {
-      slot = vBackups.size();
+      slot = int_size(vBackups);
       vBackups.push_back(*this);
+      assert(check_int_size(vBackups));
     } else {
-      assert(slot < vBackups.size());
+      assert(slot < int_size(vBackups));
       vBackups[slot] = *this;
     }
     action.idx = slot;
@@ -1406,7 +1402,8 @@ namespace rrr {
   }
 
   void AndNetwork::Load(int slot) {
-    assert(slot < vBackups.size());
+    assert(slot >= 0);
+    assert(slot < int_size(vBackups));
     Action action;
     action.type = LOAD;
     action.idx = slot;
@@ -1418,7 +1415,7 @@ namespace rrr {
     assert(!vBackups.empty());
     Action action;
     action.type = POP_BACK;
-    action.idx = vBackups.size() - 1;
+    action.idx = int_size(vBackups) - 1;
     vBackups.pop_back();
     TakenAction(action);
   }

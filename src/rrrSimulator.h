@@ -489,7 +489,9 @@ namespace rrr {
 
   template <typename Ntk>
   void Simulator<Ntk>::Save(int slot) {
-    if(slot >= vBackups.size()) {
+    assert(slot >= 0);
+    assert(!check_int_max(slot));
+    if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
     vBackups[slot].nWords = nWords;
@@ -516,7 +518,8 @@ namespace rrr {
 
   template <typename Ntk>
   void Simulator<Ntk>::Load(int slot) {
-    assert(slot < vBackups.size());
+    assert(slot >= 0);
+    assert(slot < int_size(vBackups));
     nWords  = vBackups[slot].nWords;
     target  = vBackups[slot].target;
     vValues = vBackups[slot].vValues;
@@ -669,7 +672,7 @@ namespace rrr {
       std::cout << std::endl;
     }
     // record care pi indices
-    assert((int)vCex.size() == pNtk->GetNumPis());
+    assert(int_size(vCex) == pNtk->GetNumPis());
     std::vector<int> vCarePiIdxs;
     for(int idx = 0; idx < pNtk->GetNumPis(); idx++) {
       switch(vCex[idx]) {
