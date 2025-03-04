@@ -7,11 +7,24 @@
 #include <string>
 #include <functional>
 #include <limits>
+#include <type_traits>
 #include <cassert>
 
 #include "rrrTypes.h"
 
 namespace rrr {
+
+  /* {{{ Invocable */
+
+#if defined(__cpp_lib_is_invocable)
+  template <typename Fn, typename... Args>
+  using is_invokable = std::is_invocable<Fn, Args...>;
+#else
+  template <typename Fn, typename... Args>
+  struct is_invokable: std::is_constructible<std::function<void(Args...)>, std::reference_wrapper<typename std::remove_reference<Fn>::type>> {};
+#endif
+
+  /* }}} */
 
   /* {{{ Int size */
   
