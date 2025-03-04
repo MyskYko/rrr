@@ -3382,7 +3382,7 @@ static inline int Abc_TtEvalLut4( int Ins[4], int Lut, int nVars )
             Cube &= ((k >> i) & 1) ? Ins[i] : ~Ins[i];
         Res |= Cube;
     }
-    return Res & ~(~0 << (1<<nVars));
+    return Res & ~(~0u << (1<<nVars));
 }
 
 
@@ -3456,6 +3456,7 @@ static inline void Abc_TtPrintBiDec( word * pTruth, int nVars )
 }
 static inline int Abc_TtVerifyBiDec( word * pTruth, int nVars, int This, int That, int nSuppLim, word wThis, word wThat )
 {
+    (void)nSuppLim;
     int pVarsThis[12], pVarsThat[12], pVarsAll[12];
     int nThis = Abc_TtBitCount16(This);
     int nThat = Abc_TtBitCount16(That);

@@ -1652,6 +1652,8 @@ static inline unsigned Vec_IntUniqueHashKeyDebug( unsigned char * pStr, int nCha
 }
 static inline void Vec_IntUniqueProfile( Vec_Int_t * vData, int * pTable, int * pNexts, int TableMask, int nIntSize )
 {
+    (void)vData;
+    (void)nIntSize;
     int i, Key, Counter;
     for ( i = 0; i <= TableMask; i++ )
     {

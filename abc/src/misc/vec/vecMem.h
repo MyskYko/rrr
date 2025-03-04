@@ -119,6 +119,7 @@ static inline void Vec_MemFreeP( Vec_Mem_t ** p )
 }
 static inline Vec_Mem_t * Vec_MemDup( Vec_Mem_t * pVec )
 {
+    (void)pVec;
     Vec_Mem_t * p = NULL;
     return p;
 }
@@ -136,9 +137,13 @@ static inline Vec_Mem_t * Vec_MemDup( Vec_Mem_t * pVec )
 ***********************************************************************/
 static inline void Vec_MemFill( Vec_Mem_t * pVec, int nEntries )
 {
+    (void)pVec;
+    (void)nEntries;
 }
 static inline void Vec_MemClean( Vec_Mem_t * pVec, int nEntries )
 {
+    (void)pVec;
+    (void)nEntries;
 }
 
 /**Function*************************************************************
