@@ -4,6 +4,7 @@
 #include <list>
 #include <map>
 #include <algorithm>
+#include <type_traits>
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
@@ -111,11 +112,16 @@ namespace rrr {
     void ForEachIntReverse(std::function<void(int)> const &func) const;
     void ForEachPiInt(std::function<void(int)> const &func) const;
     void ForEachPo(std::function<void(int)> const &func) const;
-    void ForEachPoDriver(std::function<void(int, bool)> const &func) const;
-    void ForEachFanin(int id, std::function<void(int, bool)> const &func) const;
-    void ForEachFaninIdx(int id, std::function<void(int, int, bool)> const &func) const; // func(index of fi in fanin list of id, fi, c)
-    void ForEachFanout(int id, bool fPos, std::function<void(int, bool)> const &func) const;
-    void ForEachFanoutRidx(int id, bool fPos, std::function<void(int, bool, int)> const &func) const; // func(fo, c, index of id in fanin list of fo)
+    template <typename Func>
+    void ForEachPoDriver(Func const &func) const;
+    template <typename Func>
+    void ForEachFanin(int id, Func const &func) const;
+    template <typename Func>
+    void ForEachFaninIdx(int id, Func const &func) const; // func(index of fi in fanin list of id, fi[, c])
+    template <typename Func>
+    void ForEachFanout(int id, bool fPos, Func const &func) const;
+    template <typename Func>
+    void ForEachFanoutRidx(int id, bool fPos, Func const &func) const; // func(fo[, c], index of id in fanin list of fo)
     void ForEachTfi(int id, bool fPis, std::function<void(int)> const &func);
     template <template <typename...> typename Container, typename ... Ts>
     void ForEachTfiEnd(int id, Container<Ts...> const &ends, std::function<void(int)> const &func);
@@ -139,7 +145,8 @@ namespace rrr {
     void AddFanin(int id, int fi, bool c);
     void TrivialCollapse(int id);
     void TrivialDecompose(int id);
-    void SortFanins(int id, std::function<bool(int, bool, int, bool)> const &cost);
+    template <typename Func>
+    void SortFanins(int id, Func const &cost);
     std::pair<std::vector<int>, std::vector<bool>> Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs);
 
     // Network cleanup
@@ -167,7 +174,7 @@ namespace rrr {
   }
 
   void AndNetwork::SortInts(itr it) {
-    ForEachFanin(*it, [&](int fi, bool c) {
+    ForEachFanin(*it, [&](int fi) {
       itr it2 = std::find(it, lInts.end(), fi);
       if(it2 != lInts.end()) {
         lInts.erase(it2);
@@ -472,7 +479,7 @@ namespace rrr {
     }
     unsigned iTravStart = StartTraversal(GetNumFanouts(id));
     int idx = 0;
-    ForEachFanout(id, false, [&](int fo, bool c) {
+    ForEachFanout(id, false, [&](int fo) {
       vTrav[fo] = iTravStart + idx;
       idx++;
     });
@@ -510,13 +517,13 @@ namespace rrr {
     for(int i = 0; i < nHops; i++) {
       vPrevs.swap(vNexts);
       for(int id: vPrevs) {
-        ForEachFanin(id, [&](int fi, bool c) {
+        ForEachFanin(id, [&](int fi) {
           if(vTrav[fi] != iTrav) {
             vNexts.push_back(fi);
             vTrav[fi] = iTrav;
           }
         });
-        ForEachFanout(id, false, [&](int fo, bool c) {
+        ForEachFanout(id, false, [&](int fo) {
           if(vTrav[fo] != iTrav) {
             vNexts.push_back(fo);
             vTrav[fo] = iTrav;
@@ -693,26 +700,48 @@ namespace rrr {
       func(po);
     }
   }
-  
-  inline void AndNetwork::ForEachPoDriver(std::function<void(int, bool)> const &func) const {
+
+  template <typename Func>
+  inline void AndNetwork::ForEachPoDriver(Func const &func) const {
     for(int po: vPos) {
-      func(GetFanin(po, 0), GetCompl(po, 0));
-    }
-  }
-  
-  inline void AndNetwork::ForEachFanin(int id, std::function<void(int, bool)> const &func) const {
-    for(int fi_edge: vvFaninEdges[id]) {
-      func(Edge2Node(fi_edge), EdgeIsCompl(fi_edge));
+      if constexpr(std::is_invocable_v<Func, int>) {
+        func(GetFanin(po, 0));
+      } else if constexpr(std::is_invocable_v<Func, int, bool>) {
+        func(GetFanin(po, 0), GetCompl(po, 0));
+      } else {
+        static_assert(0);
+      }
     }
   }
 
-  inline void AndNetwork::ForEachFaninIdx(int id, std::function<void(int, int, bool)> const &func) const {
+  template <typename Func>
+  inline void AndNetwork::ForEachFanin(int id, Func const &func) const {
+    for(int fi_edge: vvFaninEdges[id]) {
+      if constexpr(std::is_invocable_v<Func, int>) {
+        func(Edge2Node(fi_edge));
+      } else if constexpr(std::is_invocable_v<Func, int, bool>) {
+        func(Edge2Node(fi_edge), EdgeIsCompl(fi_edge));
+      } else {
+        static_assert(0);
+      }
+    }
+  }
+
+  template <typename Func>
+  inline void AndNetwork::ForEachFaninIdx(int id, Func const &func) const {
     for(int idx = 0; idx < GetNumFanins(id); idx++) {
-      func(idx, GetFanin(id, idx), GetCompl(id, idx));
+      if constexpr(std::is_invocable_v<Func, int, int>) {
+        func(idx, GetFanin(id, idx));
+      } else if constexpr(std::is_invocable_v<Func, int, int, bool>) {
+        func(idx, GetFanin(id, idx), GetCompl(id, idx));
+      } else {
+        static_assert(0);
+      }
     }
   }
   
-  inline void AndNetwork::ForEachFanout(int id, bool fPos, std::function<void(int, bool)> const &func) const {
+  template <typename Func>
+  inline void AndNetwork::ForEachFanout(int id, bool fPos, Func const &func) const {
     if(vRefs[id] == 0) {
       return;
     }
@@ -726,14 +755,26 @@ namespace rrr {
     for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
-        func(*it, GetCompl(*it, idx));
+        if constexpr(std::is_invocable_v<Func, int>) {
+          func(*it);
+        } else if constexpr(std::is_invocable_v<Func, int, bool>) {
+          func(*it, GetCompl(*it, idx));
+        } else {
+          static_assert(0);
+        }
         nRefs--;
       }
     }
     if(fPos && nRefs != 0) {
       for(int po: vPos) {
         if(GetFanin(po, 0) == id) {
-          func(po, GetCompl(po, 0));
+          if constexpr(std::is_invocable_v<Func, int>) {
+            func(po);
+          } else if constexpr(std::is_invocable_v<Func, int, bool>) {
+            func(po, GetCompl(po, 0));
+          } else {
+            static_assert(0);
+          }
           nRefs--;
           if(nRefs == 0) {
             break;
@@ -743,8 +784,9 @@ namespace rrr {
     }
     assert(!fPos || nRefs == 0);
   }
-  
-  inline void AndNetwork::ForEachFanoutRidx(int id, bool fPos, std::function<void(int, bool, int)> const &func) const {
+
+  template <typename Func>
+  inline void AndNetwork::ForEachFanoutRidx(int id, bool fPos, Func const &func) const {
     if(vRefs[id] == 0) {
       return;
     }
@@ -758,14 +800,26 @@ namespace rrr {
     for(; nRefs != 0 && it != lInts.end(); it++) {
       int idx = FindFanin(*it, id);
       if(idx >= 0) {
-        func(*it, GetCompl(*it, idx), idx);
+        if constexpr(std::is_invocable_v<Func, int, int>) {
+          func(*it, idx);
+        } else if constexpr(std::is_invocable_v<Func, int, bool, int>) {
+          func(*it, GetCompl(*it, idx), idx);
+        } else {
+          static_assert(0);
+        }
         nRefs--;
       }
     }
     if(fPos && nRefs != 0) {
       for(int po: vPos) {
         if(GetFanin(po, 0) == id) {
-          func(po, GetCompl(po, 0), 0);
+          if constexpr(std::is_invocable_v<Func, int, int>) {
+            func(po, 0);
+          } else if constexpr(std::is_invocable_v<Func, int, bool, int>) {
+            func(po, GetCompl(po, 0), 0);
+          } else {
+            static_assert(0);
+          }
           nRefs--;
           if(nRefs == 0) {
             break;
@@ -1044,7 +1098,7 @@ namespace rrr {
     Action action;
     action.type = REMOVE_UNUSED;
     action.id = id;
-    ForEachFanin(id, [&](int fi, bool c) {
+    ForEachFanin(id, [&](int fi) {
       action.vFanins.push_back(fi);
       vRefs[fi]--;
     });
@@ -1145,7 +1199,7 @@ namespace rrr {
     });
     // remove node
     vRefs[id] = 0;
-    ForEachFanin(id, [&](int fi, bool c) {
+    ForEachFanin(id, [&](int fi) {
       vRefs[fi]--;
       action.vFanins.push_back(fi);
     });
@@ -1194,7 +1248,7 @@ namespace rrr {
         std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
         it = vvFaninEdges[id].erase(it);
         vvFaninEdges[id].insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
-        ForEachFanin(fi, [&](int fi, bool c) {
+        ForEachFanin(fi, [&](int fi) {
           action.vFanins.push_back(fi);
         });
         // remove collapsed fanin
@@ -1234,10 +1288,17 @@ namespace rrr {
     }
   }
 
-  void AndNetwork::SortFanins(int id, std::function<bool(int, bool, int, bool)> const &comp) {
+  template <typename Func>
+  void AndNetwork::SortFanins(int id, Func const &comp) {
     std::vector<int> vFaninEdges = vvFaninEdges[id];
     std::sort(vvFaninEdges[id].begin(), vvFaninEdges[id].end(), [&](int i, int j) {
-      return comp(Edge2Node(i), EdgeIsCompl(i), Edge2Node(j), EdgeIsCompl(j));
+      if constexpr(std::is_invocable_v<Func, int, int>) {
+        return comp(Edge2Node(i), Edge2Node(j));
+      } else if constexpr(std::is_invocable_v<Func, int, bool, int, bool>) {
+        return comp(Edge2Node(i), EdgeIsCompl(i), Edge2Node(j), EdgeIsCompl(j));
+      } else {
+        static_assert(0);
+      }
     });
     if(vFaninEdges == vvFaninEdges[id]) {
       return;
@@ -1429,12 +1490,12 @@ namespace rrr {
     std::cout << "inputs: " << vPis << std::endl;
     ForEachInt([&](int id) {
       std::cout << "node " << id << ": ";
-      PrintComplementedEdges(std::bind(&AndNetwork::ForEachFanin, this, id, std::placeholders::_1));
+      PrintComplementedEdges(std::bind(&AndNetwork::ForEachFanin<std::function<void(int, bool)>>, this, id, std::placeholders::_1));
       std::cout << " (ref = " << vRefs[id] << ")";
       std::cout << std::endl;
     });
     std::cout << "outputs: ";
-    PrintComplementedEdges(std::bind(&AndNetwork::ForEachPoDriver, this, std::placeholders::_1));
+    PrintComplementedEdges(std::bind(&AndNetwork::ForEachPoDriver<std::function<void(int, bool)>>, this, std::placeholders::_1));
     std::cout << std::endl;
   }
 

@@ -79,13 +79,13 @@ namespace rrr {
     // get tentative window IO
     std::set<int> sInputs, sOutputs;
     for(int id: sNodes) {
-      pNtk->ForEachFanin(id, [&](int fi, bool c) {
+      pNtk->ForEachFanin(id, [&](int fi) {
         if(!sNodes.count(fi)) {
           sInputs.insert(fi);
         }
       });
       bool fOutput = false;
-      pNtk->ForEachFanout(id, true, [&](int fo, bool c) {
+      pNtk->ForEachFanout(id, true, [&](int fo) {
         if(!sNodes.count(fo)) {
           fOutput = true;
         }
@@ -102,7 +102,7 @@ namespace rrr {
     // first by including inner nodes
     std::set<int> sFanouts;
     for(int id: sOutputs) {
-      pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
+      pNtk->ForEachFanout(id, false, [&](int fo) {
         if(!sNodes.count(fo)) {
           sFanouts.insert(fo);
         }
@@ -130,13 +130,13 @@ namespace rrr {
       sInputs.clear();
       sOutputs.clear();
       for(int id: sNodes) {
-        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+        pNtk->ForEachFanin(id, [&](int fi) {
           if(!sNodes.count(fi)) {
             sInputs.insert(fi);
           }
         });
         bool fOutput = false;
-        pNtk->ForEachFanout(id, true, [&](int fo, bool c) {
+        pNtk->ForEachFanout(id, true, [&](int fo) {
           if(!sNodes.count(fo)) {
             fOutput = true;
           }
@@ -151,7 +151,7 @@ namespace rrr {
       }
       sFanouts.clear();
       for(int id: sOutputs) {
-        pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
+        pNtk->ForEachFanout(id, false, [&](int fo) {
           if(!sNodes.count(fo)) {
             sFanouts.insert(fo);
           }
@@ -166,7 +166,7 @@ namespace rrr {
           continue;
         }
         sFanouts.clear();
-        pNtk->ForEachFanout(id, false, [&](int fo, bool c) {
+        pNtk->ForEachFanout(id, false, [&](int fo) {
           if(!sNodes.count(fo)) {
             sFanouts.insert(fo);
           }
@@ -192,7 +192,7 @@ namespace rrr {
           // recompute inputs
           sInputs.clear();
           for(int id: sNodes) {
-            pNtk->ForEachFanin(id, [&](int fi, bool c) {
+            pNtk->ForEachFanin(id, [&](int fi) {
               if(!sNodes.count(fi)) {
                 sInputs.insert(fi);
               }

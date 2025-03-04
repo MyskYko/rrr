@@ -184,7 +184,7 @@ namespace rrr {
     }
     // store po vars (NOTE: it's not a lit)
     vLits.clear();
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
+    pNtk->ForEachPoDriver([&](int fi) {
       vLits.push_back(v[fi]);
     });
     // encode an inverted copy
@@ -201,7 +201,7 @@ namespace rrr {
     }
     int idx = 0;
     int n = 0;
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
+    pNtk->ForEachPoDriver([&](int fi) {
       assert(fi != id);
       if(v[fi] != vLits[idx]) {
         int x = sat_solver_addvar(p);
@@ -271,6 +271,7 @@ namespace rrr {
 
   template <typename Ntk>
   void SatSolver<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
+    (void)fSame;
     pNtk = pNtk_;
     status = false;
     target = -1;

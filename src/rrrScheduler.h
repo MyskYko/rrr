@@ -481,7 +481,7 @@ namespace rrr {
       }
     } else {
       CreateJob(pNtk, iSeed);
-      OnJobEnd([&](Job *pJob) {});
+      OnJobEnd([&](Job *pJob) { (void)pJob; });
     }
     time_point end = GetCurrentTime();
     double elapsed_seconds = Duration(start, end);

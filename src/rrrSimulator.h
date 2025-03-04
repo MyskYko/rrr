@@ -470,7 +470,7 @@ namespace rrr {
     });
     */
     Clear(nWords, care.begin());
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
+    pNtk->ForEachPoDriver([&](int fi) {
       assert(fi != target);
       for(int i = 0; i < nWords; i++) {
         care[i] = care[i] | (vValues[fi * nWords + i] ^ vValues2[fi * nWords + i]);
@@ -784,7 +784,7 @@ namespace rrr {
         }
       });
       Clear(1, care.begin() + iWord);
-      pNtk->ForEachPoDriver([&](int fi, bool c) {
+      pNtk->ForEachPoDriver([&](int fi) {
         assert(fi != target);
         care[iWord] = care[iWord] | (vValues[fi * nWords + iWord] ^ vValues2[fi * nWords + iWord]);
       });
