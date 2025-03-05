@@ -28,6 +28,7 @@ namespace rrr {
     int nSortType;
     int nFlow;
     int nDistance;
+    bool fCompatible;
     seconds nTimeout; // assigned upon Run
 
     // data
@@ -58,13 +59,14 @@ namespace rrr {
     void SetRandPiOrder();
     void SetRandCosts();
     void SortFanins(int id);
+    void SortFanins();
 
-    // reduce fanin
-    bool ReduceFanin(int id, bool fRemoveUnused = false);
-    bool ReduceFaninOneRandom(int id, bool fRemoveUnused = false);
+    // reduce fanins
+    bool ReduceFanins(int id, bool fRemoveUnused = false);
+    bool ReduceFaninsOneRandom(int id, bool fRemoveUnused = false);
 
     // reduce
-    void Reduce();
+    bool Reduce();
     void ReduceRandom();
 
     // remove redundancy
@@ -425,14 +427,20 @@ namespace rrr {
     }
   }
   
+  template <typename Ntk, typename Ana>
+  inline void Optimizer<Ntk, Ana>::SortFanins() {
+    pNtk->ForEachInt([&](int id) {
+      SortFanins(id);
+    });
+  }
+  
   /* }}} */
   
-  /* {{{ Reduce fanin */
+  /* {{{ Reduce fanins */
   
   template <typename Ntk, typename Ana>
-  inline bool Optimizer<Ntk, Ana>::ReduceFanin(int id, bool fRemoveUnused) {
+  inline bool Optimizer<Ntk, Ana>::ReduceFanins(int id, bool fRemoveUnused) {
     assert(pNtk->GetNumFanouts(id) > 0);
-    SortFanins(id);
     bool fRemoved = false;
     for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
       // skip fanins that were just added
@@ -456,8 +464,9 @@ namespace rrr {
     return fRemoved;
   }
 
+  /*
   template <typename Ntk, typename Ana>
-  inline bool Optimizer<Ntk, Ana>::ReduceFaninOneRandom(int id, bool fRemoveUnused) {
+  inline bool Optimizer<Ntk, Ana>::ReduceFaninsOneRandom(int id, bool fRemoveUnused) {
     assert(pNtk->GetNumFanouts(id) > 0);
     // generate random order
     vTmp.resize(pNtk->GetNumFanins(id));
@@ -483,6 +492,7 @@ namespace rrr {
     }
     return false;
   }
+  */
   
   // TODO: add a method to minimize the size of fanins (check singles, pairs, trios, and so on)?
   
@@ -491,7 +501,8 @@ namespace rrr {
   /* {{{ Reduce */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Reduce() {
+  bool Optimizer<Ntk, Ana>::Reduce() {
+    bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
@@ -501,21 +512,15 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
-      ReduceFanin(*it);
+      fReduced |= ReduceFanins(*it);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
-      /*
-      if(pNtk->GetNumFanins(*it) == 1) {
-        pNtk->RemoveBuffer(*it);
-      }
-      if(pNtk->GetNumFanins(*it) == 0) {
-        pNtk->RemoveConst(*it);
-      }
-      */
     }
+    return fReduced;
   }
 
+  /*
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::ReduceRandom() {
     pNtk->Sweep(false);
@@ -529,12 +534,13 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
-      ReduceFanin(*it, true);
+      ReduceFanins(*it, true);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
     }
   }
+  */
 
   /* }}} */
 
@@ -542,6 +548,12 @@ namespace rrr {
   
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::RemoveRedundancy() {
+    if(fCompatible) {
+      while(Reduce()) {
+        SortFanins();
+      }
+      return;
+    }
     std::vector<int> vInts = pNtk->GetInts();
     for(critr it = vInts.rbegin(); it != vInts.rend();) {
       if(!pNtk->IsInt(*it)) {
@@ -553,7 +565,8 @@ namespace rrr {
         it++;
         continue;
       }
-      bool fReduced = ReduceFanin(*it);
+      SortFanins(*it);
+      bool fReduced = ReduceFanins(*it);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
@@ -565,6 +578,7 @@ namespace rrr {
     }
   }
 
+  /*
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::RemoveRedundancyRandom() {
     pNtk->Sweep(false);
@@ -580,7 +594,7 @@ namespace rrr {
         it++;
         continue;
       }
-      bool fReduced = ReduceFaninOneRandom(*it, true);
+      bool fReduced = ReduceFaninsOneRandom(*it, true);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
@@ -592,6 +606,7 @@ namespace rrr {
       }
     }
   }
+  */
 
   /* }}} */
 
@@ -710,6 +725,10 @@ namespace rrr {
     }
     if(pNtk->IsInt(id)) {
       pNtk->TrivialDecompose(id);
+      SortFanins();
+      if(fCompatible) {
+        RemoveRedundancy();
+      }
     }
     if(fGreedy) {
       pNtk->PopBack();
@@ -783,6 +802,7 @@ namespace rrr {
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
     nDistance(pPar->nDistance),
+    fCompatible(pPar->fUseBddCspf),
     ana(pPar),
     target(-1) {
   }

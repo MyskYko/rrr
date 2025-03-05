@@ -250,6 +250,9 @@ namespace rrr {
           Assign(vGs[action.fi], pBdd->Or(pBdd->LitNot(x), vGs[action.id]));
           DecRef(x);
         }
+      } else {
+        // otherwise mark the node for future update
+        vCUpdates[action.id] = true;
       }
       vvCs[action.id].resize(action.idx + 1, LitMax);
       Assign(vvCs[action.id][action.idx], vGs[action.fi]);
