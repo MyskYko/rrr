@@ -368,7 +368,7 @@ namespace rrr {
     for(int idx = 0; idx < nFanins; idx++) {
       lit x = pBdd->Const1();
       IncRef(x);
-      for(unsigned idx2 = idx + 1; idx2 < nFanins; idx2++) {
+      for(int idx2 = idx + 1; idx2 < nFanins; idx2++) {
         int fi = pNtk->GetFanin(id, idx2);
         bool c = pNtk->GetCompl(id, idx2);
         Assign(x, pBdd->And(x, pBdd->LitNotCond(vFs[fi], c)));
