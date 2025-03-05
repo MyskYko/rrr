@@ -48,17 +48,15 @@ namespace rrr {
     }
     int nRadius = 2;
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
-    int nSize = int_size(vNodes);
+    std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
     // gradually increase radius until it hits window size limit
-    while(nSize < nWindowSize) {
-      std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
-      int nSizeNew = int_size(vNodesNew);
-      if(nSize == nSizeNew) { // already maximum
+    while(int_size(vNodesNew) < nWindowSize) {
+      if(int_size(vNodes) == int_size(vNodesNew)) { // already maximum
         break;
       }
       vNodes = vNodesNew;
-      nSize = nSizeNew;
       nRadius++;
+      vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
     }
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     sNodes.insert(id);
@@ -113,7 +111,7 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "inners: " << vInners << std::endl;
       }
-      if(nSize + int_size(vInners) > 2 * nWindowSize) {
+      if(int_size(sNodes) + int_size(vInners) > 2 * nWindowSize) {
         // TODO: parametrize
         break;
       }
