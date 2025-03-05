@@ -444,18 +444,18 @@ namespace rrr {
           }
           while(nFinishedJobs < nJobs) {
             OnJobEnd([&](Job *pJob) {
-              std::cout << "job " << pJob->id << " finished" << std::endl;
+              std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
               par.Insert(pJob->pNtk);
             });
           }
         } else {
           CreateJob(pSubNtk, iSeed + nJobs);
-          std::cout << "job " << nJobs - 1 << " created" << std::endl;
+          std::cout << "job " << nJobs - 1 << " created (size = " << pSubNtk->GetNumInts() << ")" << std::endl;
         }
       }
       while(nFinishedJobs < nJobs) {
         OnJobEnd([&](Job *pJob) {
-          std::cout << "job " << pJob->id << " finished" << std::endl;
+          std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
           par.Insert(pJob->pNtk);
         });
       }
