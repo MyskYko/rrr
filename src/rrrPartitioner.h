@@ -113,6 +113,10 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "inners: " << vInners << std::endl;
       }
+      if(nSize + int_size(vInners) > 2 * nWindowSize) {
+        // TODO: parametrize
+        break;
+      }
       bool fOverlap = false;
       for(int i: vInners) {
         if(sBlocked.count(i)) {
