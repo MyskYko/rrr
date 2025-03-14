@@ -30,6 +30,7 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     seconds nTimeout; // assigned upon Run
+    std::string verbose_prefix;
 
     // data
     Ana ana;
@@ -45,6 +46,10 @@ namespace rrr {
     // marks
     int target;
     std::vector<bool> vTfoMarks;
+
+    // print
+    template<typename... Args>
+    void Print(int nVerboseLevel, Args... args);
     
     // callback
     void ActionCallback(Action const &action);
@@ -97,12 +102,35 @@ namespace rrr {
     
   };
 
+  /* {{{ Print */
+  
+  template <typename Ntk, typename Ana>
+  template <typename... Args>
+  inline void Optimizer<Ntk, Ana>::Print(int nVerboseLevel, Args... args) {
+    if(nVerbose > nVerboseLevel) {
+      std::cout << verbose_prefix;
+      for(int i = 0; i < nVerboseLevel; i++) {
+        std::cout << "\t";
+      }
+      PrintNext(std::cout, args...);
+      std::cout << std::endl;
+    }
+  }
+  
+  /* }}} */
+
   /* {{{ Callback */
   
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::ActionCallback(Action const &action) {
-    if(nVerbose) {
-      PrintAction(action);
+    if(nVerbose > 2) {
+      std::stringstream ss = GetActionDescription(action);
+      std::string str;
+      std::getline(ss, str);
+      Print(2, str);
+      while(std::getline(ss, str)) {
+        Print(3, str);
+      }
     }
     switch(action.type) {
     case REMOVE_FANIN:
@@ -706,12 +734,11 @@ namespace rrr {
       if(it == vCands.end()) {
         break;
       }
+      Print(1, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), "):", "cost", "=", dCost);
       RemoveRedundancy();
       mapNewFanins.clear();
       double dNewCost = CostFunction(pNtk);
-      if(nVerbose) {
-        std::cout << "cost: " << dCost << " -> " << dNewCost << std::endl;
-      }
+      Print(2, "cost:", dCost, "->", dNewCost);
       if(fGreedy) {
         if(dNewCost <= dCost) {
           pNtk->Save(slot);
@@ -755,9 +782,7 @@ namespace rrr {
     mapNewFanins.clear();
     RemoveRedundancy();
     double dNewCost = CostFunction(pNtk);
-    if(nVerbose) {
-      std::cout << "cost: " << dCost << " -> " << dNewCost << std::endl;
-    }
+    Print(1, "cost:", dCost, "->", dNewCost);
     if(fGreedy && dNewCost > dCost) {
       pNtk->Load(slot);
     }
@@ -783,9 +808,7 @@ namespace rrr {
       if(!pNtk->IsInt(*it)) {
         continue;
       }
-      if(nVerbose) {
-        std::cout << "node " << *it << " (" << std::distance(vInts.crbegin(), it) + 1 << "/" << vInts.size() << ")" << std::endl;
-      }
+      Print(0, "node", *it, "(", int_distance(vInts.crbegin(), it) + 1, "/", int_size(vInts), "):", "cost", "=", CostFunction(pNtk));
       func(*it);
     }
   }
