@@ -28,13 +28,13 @@ namespace rrr {
 
   /* {{{ Int size */
   
-  template <template <typename...> typename Container, typename ... Ts>
+  template <template <typename...> typename Container, typename... Ts>
   static inline int int_size(Container<Ts...> const &c) {
     assert(c.size() <= (typename Container<Ts...>::size_type)std::numeric_limits<int>::max());
     return c.size();
   }
 
-  template <template <typename...> typename Container, typename ... Ts>
+  template <template <typename...> typename Container, typename... Ts>
   static inline bool check_int_size(Container<Ts...> const &c) {
     return c.size() <= (typename Container<Ts...>::size_type)std::numeric_limits<int>::max();
   }
