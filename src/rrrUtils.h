@@ -202,6 +202,7 @@ namespace rrr {
     default:
       assert(0);
     }
+    return UNDEF;
   }
 
   static inline char GetVarValueChar(VarValue x) {
@@ -219,6 +220,7 @@ namespace rrr {
     default:
       assert(0);
     }
+    return 'X';
   }
 
   /* }}} */
