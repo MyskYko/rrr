@@ -17,6 +17,7 @@ namespace rrr {
     using itr = std::vector<word>::iterator;
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
+    static constexpr bool fKeepStimula = true;
 
     // pointer to network
     Ntk *pNtk;
@@ -520,15 +521,53 @@ namespace rrr {
   void Simulator<Ntk>::Load(int slot) {
     assert(slot >= 0);
     assert(slot < int_size(vBackups));
-    nWords  = vBackups[slot].nWords;
-    target  = vBackups[slot].target;
-    vValues = vBackups[slot].vValues;
-    care    = vBackups[slot].care;
-    iPivot  = vBackups[slot].iPivot;
-    vAssignedStimuli = vBackups[slot].vAssignedStimuli;
     fUpdate = false;
     sUpdates.clear();
-    tmp.resize(nWords);
+    if(!fKeepStimula) {
+      nWords  = vBackups[slot].nWords;
+      target  = vBackups[slot].target;
+      vValues = vBackups[slot].vValues;
+      care    = vBackups[slot].care;
+      iPivot  = vBackups[slot].iPivot;
+      vAssignedStimuli = vBackups[slot].vAssignedStimuli;
+      tmp.resize(nWords);
+    } else {
+      std::vector<int> vOffsets;
+      for(int i = 0; i < vBackups[slot].nWords; i++) {
+        bool fDifferent = false;
+        pNtk->ForEachPi([&](int id) {
+          if(vValues[id * vBackups[slot].nWords + i] != vValues[id * nWords + i]) {
+            fDifferent = true;
+          }
+        });
+        if(fDifferent) {
+          vOffsets.push_back(i);
+        }
+      }
+      if(nWords == vBackups[slot].nWords) {
+        if(vOffsets.empty()) {
+          target  = vBackups[slot].target;
+          vValues = vBackups[slot].vValues;
+          care    = vBackups[slot].care;
+        } else {
+          target = -1;
+          std::vector<std::vector<word>> vInputStimuli(pNtk->GetNumPis());
+          pNtk->ForEachPiIdx([&](int idx, int id) {
+            vInputStimuli[idx].resize(nWords);
+            Copy(nWords, vInputStimuli[idx].begin(), vValues.begin() + id * nWords, false);
+          });
+          vValues = vBackups[slot].vValues;
+          pNtk->ForEachPiIdx([&](int idx, int id) {
+            Copy(nWords, vValues.begin() + id * nWords, vInputStimuli[idx].begin(), false);
+          });
+          for(int i: vOffsets) {
+            SimulateOneWord(i);
+          }
+        }
+      } else {
+        assert(0);
+      }
+    }
   }
   
   /* }}} */

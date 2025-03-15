@@ -107,6 +107,7 @@ namespace rrr {
 
     // network traversal
     void ForEachPi(std::function<void(int)> const &func) const;
+    void ForEachPiIdx(std::function<void(int, int)> const &func) const; // func(index, id)
     void ForEachInt(std::function<void(int)> const &func) const;
     void ForEachIntReverse(std::function<void(int)> const &func) const;
     void ForEachPiInt(std::function<void(int)> const &func) const;
@@ -672,7 +673,13 @@ namespace rrr {
       func(pi);
     }
   }
-  
+
+  inline void AndNetwork::ForEachPiIdx(std::function<void(int, int)> const &func) const {
+    for(int idx = 0; idx < GetNumPis(); idx++) {
+      func(idx, GetPi(idx));
+    }
+  }
+
   inline void AndNetwork::ForEachInt(std::function<void(int)> const &func) const {
     for(int id: lInts) {
       func(id);
