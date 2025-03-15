@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include <vector>
 #include <set>
 #include <string>
@@ -94,7 +95,7 @@ namespace rrr {
   /* {{{ Print next */
 
   struct SW {
-    int width = 4;
+    int width;
   };
 
   template <typename T>
@@ -102,16 +103,6 @@ namespace rrr {
   template <typename T, typename... Args>
   void PrintNext(std::ostream &os, T t, Args... args);
   
-  static inline void PrintNext(std::ostream &os, int t) {
-    os << std::setw(SW{}.width) << t;
-  }
-
-  template <typename... Args>
-  static inline void PrintNext(std::ostream &os, int t, Args... args) {
-    os << std::setw(SW{}.width) << t << " ";
-    PrintNext(os, args...);
-  }
-
   static inline void PrintNext(std::ostream &os, bool arg) {
     os << arg;
   }
@@ -126,6 +117,26 @@ namespace rrr {
     PrintNext(os, args...);
   }
   
+  static inline void PrintNext(std::ostream &os, int t) {
+    os << std::setw(4) << t;
+  }
+
+  template <typename... Args>
+  static inline void PrintNext(std::ostream &os, int t, Args... args) {
+    os << std::setw(4) << t << " ";
+    PrintNext(os, args...);
+  }
+
+  static inline void PrintNext(std::ostream &os, double t) {
+    os << std::fixed << std::setprecision(2) << std::setw(8) << t;
+  }
+
+  template <typename... Args>
+  static inline void PrintNext(std::ostream &os, double t, Args... args) {
+    os << std::fixed << std::setprecision(2) << std::setw(8) << t << " ";
+    PrintNext(os, args...);
+  }
+
   template <typename T>
   static inline void PrintNext(std::ostream &os, SW sw, T arg) {
     os << std::setw(sw.width) << arg;
