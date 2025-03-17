@@ -19,11 +19,17 @@ namespace rrr {
     // parameters
     int nVerbose;
     int nWindowSize;
+    std::string strVerbosePrefix;
 
     // data
     std::map<Ntk *, std::tuple<std::set<int>, std::vector<int>, std::vector<bool>, std::vector<int>>> mSubNtk2Io;
     std::set<int> sBlocked;
+    std::vector<bool> vFailed;
 
+    // print
+    template<typename... Args>
+    void Print(int nVerboseLevel, Args... args);
+    
     // subroutines
     Ntk *ExtractDisjoint(int id);
     
@@ -37,15 +43,32 @@ namespace rrr {
     void Insert(Ntk *pSubNtk);
   };
 
+  /* {{{ Print */
+  
+  template <typename Ntk>
+  template <typename... Args>
+  inline void Partitioner<Ntk>::Print(int nVerboseLevel, Args... args) {
+    if(nVerbose > nVerboseLevel) {
+      std::cout << strVerbosePrefix;
+      for(int i = 0; i < nVerboseLevel; i++) {
+        std::cout << "\t";
+      }
+      PrintNext(std::cout, args...);
+      std::cout << std::endl;
+    }
+  }
+
+  /* }}} */
+
   /* {{{ Subroutines */
 
   template <typename Ntk>
   Ntk *Partitioner<Ntk>::ExtractDisjoint(int id) {
     // collect neighbor
     assert(!sBlocked.count(id));
-    if(nVerbose) {
-      std::cout << "extracting with a center node " << id << std::endl;
-    }
+    // if(nVerbose) {
+    //   std::cout << "extracting with a center node " << id << std::endl;
+    // }
     int nRadius = 2;
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
     std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
@@ -60,9 +83,9 @@ namespace rrr {
     }
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     sNodes.insert(id);
-    if(nVerbose) {
-      std::cout << "neighbors: " << sNodes << std::endl;
-    }
+    // if(nVerbose) {
+    //   std::cout << "neighbors: " << sNodes << std::endl;
+    // }
     // remove nodes that are already blocked
     for(std::set<int>::iterator it = sNodes.begin(); it != sNodes.end();) {
       if(sBlocked.count(*it)) {
@@ -71,9 +94,9 @@ namespace rrr {
         it++;
       }
     }
-    if(nVerbose) {
-      std::cout << "disjoint neighbors: " << sNodes << std::endl;
-    }
+    // if(nVerbose) {
+    //   std::cout << "disjoint neighbors: " << sNodes << std::endl;
+    // }
     // get tentative window IO
     std::set<int> sInputs, sOutputs;
     for(int id: sNodes) {
@@ -92,10 +115,10 @@ namespace rrr {
         sOutputs.insert(id);
       }
     }
-    if(nVerbose) {
-      std::cout << "\tinputs: " << sInputs << std::endl;
-      std::cout << "\toutputs: " << sOutputs << std::endl;
-    }
+    // if(nVerbose) {
+    //   std::cout << "\tinputs: " << sInputs << std::endl;
+    //   std::cout << "\toutputs: " << sOutputs << std::endl;
+    // }
     // prevent potential loops while ensuring disjointness
     // first by including inner nodes
     std::set<int> sFanouts;
@@ -108,16 +131,16 @@ namespace rrr {
     }
     std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
     while(!vInners.empty()) {
-      if(nVerbose) {
-        std::cout << "inners: " << vInners << std::endl;
-      }
+      // if(nVerbose) {
+      //   std::cout << "inners: " << vInners << std::endl;
+      // }
       if(int_size(sNodes) + int_size(vInners) > 2 * nWindowSize) {
         // TODO: parametrize
         break;
       }
       bool fOverlap = false;
-      for(int i: vInners) {
-        if(sBlocked.count(i)) {
+      for(int id: vInners) {
+        if(sBlocked.count(id)) {
           fOverlap = true;
           break;
         }
@@ -126,9 +149,9 @@ namespace rrr {
         break;
       }
       sNodes.insert(vInners.begin(), vInners.end());
-      if(nVerbose) {
-        std::cout << "new neighbors: " << sNodes << std::endl;
-      }
+      // if(nVerbose) {
+      //   std::cout << "new neighbors: " << sNodes << std::endl;
+      // }
       sInputs.clear();
       sOutputs.clear();
       for(int id: sNodes) {
@@ -147,10 +170,10 @@ namespace rrr {
           sOutputs.insert(id);
         }
       }
-      if(nVerbose) {
-        std::cout << "\tnew inputs: " << sInputs << std::endl;
-        std::cout << "\tnew outputs: " << sOutputs << std::endl;
-      }
+      // if(nVerbose) {
+      //   std::cout << "\tnew inputs: " << sInputs << std::endl;
+      //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
+      // }
       sFanouts.clear();
       for(int id: sOutputs) {
         pNtk->ForEachFanout(id, false, [&](int fo) {
@@ -174,21 +197,21 @@ namespace rrr {
           }
         });
         if(pNtk->IsReachable(sFanouts, sInputs)) {
-          if(nVerbose) {
-            std::cout << id << " is reachable to inputs" << std::endl;
-          }
+          // if(nVerbose) {
+          //   std::cout << id << " is reachable to inputs" << std::endl;
+          // }
           sNodes.erase(id);
           pNtk->ForEachTfiEnd(id, sInputs, [&](int fi) {
             int r = sNodes.erase(fi);
             assert(r);
           });
-          if(nVerbose) {
-            std::cout << "new neighbors: " << sNodes << std::endl;
-          }
+          // if(nVerbose) {
+          //   std::cout << "new neighbors: " << sNodes << std::endl;
+          // }
           if(sNodes.empty()) {
-            if(nVerbose) {
-              std::cout << "IS EMPTY" << std::endl;
-            }
+            // if(nVerbose) {
+            //   std::cout << "IS EMPTY" << std::endl;
+            // }
             return NULL;
           }
           // recompute inputs
@@ -200,9 +223,9 @@ namespace rrr {
               }
             });
           }
-          if(nVerbose) {
-            std::cout << "\tnew inputs: " << sInputs << std::endl;
-          }
+          // if(nVerbose) {
+          //   std::cout << "\tnew inputs: " << sInputs << std::endl;
+          // }
         }
       }
       // recompute outputs
@@ -213,9 +236,9 @@ namespace rrr {
           it++;
         }
       }
-      if(nVerbose) {
-        std::cout << "\tnew outputs: " << sOutputs << std::endl;
-      }
+      // if(nVerbose) {
+      //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
+      // }
     }
     // ensure outputs of both windows do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
@@ -225,9 +248,9 @@ namespace rrr {
       if(!pNtk->IsReachable(std::get<3>(entry.second), sInputs)) {
         continue;
       }
-      if(nVerbose) {
-        std::cout << "POTENTIAL LOOPS" << std::endl;
-      }
+      // if(nVerbose) {
+      //   std::cout << "POTENTIAL LOOPS" << std::endl;
+      // }
       return NULL;
     }
     if(int_size(sNodes) < nWindowSize / 2) {
@@ -240,8 +263,8 @@ namespace rrr {
     std::vector<int> vOutputs(sOutputs.begin(), sOutputs.end());
     Ntk *pSubNtk = pNtk->Extract(sNodes, vInputs, vOutputs);
     // return subntk to be modified, while remember IOs
-    for(int i: sNodes) {
-      sBlocked.insert(i);
+    for(int id: sNodes) {
+      sBlocked.insert(id);
     }
     mSubNtk2Io.emplace(pSubNtk, std::make_tuple(std::move(sNodes), std::move(vInputs), std::vector<bool>(vInputs.size()), std::move(vOutputs)));
     return pSubNtk;
@@ -269,16 +292,23 @@ namespace rrr {
   template <typename Ntk>
   Ntk *Partitioner<Ntk>::Extract(int iSeed) {
     // pick a center node from candidates that do not belong to any other ongoing windows
+    vFailed.resize(pNtk->GetNumNodes());
     std::mt19937 rng(iSeed);
     std::vector<int> vInts = pNtk->GetInts();
     std::shuffle(vInts.begin(), vInts.end(), rng);
-    for(int id: vInts) {
+    for(int i = 0; i < int_size(vInts); i++) {
+      int id = vInts[i];
+      if(vFailed[id]) {
+        continue;
+      }
       if(!sBlocked.count(id)) {
         Ntk *pSubNtk = ExtractDisjoint(id);
+        Print(0, "try partitioning with node", id, "(", i, "/", int_size(vInts), ")");
         if(pSubNtk) {
           return pSubNtk;
         }
       }
+      vFailed[id] = true;
     }
     return NULL;
   }
@@ -312,6 +342,7 @@ namespace rrr {
     }
     delete pSubNtk;
     mSubNtk2Io.erase(pSubNtk);
+    vFailed.clear(); // clear, there isn't really a way to track
   }
 
   /* }}} */

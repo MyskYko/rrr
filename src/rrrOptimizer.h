@@ -30,7 +30,7 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     seconds nTimeout; // assigned upon Run
-    std::string verbose_prefix;
+    std::string strVerbosePrefix;
 
     // data
     Ana ana;
@@ -108,7 +108,7 @@ namespace rrr {
   template <typename... Args>
   inline void Optimizer<Ntk, Ana>::Print(int nVerboseLevel, Args... args) {
     if(nVerbose > nVerboseLevel) {
-      std::cout << verbose_prefix;
+      std::cout << strVerbosePrefix;
       for(int i = 0; i < nVerboseLevel; i++) {
         std::cout << "\t";
       }
