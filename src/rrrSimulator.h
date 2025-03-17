@@ -565,6 +565,7 @@ namespace rrr {
           }
         }
       } else {
+        // when nWords has changed
         assert(0);
       }
     }
@@ -611,12 +612,13 @@ namespace rrr {
   void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
     pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
+    // TODO: what if nWords has changed? shall we reset it to default?
     vValues.resize(nWords * pNtk->GetNumNodes());
     target = -1;
-    iPivot = 0;
     fUpdate = false;
     sUpdates.clear();
     if(!fSame) { // reset stimuli if network function changed
+      iPivot = 0;
       vAssignedStimuli.clear();
       vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
       GenerateRandomStimuli();
