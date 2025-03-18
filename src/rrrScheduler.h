@@ -30,7 +30,7 @@ namespace rrr {
     int nVerbose;
     int iSeed;
     int nFlow;
-    int nRestarts;
+    int nTasks;
     bool fMultiThreading;
     bool fPartitioning;
     bool fDeterministic;
@@ -376,7 +376,7 @@ namespace rrr {
     nVerbose(pPar->nSchedulerVerbose),
     iSeed(pPar->iSeed),
     nFlow(pPar->nSchedulerFlow),
-    nRestarts(pPar->nRestarts),
+    nTasks(pPar->nTasks),
     fMultiThreading(pPar->nThreads > 1),
     fPartitioning(pPar->nWindowSize > 0),
     fDeterministic(pPar->fDeterministic),
@@ -435,7 +435,7 @@ namespace rrr {
     if(fPartitioning) {
       pNtk->Sweep();
       par.UpdateNetwork(pNtk);
-      while(nJobs < nRestarts) {
+      while(nJobs < nTasks) {
         Ntk *pSubNtk = par.Extract(iSeed + nJobs);
         if(pSubNtk == NULL) {
           if(nJobs == nFinishedJobs) {
@@ -459,14 +459,14 @@ namespace rrr {
           par.Insert(pJob->pNtk);
         });
       }
-    } else if(nRestarts > 0) {
+    } else if(nTasks > 1) {
       fDeterministic = false; // it is deterministic anyways
       double dCost = CostFunction(pNtk);
-      for(int i = 0; i < 1 + nRestarts; i++) {
+      for(int i = 0; i < nTasks; i++) {
         Ntk *pCopy = new Ntk(*pNtk);
         CreateJob(pCopy, iSeed + i);
       }
-      for(int i = 0; i < 1 + nRestarts; i++) {
+      for(int i = 0; i < nTasks; i++) {
         OnJobEnd([&](Job *pJob) {
           double dNewCost = CostFunction(pJob->pNtk);
           if(nVerbose) {

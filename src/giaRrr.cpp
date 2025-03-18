@@ -4,7 +4,7 @@
 #include "rrrAbc.h"
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nRestarts, int nThreads, int nWindowSize, int fDeterministic) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nTasks, int nThreads, int nWindowSize, int fDeterministic) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -24,7 +24,7 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nOptimizerFlow = nOptimizerFlow;
   Par.nSchedulerFlow = nSchedulerFlow;
   Par.nDistance = nDistance;
-  Par.nRestarts = nRestarts;
+  Par.nTasks = nTasks;
   Par.nThreads = nThreads;
   Par.nWindowSize = nWindowSize;
   Par.fDeterministic = fDeterministic;
