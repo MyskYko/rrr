@@ -34,6 +34,7 @@ namespace rrr {
     bool fMultiThreading;
     bool fPartitioning;
     bool fDeterministic;
+    int nParallelPartitions;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -380,6 +381,7 @@ namespace rrr {
     fMultiThreading(pPar->nThreads > 1),
     fPartitioning(pPar->nPartitionSize > 0),
     fDeterministic(pPar->fDeterministic),
+    nParallelPartitions(pPar->nParallelPartitions),
     nTimeout(pPar->nTimeout),
     nJobs(0),
     nFinishedJobs(0),
@@ -433,24 +435,28 @@ namespace rrr {
   void Scheduler<Ntk, Opt>::Run() {
     start = GetCurrentTime();
     if(fPartitioning) {
+      fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
       par.UpdateNetwork(pNtk);
       while(nJobs < nTasks) {
-        Ntk *pSubNtk = par.Extract(iSeed + nJobs);
-        if(pSubNtk == NULL) {
-          if(nJobs == nFinishedJobs) {
-            std::cout << "failed to partition" << std::endl;
-            break;
+        assert(nParallelPartitions > 0);
+        if(nJobs < nFinishedJobs + nParallelPartitions) {
+          Ntk *pSubNtk = par.Extract(iSeed + nJobs);
+          if(pSubNtk) {
+            CreateJob(pSubNtk, iSeed + nJobs);
+            std::cout << "job " << nJobs - 1 << " created (size = " << pSubNtk->GetNumInts() << ")" << std::endl;
+            continue;
           }
-          while(nFinishedJobs < nJobs) {
-            OnJobEnd([&](Job *pJob) {
-              std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
-              par.Insert(pJob->pNtk);
-            });
-          }
-        } else {
-          CreateJob(pSubNtk, iSeed + nJobs);
-          std::cout << "job " << nJobs - 1 << " created (size = " << pSubNtk->GetNumInts() << ")" << std::endl;
+        }
+        if(nJobs == nFinishedJobs) {
+          std::cout << "failed to partition" << std::endl;
+          break;
+        }
+        while(nFinishedJobs < nJobs) {
+          OnJobEnd([&](Job *pJob) {
+            std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
+            par.Insert(pJob->pNtk);
+          });
         }
       }
       while(nFinishedJobs < nJobs) {
@@ -460,7 +466,6 @@ namespace rrr {
         });
       }
     } else if(nTasks > 1) {
-      fDeterministic = false; // it is deterministic anyways
       double dCost = CostFunction(pNtk);
       for(int i = 0; i < nTasks; i++) {
         Ntk *pCopy = new Ntk(*pNtk);

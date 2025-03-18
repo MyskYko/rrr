@@ -4,7 +4,7 @@
 #include "rrrAbc.h"
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nTasks, int nThreads, int nPartitionSize, int fDeterministic) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nTasks, int nThreads, int nPartitionSize, int fDeterministic, int nParallelPartitions) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -28,6 +28,7 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nThreads = nThreads;
   Par.nPartitionSize = nPartitionSize;
   Par.fDeterministic = fDeterministic;
+  Par.nParallelPartitions = nParallelPartitions;
   rrr::Perform(&ntk, &Par);
   Gia_Man_t *pNew = rrr::CreateGia(&ntk);
   return pNew;

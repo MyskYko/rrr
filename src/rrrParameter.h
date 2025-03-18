@@ -23,6 +23,7 @@ namespace rrr {
     int nThreads = 1;
     int nPartitionSize = 0;
     bool fDeterministic = true;
+    int nParallelPartitions = 1;
   };
   
 }
