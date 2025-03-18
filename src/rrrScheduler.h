@@ -378,7 +378,7 @@ namespace rrr {
     nFlow(pPar->nSchedulerFlow),
     nTasks(pPar->nTasks),
     fMultiThreading(pPar->nThreads > 1),
-    fPartitioning(pPar->nWindowSize > 0),
+    fPartitioning(pPar->nPartitionSize > 0),
     fDeterministic(pPar->fDeterministic),
     nTimeout(pPar->nTimeout),
     nJobs(0),
@@ -439,7 +439,7 @@ namespace rrr {
         Ntk *pSubNtk = par.Extract(iSeed + nJobs);
         if(pSubNtk == NULL) {
           if(nJobs == nFinishedJobs) {
-            std::cout << "failed to extract a window" << std::endl;
+            std::cout << "failed to partition" << std::endl;
             break;
           }
           while(nFinishedJobs < nJobs) {

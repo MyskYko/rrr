@@ -18,7 +18,7 @@ namespace rrr {
 
     // parameters
     int nVerbose;
-    int nWindowSize;
+    int nPartitionSize;
     std::string strVerbosePrefix;
 
     // data
@@ -72,8 +72,8 @@ namespace rrr {
     int nRadius = 2;
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
     std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
-    // gradually increase radius until it hits window size limit
-    while(int_size(vNodesNew) < nWindowSize) {
+    // gradually increase radius until it hits partition size limit
+    while(int_size(vNodesNew) < nPartitionSize) {
       if(int_size(vNodes) == int_size(vNodesNew)) { // already maximum
         break;
       }
@@ -97,7 +97,7 @@ namespace rrr {
     // if(nVerbose) {
     //   std::cout << "disjoint neighbors: " << sNodes << std::endl;
     // }
-    // get tentative window IO
+    // get tentative partition IO
     std::set<int> sInputs, sOutputs;
     for(int id: sNodes) {
       pNtk->ForEachFanin(id, [&](int fi) {
@@ -134,7 +134,7 @@ namespace rrr {
       // if(nVerbose) {
       //   std::cout << "inners: " << vInners << std::endl;
       // }
-      if(int_size(sNodes) + int_size(vInners) > 2 * nWindowSize) {
+      if(int_size(sNodes) + int_size(vInners) > 2 * nPartitionSize) {
         // TODO: parametrize
         break;
       }
@@ -240,7 +240,7 @@ namespace rrr {
       //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
       // }
     }
-    // ensure outputs of both windows do not reach each other's inputs at the same time
+    // ensure outputs of both partitions do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
       if(!pNtk->IsReachable(sOutputs, std::get<1>(entry.second))) {
         continue;
@@ -253,7 +253,7 @@ namespace rrr {
       // }
       return NULL;
     }
-    if(int_size(sNodes) < nWindowSize / 2) {
+    if(int_size(sNodes) < nPartitionSize / 2) {
       // too small
       // TODO: fix this parameterized
       return NULL;
@@ -277,7 +277,7 @@ namespace rrr {
   template <typename Ntk>
   Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
     nVerbose(pPar->nPartitionerVerbose),
-    nWindowSize(pPar->nWindowSize) {
+    nPartitionSize(pPar->nPartitionSize) {
   }
 
   template <typename Ntk>
@@ -291,7 +291,7 @@ namespace rrr {
   
   template <typename Ntk>
   Ntk *Partitioner<Ntk>::Extract(int iSeed) {
-    // pick a center node from candidates that do not belong to any other ongoing windows
+    // pick a center node from candidates that do not belong to any other ongoing partitions
     vFailed.resize(pNtk->GetNumNodes());
     std::mt19937 rng(iSeed);
     std::vector<int> vInts = pNtk->GetInts();
@@ -322,7 +322,7 @@ namespace rrr {
     std::vector<int> &vOldOutputs = std::get<3>(mSubNtk2Io[pSubNtk]);
     std::vector<int> &vNewOutputs = vNewSignals.first;
     std::vector<bool> &vNewCompls = vNewSignals.second;
-    // need to remap updated outputs that are used as inputs in other windows
+    // need to remap updated outputs that are used as inputs in other partitions
     std::map<int, int> mOutput2Idx;
     for(int idx = 0; idx < int_size(vOldOutputs); idx++) {
       mOutput2Idx[vOldOutputs[idx]] = idx;

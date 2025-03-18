@@ -21,7 +21,7 @@ namespace rrr {
     int nDistance = 0;
     int nTasks = 1;
     int nThreads = 1;
-    int nWindowSize = 0;
+    int nPartitionSize = 0;
     bool fDeterministic = true;
   };
   

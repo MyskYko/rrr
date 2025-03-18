@@ -8,9 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nDistance, nTasks, nThreads, nWindowSize, fDeterministic
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = 12, nOptimizerFlow = 0, nSchedulerFlow = 0, nDistance = 0, nTasks = 1, nThreads = 1, nWindowSize = 0, fDeterministic = 1
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nTasks, int nThreads, int nWindowSize, int fDeterministic
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nDistance, nTasks, nThreads, nPartitionSize, fDeterministic
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = 12, nOptimizerFlow = 0, nSchedulerFlow = 0, nDistance = 0, nTasks = 1, nThreads = 1, nPartitionSize = 0, fDeterministic = 1
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nTasks, int nThreads, int nPartitionSize, int fDeterministic
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
           globalUtilOptind++;
           break;
       case 'K':
-          nWindowSize = atoi(argv[globalUtilOptind]);
+          nPartitionSize = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
       case 'D':
@@ -160,7 +160,7 @@ usage:
       Abc_Print( -2, "\t                2: iterate like deepsyn\n" );
       Abc_Print( -2, "\t-N num : number of tasks by restarting or partitioning [default = %d]\n", nTasks );
       Abc_Print( -2, "\t-J num : number of threads [default = %d]\n", nThreads );
-      Abc_Print( -2, "\t-K num : window size (0 = no partitioning) [default = %d]\n", nWindowSize );
+      Abc_Print( -2, "\t-K num : partition size (0 = no partitioning) [default = %d]\n", nPartitionSize );
       Abc_Print( -2, "\t-D num : distance between nodes (0 = no limit) [default = %d]\n", nDistance );
       Abc_Print( -2, "\t-R num : random number generator seed [default = %d]\n", iSeed );
       Abc_Print( -2, "\t-W num : number of simulation words [default = %d]\n", nWords );
