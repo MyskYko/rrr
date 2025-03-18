@@ -42,7 +42,7 @@ namespace rrr {
     std::function<double(Ntk *)> CostFunction;
     
     // data
-    int nJobs;
+    int nCreatedJobs;
     int nFinishedJobs;
     time_point start;
     Partitioner<Ntk> par;
@@ -289,7 +289,7 @@ namespace rrr {
 
   template <typename Ntk, typename Opt>
   void Scheduler<Ntk, Opt>::CreateJob(Ntk *pNtk_, int iSeed_) {
-    Job *pJob = new Job(nJobs++, pNtk_, iSeed_);
+    Job *pJob = new Job(nCreatedJobs++, pNtk_, iSeed_);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -382,7 +382,7 @@ namespace rrr {
     fDeterministic(pPar->fDeterministic),
     nParallelPartitions(pPar->nParallelPartitions),
     nTimeout(pPar->nTimeout),
-    nJobs(0),
+    nCreatedJobs(0),
     nFinishedJobs(0),
     par(pPar),
     pOpt(NULL) {
@@ -437,28 +437,28 @@ namespace rrr {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
       par.UpdateNetwork(pNtk);
-      while(nJobs < nTasks) {
+      while(nCreatedJobs < nTasks) {
         assert(nParallelPartitions > 0);
-        if(nJobs < nFinishedJobs + nParallelPartitions) {
-          Ntk *pSubNtk = par.Extract(iSeed + nJobs);
+        if(nCreatedJobs < nFinishedJobs + nParallelPartitions) {
+          Ntk *pSubNtk = par.Extract(iSeed + nCreatedJobs);
           if(pSubNtk) {
-            CreateJob(pSubNtk, iSeed + nJobs);
-            std::cout << "job " << nJobs - 1 << " created (size = " << pSubNtk->GetNumInts() << ")" << std::endl;
+            CreateJob(pSubNtk, iSeed + nCreatedJobs);
+            std::cout << "job " << nCreatedJobs - 1 << " created (size = " << pSubNtk->GetNumInts() << ")" << std::endl;
             continue;
           }
         }
-        if(nJobs == nFinishedJobs) {
+        if(nCreatedJobs == nFinishedJobs) {
           std::cout << "failed to partition" << std::endl;
           break;
         }
-        while(nFinishedJobs < nJobs) {
+        while(nFinishedJobs < nCreatedJobs) {
           OnJobEnd([&](Job *pJob) {
             std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
             par.Insert(pJob->pNtk);
           });
         }
       }
-      while(nFinishedJobs < nJobs) {
+      while(nFinishedJobs < nCreatedJobs) {
         OnJobEnd([&](Job *pJob) {
           std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
           par.Insert(pJob->pNtk);
