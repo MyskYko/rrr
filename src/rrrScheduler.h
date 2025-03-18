@@ -19,6 +19,9 @@ namespace rrr {
   template <typename Ntk, typename Opt>
   class Scheduler {
   private:
+    // aliases
+    static constexpr char *pCompress2rs = "balance -l; resub -K 6 -l; rewrite -l; resub -K 6 -N 2 -l; refactor -l; resub -K 8 -l; balance -l; resub -K 8 -N 2 -l; rewrite -l; resub -K 10 -l; rewrite -z -l; resub -K 10 -N 2 -l; balance -l; resub -K 12 -l; refactor -z -l; resub -K 12 -N 2 -l; rewrite -z -l; balance -l";
+    
     // job
     struct Job;
     struct CompareJobPointers;
@@ -220,7 +223,6 @@ namespace rrr {
         }
         // deepsyn
         int fUseTwo = 0;
-        std::string pCompress2rs = "balance -l; resub -K 6 -l; rewrite -l; resub -K 6 -N 2 -l; refactor -l; resub -K 8 -l; balance -l; resub -K 8 -N 2 -l; rewrite -l; resub -K 10 -l; rewrite -z -l; resub -K 10 -N 2 -l; balance -l; resub -K 12 -l; refactor -z -l; resub -K 12 -N 2 -l; rewrite -z -l; balance -l";
         unsigned Rand = rng();
         int fDch = Rand & 1;
         //int fCom = (Rand >> 1) & 3;
@@ -229,11 +231,11 @@ namespace rrr {
         int KLut = fUseTwo ? 2 + (i % 5) : 3 + (i % 4);
         std::string pComp;
         if ( fCom == 3 )
-          pComp = "; &put; " + pCompress2rs + "; " + pCompress2rs + "; " + pCompress2rs + "; &get";
+          pComp = std::string("; &put; ") + pCompress2rs + "; " + pCompress2rs + "; " + pCompress2rs + "; &get";
         else if ( fCom == 2 )
-          pComp = "; &put; " + pCompress2rs + "; " + pCompress2rs + "; &get";
+          pComp = std::string("; &put; ") + pCompress2rs + "; " + pCompress2rs + "; &get";
         else if ( fCom == 1 )
-          pComp = "; &put; " + pCompress2rs + "; &get";
+          pComp = std::string("; &put; ") + pCompress2rs + "; &get";
         else if ( fCom == 0 )
           pComp = "; &dc2";
         std::string Command = "&dch";
@@ -258,7 +260,7 @@ namespace rrr {
           if(rng() & 1) {
             CallAbc(pJob->pNtk, "&dc2");
           } else {
-            CallAbc(pJob->pNtk, "&put; " + pCompress2rs + "; &get");
+            CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; &get");
           }
           if(nVerbose) {
             std::cout << "\trrr " << std::setw(6) << j << ": cost = " << CostFunction(pJob->pNtk) << std::endl;

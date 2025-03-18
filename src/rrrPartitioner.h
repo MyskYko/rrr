@@ -69,7 +69,7 @@ namespace rrr {
     // if(nVerbose) {
     //   std::cout << "extracting with a center node " << id << std::endl;
     // }
-    int nRadius = 2;
+    int nRadius = 1;
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
     std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
     // gradually increase radius until it hits partition size limit
@@ -240,6 +240,7 @@ namespace rrr {
       //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
       // }
     }
+    assert(int_size(sNodes) <= 2 * nPartitionSize);
     // ensure outputs of both partitions do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
       if(!pNtk->IsReachable(sOutputs, std::get<1>(entry.second))) {
