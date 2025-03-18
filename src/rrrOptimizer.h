@@ -25,6 +25,7 @@ namespace rrr {
     // parameters
     int nVerbose;
     std::function<double(Ntk *)> CostFunction;
+    int nSortTypeOriginal;
     int nSortType;
     int nFlow;
     int nDistance;
@@ -96,9 +97,7 @@ namespace rrr {
     void UpdateNetwork(Ntk *pNtk_, bool fSame = false);
 
     // run
-    void Run(seconds nTimeout_ = 0);
-    void ResetSeed(int iSeed);
-    void Randomize(int iSeed);
+    void Run(int iSeed = 0, seconds nTimeout_ = 0);
     
   };
 
@@ -822,6 +821,7 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(pPar->nOptimizerVerbose),
     CostFunction(CostFunction),
+    nSortTypeOriginal(pPar->nSortType),
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
     nDistance(pPar->nDistance),
@@ -843,7 +843,14 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Run(seconds nTimeout_) {
+  void Optimizer<Ntk, Ana>::Run(int iSeed, seconds nTimeout_) {
+    rng.seed(iSeed);
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+    if(nSortTypeOriginal < 0) {
+      nSortType = rng() % 18;
+      std::cout << "sorttype = "  << nSortType << std::endl;
+    }
     nTimeout = nTimeout_;
     start = GetCurrentTime();
     switch(nFlow) {
@@ -906,19 +913,6 @@ namespace rrr {
     default:
       assert(0);
     }
-  }
-
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::ResetSeed(int iSeed) {
-    rng.seed(iSeed);
-    vRandPiOrder.clear();
-    vRandCosts.clear();
-  }
-  
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::Randomize(int iSeed) {
-    ResetSeed(iSeed);
-    nSortType = rng() % 18;
   }
   
   /* }}} */

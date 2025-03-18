@@ -156,8 +156,7 @@ namespace rrr {
     // start flow
     switch(nFlow) {
     case 0:
-      opt.ResetSeed(pJob->iSeed);
-      opt.Run(GetRemainingTime());
+      opt.Run(pJob->iSeed, GetRemainingTime());
       break;
     case 1: { // transtoch
       std::mt19937 rng(pJob->iSeed);
@@ -183,8 +182,7 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Randomize(rng());
-          opt.Run(GetRemainingTime());
+          opt.Run(rng(), GetRemainingTime());
           CallAbc(pJob->pNtk, "&dc2");
           double dNewCost = CostFunction(pJob->pNtk);
           if(nVerbose) {
@@ -255,8 +253,7 @@ namespace rrr {
             break;
           }
           opt.UpdateNetwork(pJob->pNtk, true);
-          opt.Randomize(rng());
-          opt.Run(GetRemainingTime());
+          opt.Run(rng(), GetRemainingTime());
           if(rng() & 1) {
             CallAbc(pJob->pNtk, "&dc2");
           } else {
