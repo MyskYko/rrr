@@ -92,10 +92,14 @@ namespace rrr {
     // resub stop
     bool SingleResubStop(int id, std::vector<int> const &vCands);
     bool MultiResubStop(int id, std::vector<int> const &vCands, bool fGreedy = true, int nMax = 0);
+
+    // multi-target resub
+    bool MultiTargetResub(std::vector<int> vTargets, bool fGreedy = true, int nMax = 0);
     
     // apply
     void ApplyReverseTopologically(std::function<void(int)> const &func);
-    bool ApplyRandomlyStop(std::function<bool(int)> const &func);
+    void ApplyRandomlyStop(std::function<bool(int)> const &func);
+    void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
     
   public:
     // constructors
@@ -877,7 +881,7 @@ namespace rrr {
     double dCost = CostFunction(pNtk);
     // remember fanins
     std::set<int> sFanins = pNtk->GetExtendedFanins(id);
-    Print(2, "extended fanins:", pNtk->GetExtendedFanins(id));
+    Print(2, "extended fanins:", sFanins);
     // collapse
     pNtk->TrivialCollapse(id);
     // resub
@@ -913,6 +917,88 @@ namespace rrr {
   }
   
   /* }}} */
+
+  /* {{{ Multi-target resub */
+
+  template <typename Ntk, typename Ana>
+  bool Optimizer<Ntk, Ana>::MultiTargetResub(std::vector<int> vTargets, bool fGreedy, int nMax) {
+    // save
+    int slot = pNtk->Save();
+    double dCost = CostFunction(pNtk);
+    // remove targets that are trivially collapsed together
+    for(int id: vTargets) {
+      if(pNtk->IsInt(id)) {
+        pNtk->TrivialCollapse(id);
+      }
+    }
+    for(itr it = vTargets.begin(); it != vTargets.end();) {
+      if(!pNtk->IsInt(*it)) {
+        it = vTargets.erase(it);
+      } else {
+        it++;
+      }
+    }
+    // add while remembering extended fanins
+    Print(1, "targets:", vTargets);
+    std::vector<std::set<int>> vsFanins;
+    for(int id: vTargets) {
+      // get candidates
+      std::vector<int> vCands;
+      if(nDistance) {
+        vCands = pNtk->GetNeighbors(id, true, nDistance);
+      } else {
+        vCands = pNtk->GetPisInts();
+      }
+      std::shuffle(vCands.begin(), vCands.end(), rng);
+      // remember fanins
+      std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+      Print(2, "extended fanins:", sFanins);
+      vsFanins.push_back(std::move(sFanins));
+      // add
+      MultiAdd(id, vCands, nMax);
+    }
+    // reduce
+    RemoveRedundancy();
+    mapNewFanins.clear();
+    // TODO: we could quit here if nothing has been removed
+    RemoveRedundancy();
+    double dNewCost = CostFunction(pNtk);
+    Print(1, "cost:", dCost, "->", dNewCost);
+    if(!fGreedy || dNewCost <= dCost) {
+      bool fChanged = false;
+      if(dNewCost < dCost) {
+        fChanged = true;
+      } else {
+        for(int id: vTargets) {
+          if(!pNtk->IsInt(id)) {
+            fChanged = true;
+            break;
+          }
+        }
+        for(int i = 0; !fChanged && i < int_size(vTargets); i++) {
+          std::set<int> sNewFanins = pNtk->GetExtendedFanins(vTargets[i]);
+          Print(2, "new extended fanins:", sNewFanins);
+          if(vsFanins[i] != sNewFanins) {
+            fChanged = true;
+          }
+        }
+      }
+      if(fChanged) {
+        for(int id: vTargets) {
+          if(pNtk->IsInt(id)) {
+            pNtk->TrivialDecompose(id);
+          }
+        }
+        pNtk->PopBack();
+        return true;
+      }
+    }
+    pNtk->Load(slot);
+    pNtk->PopBack();
+    return false;
+  }
+  
+  /* }}} */
   
   /* {{{ Apply */
 
@@ -932,7 +1018,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::ApplyRandomlyStop(std::function<bool(int)> const &func) {
+  void Optimizer<Ntk, Ana>::ApplyRandomlyStop(std::function<bool(int)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
     std::shuffle(vInts.begin(), vInts.end(), rng);
     for(citr it = vInts.begin(); it != vInts.end(); it++) {
@@ -944,12 +1030,28 @@ namespace rrr {
       }
       Print(0, "node", *it, "(", int_distance(vInts.cbegin(), it) + 1, "/", int_size(vInts), "):", "cost", "=", CostFunction(pNtk));
       if(func(*it)) {
-        return true;
+        break;
       }
     }
-    return false;
   }
 
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    ForEachCombinationStop(int_size(vInts), k, [&](std::vector<int> const &vIdxs) {
+      assert(int_size(vIdxs) == k);
+      if(Timeout()) {
+        return true;
+      }
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      return func(vTargets);
+    });
+  }
+  
   /* }}} */
   
   /* {{{ Constructors */
@@ -1058,7 +1160,15 @@ namespace rrr {
           vCands = pNtk->GetPisInts();
         }
         std::shuffle(vCands.begin(), vCands.end(), rng);
-        return SingleResubStop(id, vCands);
+        //return SingleResubStop(id, vCands);
+        return MultiResubStop(id, vCands, false);
+      });
+      break;
+    }
+    case 4: {
+      RemoveRedundancy();
+      ApplyCombinationRandomlyStop(2, [&](std::vector<int> const &vTargets) {
+        return MultiTargetResub(vTargets);
       });
       break;
     }
