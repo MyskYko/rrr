@@ -104,6 +104,7 @@ namespace rrr {
     bool IsReachable(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts);
     template <template <typename...> typename Container, typename... Ts, template <typename...> typename Container2, typename... Ts2>
     std::vector<int> GetInners(Container<Ts...> const &srcs, Container2<Ts2...> const &dsts);
+    std::set<int> GetExtendedFanins(int id);
 
     // network traversal
     void ForEachPi(std::function<void(int)> const &func) const;
@@ -662,6 +663,43 @@ namespace rrr {
     }
     EndTraversal();
     return vInners;
+  }
+
+  inline std::set<int> AndNetwork::GetExtendedFanins(int id) {
+    // go to the root of trivially collapsable nodes
+    while(GetNumFanouts(id) == 1) {
+      int id_new = -1;
+      ForEachFanout(id, false, [&](int fo, bool c) {
+        if(!c) {
+          id_new = fo;
+        }
+      });
+      if(id_new != -1) {
+        id = id_new;
+      } else {
+        break;
+      }
+    }
+    // emulate trivial collapse
+    std::vector<int> vFaninEdges = vvFaninEdges[id];
+    for(int idx = 0; idx < int_size(vFaninEdges);) {
+      int fi_edge = vFaninEdges[idx];
+      int fi = Edge2Node(fi_edge);
+      bool c = EdgeIsCompl(fi_edge);
+      if(!IsPi(fi) && !c && vRefs[fi] == 1) {
+        std::vector<int>::iterator it = vFaninEdges.begin() + idx;
+        it = vFaninEdges.erase(it);
+        vFaninEdges.insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
+      } else {
+        idx++;
+      }
+    }
+    // create set
+    std::set<int> sFanins;
+    for(int fi_edge: vFaninEdges) {
+      sFanins.insert(Edge2Node(fi_edge));
+    }
+    return sFanins;
   }
 
   /* }}} */

@@ -817,10 +817,7 @@ namespace rrr {
     int slot = pNtk->Save();
     double dCost = CostFunction(pNtk);
     // remember fanins
-    std::set<int> sFanins;
-    pNtk->ForEachFanin(id, [&](int fi) {
-      sFanins.insert(fi);
-    });
+    std::set<int> sFanins = pNtk->GetExtendedFanins(id);
     // main loop
     for(citr it = vCands.begin(); it != vCands.end(); it++) {
       if(Timeout()) {
@@ -837,19 +834,7 @@ namespace rrr {
       double dNewCost = CostFunction(pNtk);
       Print(2, "cost:", dCost, "->", dNewCost);
       if(dNewCost <= dCost) {
-        bool fChange = false;
-        if(!pNtk->IsInt(id)) {
-          fChange = true;
-        } else {
-          std::set<int> sNewFanins;
-          pNtk->ForEachFanin(id, [&](int fi) {
-            sNewFanins.insert(fi);
-          });
-          if(sFanins != sNewFanins) {
-            fChange = true;
-          }
-        }
-        if(fChange) {
+        if(!pNtk->IsInt(id) || sFanins != pNtk->GetExtendedFanins(id)) {
           if(pNtk->IsInt(id)) {
             pNtk->TrivialDecompose(id);
           }
