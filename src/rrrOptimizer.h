@@ -91,7 +91,7 @@ namespace rrr {
 
     // resub stop
     bool SingleResubStop(int id, std::vector<int> const &vCands);
-    bool MultiResubStop(int id, std::vector<int> const &vCands, int nMax = 0);
+    bool MultiResubStop(int id, std::vector<int> const &vCands, bool fGreedy = true, int nMax = 0);
     
     // apply
     void ApplyReverseTopologically(std::function<void(int)> const &func);
@@ -785,6 +785,7 @@ namespace rrr {
     MultiAdd(id, vCands, nMax);
     RemoveRedundancy();
     mapNewFanins.clear();
+    // TODO: we could quit here if nothing has been removed
     RemoveRedundancy();
     double dNewCost = CostFunction(pNtk);
     Print(1, "cost:", dCost, "->", dNewCost);
@@ -793,6 +794,10 @@ namespace rrr {
     }
     if(pNtk->IsInt(id)) {
       pNtk->TrivialDecompose(id);
+      SortFanins();
+      if(fCompatible) {
+        RemoveRedundancy();
+      }
     }
     if(fGreedy) {
       pNtk->PopBack();
@@ -860,7 +865,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, int nMax) {
+  bool Optimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, bool fGreedy, int nMax) {
     // if structure has changed without increasing cost, return true
     // otherwise, return false
     // NOTE: this assumes trivial collapse/decompose does not change cost
@@ -879,10 +884,11 @@ namespace rrr {
     MultiAdd(id, vCands, nMax);
     RemoveRedundancy();
     mapNewFanins.clear();
+    // TODO: we could quit here if nothing has been removed
     RemoveRedundancy();
     double dNewCost = CostFunction(pNtk);
     Print(1, "cost:", dCost, "->", dNewCost);
-    if(dNewCost <= dCost) {
+    if(!fGreedy || dNewCost <= dCost) {
       bool fChanged = false;
       if(dNewCost < dCost || !pNtk->IsInt(id)) {
         fChanged = true;
