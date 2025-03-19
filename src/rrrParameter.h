@@ -19,7 +19,7 @@ namespace rrr {
     int nOptimizerFlow = 0;
     int nSchedulerFlow = 0;
     int nDistance = 0;
-    int nTasks = 1;
+    int nJobs = 1;
     int nThreads = 1;
     int nPartitionSize = 0;
     bool fDeterministic = true;
