@@ -818,6 +818,7 @@ namespace rrr {
     double dCost = CostFunction(pNtk);
     // remember fanins
     std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+    Print(2, "extended fanins:", sFanins);
     // main loop
     for(citr it = vCands.begin(); it != vCands.end(); it++) {
       if(Timeout()) {
@@ -834,7 +835,17 @@ namespace rrr {
       double dNewCost = CostFunction(pNtk);
       Print(2, "cost:", dCost, "->", dNewCost);
       if(dNewCost <= dCost) {
-        if(!pNtk->IsInt(id) || sFanins != pNtk->GetExtendedFanins(id)) {
+        bool fChanged = false;
+        if(dNewCost < dCost || !pNtk->IsInt(id)) {
+          fChanged = true;
+        } else {
+          std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+          Print(2, "new extended fanins:", sNewFanins);
+          if(sFanins != sNewFanins) {
+            fChanged = true;
+          }
+        }
+        if(fChanged) {
           if(pNtk->IsInt(id)) {
             pNtk->TrivialDecompose(id);
           }
@@ -848,20 +859,20 @@ namespace rrr {
     return false;
   }
 
-  /*
   template <typename Ntk, typename Ana>
   bool Optimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, int nMax) {
-    bool fGreedy = false;
+    // if structure has changed without increasing cost, return true
+    // otherwise, return false
     // NOTE: this assumes trivial collapse/decompose does not change cost
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
     assert(pNtk->GetNumFanins(id) > 1);
-    // save if wanted
-    int slot;
-    if(fGreedy) {
-      slot = pNtk->Save();
-    }
+    // save
+    int slot = pNtk->Save();
     double dCost = CostFunction(pNtk);
+    // remember fanins
+    std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+    Print(2, "extended fanins:", pNtk->GetExtendedFanins(id));
     // collapse
     pNtk->TrivialCollapse(id);
     // resub
@@ -871,18 +882,29 @@ namespace rrr {
     RemoveRedundancy();
     double dNewCost = CostFunction(pNtk);
     Print(1, "cost:", dCost, "->", dNewCost);
-    if(fGreedy && dNewCost > dCost) {
-      pNtk->Load(slot);
+    if(dNewCost <= dCost) {
+      bool fChanged = false;
+      if(dNewCost < dCost || !pNtk->IsInt(id)) {
+        fChanged = true;
+      } else {
+        std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+        Print(2, "new extended fanins:", sNewFanins);
+        if(sFanins != sNewFanins) {
+          fChanged = true;
+        }
+      }
+      if(fChanged) {
+        if(pNtk->IsInt(id)) {
+          pNtk->TrivialDecompose(id);
+        }
+        pNtk->PopBack();
+        return true;
+      }
     }
-    if(pNtk->IsInt(id)) {
-      pNtk->TrivialDecompose(id);
-    }
-    if(fGreedy) {
-      pNtk->PopBack();
-    }
+    pNtk->Load(slot);
+    pNtk->PopBack();
     return false;
   }
-  */
   
   /* }}} */
   
