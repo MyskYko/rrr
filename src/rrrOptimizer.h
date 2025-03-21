@@ -100,6 +100,7 @@ namespace rrr {
     void ApplyReverseTopologically(std::function<void(int)> const &func);
     void ApplyRandomlyStop(std::function<bool(int)> const &func);
     void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyCombinationSampledRandomlyStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
     
   public:
     // constructors
@@ -1038,8 +1039,11 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
-    std::shuffle(vInts.begin(), vInts.end(), rng);
+    std::shuffle(vInts.begin(), vInts.end(), rng); // order is decided here, so it's not truely exhaustive
+    int nTried = 0;
+    int nCombs = k * (k - 1) / 2;
     ForEachCombinationStop(int_size(vInts), k, [&](std::vector<int> const &vIdxs) {
+      Print(0, "comb", vIdxs, "(", ++nTried, "/", nCombs, ")");
       assert(int_size(vIdxs) == k);
       if(Timeout()) {
         return true;
@@ -1050,6 +1054,31 @@ namespace rrr {
       }
       return func(vTargets);
     });
+  }
+  
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ApplyCombinationSampledRandomlyStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(int i = 0; i < nSamples; i++) {
+      if(Timeout()) {
+        break;
+      }
+      std::set<int> sIdxs;
+      while(int_size(sIdxs) < k) {
+        int idx = rng() % pNtk->GetNumInts();
+        sIdxs.insert(idx);
+      }
+      std::vector<int> vIdxs(sIdxs.begin(), sIdxs.end());
+      std::shuffle(vIdxs.begin(), vIdxs.end(), rng);
+      Print(0, "comb", vIdxs, "(", i + 1, "/", nSamples, ")");
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      if(func(vTargets)) {
+        break;
+      }
+    }
   }
   
   /* }}} */
@@ -1172,8 +1201,8 @@ namespace rrr {
     }
     case 4: {
       RemoveRedundancy();
-      ApplyCombinationRandomlyStop(2, [&](std::vector<int> const &vTargets) {
-        return MultiTargetResub(vTargets);
+      ApplyCombinationSampledRandomlyStop(3, 100, [&](std::vector<int> const &vTargets) {
+        return MultiTargetResub(vTargets, false);
       });
       break;
     }

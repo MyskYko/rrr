@@ -148,8 +148,8 @@ namespace rrr {
     PrintNext(os, args...);
   }
   
-  template <typename T, typename... Args>
-  static inline void PrintNext(std::ostream& os, std::vector<T> const &arg, Args... args) {
+  template <typename T>
+  static inline void PrintNext(std::ostream& os, std::vector<T> const &arg) {
     std::string delim;
     os << "[";
     for(T const &e: arg) {
@@ -159,9 +159,22 @@ namespace rrr {
     }
     os << "]";
   }
-  
+
   template <typename T, typename... Args>
-  static inline void PrintNext(std::ostream& os, std::set<T> const &arg, Args... args) {
+  static inline void PrintNext(std::ostream& os, std::vector<T> const &arg, Args... args) {
+    std::string delim;
+    os << "[";
+    for(T const &e: arg) {
+      os << delim;
+      PrintNext(os, e);
+      delim = ", ";
+    }
+    os << "] ";
+    PrintNext(os, args...);
+  }
+
+  template <typename T>
+  static inline void PrintNext(std::ostream& os, std::set<T> const &arg) {
     std::string delim;
     os << "{";
     for(T const &e: arg) {
@@ -172,6 +185,19 @@ namespace rrr {
     os << "}";
   }
 
+  template <typename T, typename... Args>
+  static inline void PrintNext(std::ostream& os, std::set<T> const &arg, Args... args) {
+    std::string delim;
+    os << "{";
+    for(T const &e: arg) {
+      os << delim;
+      PrintNext(os, e);
+      delim = ", ";
+    }
+    os << "} ";
+    PrintNext(os, args...);
+  }
+  
   template <typename T>
   void PrintNext(std::ostream &os, T t) {
     os << t;
