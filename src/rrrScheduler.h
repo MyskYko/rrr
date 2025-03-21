@@ -478,6 +478,12 @@ namespace rrr {
           par.Insert(pJob->pNtk);
         });
       }
+      if(fOptOnInsert) {
+        //std::cout << "before c2rs; dc2: " << CostFunction(pNtk) << std::endl; 
+        CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+        par.UpdateNetwork(pNtk);
+        //std::cout << "after  c2rs; dc2: " << CostFunction(pNtk) << std::endl;
+      }
     } else if(nJobs > 1) {
       double dCost = CostFunction(pNtk);
       for(int i = 0; i < nJobs; i++) {
