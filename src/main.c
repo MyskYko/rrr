@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
   Gia_Man_t *pNew;
   int c;
   PARAMS_DEF;
-  int fCore = 0;
+  int fCore = 0, fVerify = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYNJKBDRWTCGVPOAQSabcdh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYNJKBDRWTCGVPOAQSabcdvh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
       case 'd':
           fDeterministic ^= 1;
           break;
+      case 'v':
+          fVerify ^= 1;
+          break;
       case 'h':
           goto usage;
       default:
@@ -131,15 +134,17 @@ int main(int argc, char **argv) {
   pNew = Gia_ManRrr(pGia, PARAMS);
   printf("end:   %d nodes\n", Gia_ManAndNum(pNew));
 
-  if(Cec_ManVerifyTwo(pGia, pNew, 0)) {
-    printf("equivalent\n");
-  } else {
-    printf("NOT EQUIVALENT\n");
-    if(fCore) {
-      Gia_Man_t *pCore = MinimizeTest(pGia, PARAMS);
-      Gia_AigerWrite(pCore, "core.aig", 0, 0, 0);
-      printf("dumped a core of %d nodes\n", Gia_ManAndNum(pCore));
-      Gia_ManStop(pCore);
+  if(fVerify) {
+    if(Cec_ManVerifyTwo(pGia, pNew, 0)) {
+      printf("equivalent\n");
+    } else {
+      printf("NOT EQUIVALENT\n");
+      if(fCore) {
+        Gia_Man_t *pCore = MinimizeTest(pGia, PARAMS);
+        Gia_AigerWrite(pCore, "core.aig", 0, 0, 0);
+        printf("dumped a core of %d nodes\n", Gia_ManAndNum(pCore));
+        Gia_ManStop(pCore);
+      }
     }
   }
 
