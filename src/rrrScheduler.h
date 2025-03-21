@@ -283,7 +283,8 @@ namespace rrr {
       opt.Run(pJob->iSeed, GetRemainingTime());
       //std::cout << "before c2rs; dc2 part:" << CostFunction(pJob->pNtk) << std::endl; 
       CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
-      //std::cout << "after  c2rs; dc2 part: " << CostFunction(pJob->pNtk) << std::endl; 
+      //std::cout << "after  c2rs; dc2 part: " << CostFunction(pJob->pNtk) << std::endl;
+      break;
     default:
       assert(0);
     }
