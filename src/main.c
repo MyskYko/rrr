@@ -166,6 +166,7 @@ usage:
       Abc_Print( -2, "\t                0: single-add resub\n" );
       Abc_Print( -2, "\t                1: multi-add resub\n" );
       Abc_Print( -2, "\t                2: repeat 0 and 1\n" );
+      Abc_Print( -2, "\t                3: random one meaningful resub\n" );
       Abc_Print( -2, "\t-Y num : flow [default = %d]\n", nSchedulerFlow );
       Abc_Print( -2, "\t                0: apply method once\n" );
       Abc_Print( -2, "\t                1: iterate like transtoch\n" );
