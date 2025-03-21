@@ -24,6 +24,7 @@ namespace rrr {
     int nPartitionSize = 0;
     bool fDeterministic = true;
     int nParallelPartitions = 1;
+    bool fOptOnInsert = false;
   };
   
 }

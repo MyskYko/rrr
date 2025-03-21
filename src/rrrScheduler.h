@@ -38,6 +38,7 @@ namespace rrr {
     bool fPartitioning;
     bool fDeterministic;
     int nParallelPartitions;
+    bool fOptOnInsert;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -381,6 +382,7 @@ namespace rrr {
     fPartitioning(pPar->nPartitionSize > 0),
     fDeterministic(pPar->fDeterministic),
     nParallelPartitions(pPar->nParallelPartitions),
+    fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -456,6 +458,12 @@ namespace rrr {
             std::cout << "job " << pJob->id << " finished (size = " << pJob->pNtk->GetNumInts() << ")" << std::endl;
             par.Insert(pJob->pNtk);
           });
+        }
+        if(fOptOnInsert) {
+          //std::cout << "before c2rs; dc2: " << CostFunction(pNtk) << std::endl; 
+          CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+          par.UpdateNetwork(pNtk);
+          //std::cout << "after  c2rs; dc2: " << CostFunction(pNtk) << std::endl;
         }
       }
       while(nFinishedJobs < nCreatedJobs) {

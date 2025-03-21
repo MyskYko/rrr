@@ -8,9 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nDistance, nJobs, nThreads, nPartitionSize, fDeterministic, nParallelPartitions
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, fDeterministic = 1, nParallelPartitions = 1
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nJobs, int nThreads, int nPartitionSize, int fDeterministic, int nParallelPartitions
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nDistance, nJobs, nThreads, nPartitionSize, fDeterministic, nParallelPartitions, fOptOnInsert
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 1, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, fDeterministic = 1, nParallelPartitions = 1, fOptOnInsert = 0
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nDistance, int nJobs, int nThreads, int nPartitionSize, int fDeterministic, int nParallelPartitions, int fOptOnInsert
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYNJKBDRWTCGVPOAQSabcdvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYNJKBDRWTCGVPOAQSabcdevh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
       case 'd':
           fDeterministic ^= 1;
           break;
+      case 'e':
+          fOptOnInsert ^= 1;
+          break;
       case 'v':
           fVerify ^= 1;
           break;
@@ -157,7 +160,7 @@ int main(int argc, char **argv) {
   return 0;
 
 usage:
-      Abc_Print( -2, "usage: rrr [-XYNJKBDRWTCGVPOAQS num] [-abdh]\n" );
+      Abc_Print( -2, "usage: rrr [-XYNJKBDRWTCGVPOAQS num] [-abdeh]\n" );
       Abc_Print( -2, "\t        perform optimization\n" );
       Abc_Print( -2, "\t-X num : method [default = %d]\n", nOptimizerFlow );
       Abc_Print( -2, "\t                0: single-add resub\n" );
@@ -186,6 +189,7 @@ usage:
       Abc_Print( -2, "\t-a     : use BDD-based analyzer (CSPF) [default = %s]\n", fUseBddCspf? "yes": "no" );
       Abc_Print( -2, "\t-b     : use BDD-based analyzer (MSPF) [default = %s]\n", fUseBddMspf? "yes": "no" );
       Abc_Print( -2, "\t-d     : ensure deterministic execution [default = %s]\n", fDeterministic? "yes": "no" );
+      Abc_Print( -2, "\t-e     : apply c2rs; dc2 after importing changes of partitions [default = %s]\n", fOptOnInsert? "yes": "no" );
       Abc_Print( -2, "\t-h     : print the command usage\n");
 
     Abc_Stop();
