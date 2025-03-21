@@ -1152,16 +1152,21 @@ namespace rrr {
     }
     case 3: {
       RemoveRedundancy();
+      std::vector<int> vCands;
+      if(!nDistance) {
+        vCands = pNtk->GetPisInts();
+        std::shuffle(vCands.begin(), vCands.end(), rng);
+      }
       ApplyRandomlyStop([&](int id) {
-        std::vector<int> vCands;
         if(nDistance) {
           vCands = pNtk->GetNeighbors(id, true, nDistance);
-        } else {
-          vCands = pNtk->GetPisInts();
+          std::shuffle(vCands.begin(), vCands.end(), rng);
         }
-        std::shuffle(vCands.begin(), vCands.end(), rng);
-        //return SingleResubStop(id, vCands);
-        return MultiResubStop(id, vCands, false);
+        if(rng() & 1) {
+          return SingleResubStop(id, vCands);
+        } else {
+          return MultiResubStop(id, vCands);
+        }
       });
       break;
     }
