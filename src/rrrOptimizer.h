@@ -822,9 +822,11 @@ namespace rrr {
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
     assert(pNtk->GetNumFanins(id) > 1);
+    // save before trivial collapse
+    int slot0 = pNtk->Save();
     // collapse
     pNtk->TrivialCollapse(id);
-    // save
+    // save after trivial collapse
     int slot = pNtk->Save();
     double dCost = CostFunction(pNtk);
     // remember fanins
@@ -860,13 +862,16 @@ namespace rrr {
           if(pNtk->IsInt(id)) {
             pNtk->TrivialDecompose(id);
           }
-          pNtk->PopBack();
+          pNtk->PopBack(); // slot
+          pNtk->PopBack(); // slot0
           return true;
         }
       }
       pNtk->Load(slot);
     }
-    pNtk->PopBack();
+    pNtk->PopBack(); // slot
+    pNtk->Load(slot0);
+    pNtk->PopBack(); // slot0
     return false;
   }
 
