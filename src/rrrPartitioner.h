@@ -19,6 +19,7 @@ namespace rrr {
     // parameters
     int nVerbose;
     int nPartitionSize;
+    int nPartitionSizeMin;
     std::string strVerbosePrefix;
 
     // data
@@ -66,26 +67,23 @@ namespace rrr {
   Ntk *Partitioner<Ntk>::ExtractDisjoint(int id) {
     // collect neighbor
     assert(!sBlocked.count(id));
-    // if(nVerbose) {
-    //   std::cout << "extracting with a center node " << id << std::endl;
-    // }
     int nRadius = 1;
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
+    Print(1, "radius", NS(), nRadius, ":", "size =", int_size(vNodes));
     std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
+    Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(vNodesNew));
     // gradually increase radius until it hits partition size limit
-    while(int_size(vNodesNew) < nPartitionSize) {
+    while(int_size(vNodesNew) < nPartitionSize / 2) {
       if(int_size(vNodes) == int_size(vNodesNew)) { // already maximum
         break;
       }
       vNodes = vNodesNew;
       nRadius++;
       vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
+      Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(vNodesNew));
     }
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     sNodes.insert(id);
-    // if(nVerbose) {
-    //   std::cout << "neighbors: " << sNodes << std::endl;
-    // }
     // remove nodes that are already blocked
     for(std::set<int>::iterator it = sNodes.begin(); it != sNodes.end();) {
       if(sBlocked.count(*it)) {
@@ -94,9 +92,7 @@ namespace rrr {
         it++;
       }
     }
-    // if(nVerbose) {
-    //   std::cout << "disjoint neighbors: " << sNodes << std::endl;
-    // }
+    Print(1, "checking:", "size =", int_size(sNodes));
     // get tentative partition IO
     std::set<int> sInputs, sOutputs;
     for(int id: sNodes) {
@@ -115,10 +111,9 @@ namespace rrr {
         sOutputs.insert(id);
       }
     }
-    // if(nVerbose) {
-    //   std::cout << "\tinputs: " << sInputs << std::endl;
-    //   std::cout << "\toutputs: " << sOutputs << std::endl;
-    // }
+    Print(2, "nodes:", sNodes);
+    Print(2, "inputs:", sInputs);
+    Print(2, "outputs:", sOutputs);
     // prevent potential loops while ensuring disjointness
     // first by including inner nodes
     std::set<int> sFanouts;
@@ -131,11 +126,8 @@ namespace rrr {
     }
     std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
     while(!vInners.empty()) {
-      // if(nVerbose) {
-      //   std::cout << "inners: " << vInners << std::endl;
-      // }
-      if(int_size(sNodes) + int_size(vInners) > 2 * nPartitionSize) {
-        // TODO: parametrize
+      Print(1, "inner =", int_size(vInners));
+      if(int_size(sNodes) + int_size(vInners) > nPartitionSize) {
         break;
       }
       bool fOverlap = false;
@@ -149,9 +141,7 @@ namespace rrr {
         break;
       }
       sNodes.insert(vInners.begin(), vInners.end());
-      // if(nVerbose) {
-      //   std::cout << "new neighbors: " << sNodes << std::endl;
-      // }
+      Print(1, "expanding:", "size =", int_size(sNodes));
       sInputs.clear();
       sOutputs.clear();
       for(int id: sNodes) {
@@ -170,10 +160,9 @@ namespace rrr {
           sOutputs.insert(id);
         }
       }
-      // if(nVerbose) {
-      //   std::cout << "\tnew inputs: " << sInputs << std::endl;
-      //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
-      // }
+      Print(2, "nodes:", sNodes);
+      Print(2, "inputs:", sInputs);
+      Print(2, "outputs:", sOutputs);
       sFanouts.clear();
       for(int id: sOutputs) {
         pNtk->ForEachFanout(id, false, [&](int fo) {
@@ -197,21 +186,14 @@ namespace rrr {
           }
         });
         if(pNtk->IsReachable(sFanouts, sInputs)) {
-          // if(nVerbose) {
-          //   std::cout << id << " is reachable to inputs" << std::endl;
-          // }
+          Print(2, "node", id, "is reachable");
           sNodes.erase(id);
           pNtk->ForEachTfiEnd(id, sInputs, [&](int fi) {
             int r = sNodes.erase(fi);
             assert(r);
           });
-          // if(nVerbose) {
-          //   std::cout << "new neighbors: " << sNodes << std::endl;
-          // }
+          Print(1, "shrinking:", "size =", int_size(sNodes));
           if(sNodes.empty()) {
-            // if(nVerbose) {
-            //   std::cout << "IS EMPTY" << std::endl;
-            // }
             return NULL;
           }
           // recompute inputs
@@ -223,9 +205,8 @@ namespace rrr {
               }
             });
           }
-          // if(nVerbose) {
-          //   std::cout << "\tnew inputs: " << sInputs << std::endl;
-          // }
+          Print(2, "nodes:", sNodes);
+          Print(2, "inputs:", sInputs);
         }
       }
       // recompute outputs
@@ -240,7 +221,7 @@ namespace rrr {
       //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
       // }
     }
-    assert(int_size(sNodes) <= 2 * nPartitionSize);
+    assert(int_size(sNodes) <= nPartitionSize);
     // ensure outputs of both partitions do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
       if(!pNtk->IsReachable(sOutputs, std::get<1>(entry.second))) {
@@ -254,9 +235,8 @@ namespace rrr {
       // }
       return NULL;
     }
-    if(int_size(sNodes) < nPartitionSize / 2) {
+    if(int_size(sNodes) < nPartitionSizeMin) {
       // too small
-      // TODO: fix this parameterized
       return NULL;
     }
     // extract by inputs, internals, and outputs (no checks needed in ntk side)
@@ -278,7 +258,8 @@ namespace rrr {
   template <typename Ntk>
   Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
     nVerbose(pPar->nPartitionerVerbose),
-    nPartitionSize(pPar->nPartitionSize) {
+    nPartitionSize(pPar->nPartitionSize),
+    nPartitionSizeMin(pPar->nPartitionSizeMin) {
   }
 
   template <typename Ntk>
@@ -306,8 +287,8 @@ namespace rrr {
         continue;
       }
       if(!sBlocked.count(id)) {
-        Ntk *pSubNtk = ExtractDisjoint(id);
         Print(0, "try partitioning with node", id, "(", i, "/", int_size(vInts), ")");
+        Ntk *pSubNtk = ExtractDisjoint(id);
         if(pSubNtk) {
           return pSubNtk;
         }

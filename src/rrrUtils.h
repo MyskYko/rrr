@@ -98,6 +98,8 @@ namespace rrr {
     int width;
   };
 
+  struct NS {}; // no space
+
   template <typename T>
   void PrintNext(std::ostream &os, T t);
   template <typename T, typename... Args>
@@ -145,6 +147,13 @@ namespace rrr {
   template <typename T, typename... Args>
   static inline void PrintNext(std::ostream &os, SW sw, T arg, Args... args) {
     os << std::setw(sw.width) << arg << " ";
+    PrintNext(os, args...);
+  }
+
+  template <typename T, typename... Args>
+  static inline void PrintNext(std::ostream &os, NS ns, T arg, Args... args) {
+    (void)ns;
+    os << arg;
     PrintNext(os, args...);
   }
   
