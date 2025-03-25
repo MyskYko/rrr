@@ -284,6 +284,9 @@ namespace rrr {
   template <typename Ntk>
   void Partitioner<Ntk>::UpdateNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
+    assert(mSubNtk2Io.empty());
+    assert(sBlocked.empty());
+    vFailed.clear();
   }
 
   /* }}} */
