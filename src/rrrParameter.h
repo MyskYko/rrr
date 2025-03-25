@@ -25,6 +25,7 @@ namespace rrr {
     bool fDeterministic = true;
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;
+    bool fGreedy = true;
   };
   
 }

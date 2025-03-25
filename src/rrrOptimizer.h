@@ -31,6 +31,7 @@ namespace rrr {
     int nFlow;
     int nDistance;
     bool fCompatible;
+    bool fGreedy;
     seconds nTimeout; // assigned upon Run
     std::string strVerbosePrefix;
 
@@ -86,15 +87,15 @@ namespace rrr {
     int  MultiAdd(int id, std::vector<int> const &vCands, int nMax = 0);
 
     // resub
-    void SingleResub(int id, std::vector<int> const &vCands, bool fGreedy = true);
-    void MultiResub(int id, std::vector<int> const &vCands, bool fGreedy = true, int nMax = 0);
+    void SingleResub(int id, std::vector<int> const &vCands);
+    void MultiResub(int id, std::vector<int> const &vCands, int nMax = 0);
 
     // resub stop
     bool SingleResubStop(int id, std::vector<int> const &vCands);
-    bool MultiResubStop(int id, std::vector<int> const &vCands, bool fGreedy = true, int nMax = 0);
+    bool MultiResubStop(int id, std::vector<int> const &vCands, int nMax = 0);
 
     // multi-target resub
-    bool MultiTargetResub(std::vector<int> vTargets, bool fGreedy = true, int nMax = 0);
+    bool MultiTargetResub(std::vector<int> vTargets, int nMax = 0);
     
     // apply
     void ApplyReverseTopologically(std::function<void(int)> const &func);
@@ -719,7 +720,7 @@ namespace rrr {
   /* {{{ Resub */
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands, bool fGreedy) {
+  void Optimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands) {
     // NOTE: this assumes trivial collapse/decompose does not change cost
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
@@ -773,7 +774,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::MultiResub(int id, std::vector<int> const &vCands, bool fGreedy, int nMax) {
+  void Optimizer<Ntk, Ana>::MultiResub(int id, std::vector<int> const &vCands, int nMax) {
     // NOTE: this assumes trivial collapse/decompose does not change cost
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
@@ -870,7 +871,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, bool fGreedy, int nMax) {
+  bool Optimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, int nMax) {
     // if structure has changed without increasing cost, return true
     // otherwise, return false
     // NOTE: this assumes trivial collapse/decompose does not change cost
@@ -922,7 +923,7 @@ namespace rrr {
   /* {{{ Multi-target resub */
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::MultiTargetResub(std::vector<int> vTargets, bool fGreedy, int nMax) {
+  bool Optimizer<Ntk, Ana>::MultiTargetResub(std::vector<int> vTargets, int nMax) {
     // save
     int slot = pNtk->Save();
     double dCost = CostFunction(pNtk);
@@ -1095,6 +1096,7 @@ namespace rrr {
     nFlow(pPar->nOptimizerFlow),
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
+    fGreedy(pPar->fGreedy),
     ana(pPar),
     target(-1) {
   }
@@ -1202,7 +1204,7 @@ namespace rrr {
     case 4: {
       RemoveRedundancy();
       ApplyCombinationSampledRandomlyStop(3, 100, [&](std::vector<int> const &vTargets) {
-        return MultiTargetResub(vTargets, false);
+        return MultiTargetResub(vTargets);
       });
       break;
     }
