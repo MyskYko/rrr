@@ -11,12 +11,11 @@
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
-#include "rrrPartitioner.h"
 #include "rrrAbc.h"
 
 namespace rrr {
 
-  template <typename Ntk, typename Opt>
+  template <typename Ntk, typename Opt, typename Par>
   class Scheduler {
   private:
     // aliases
@@ -46,7 +45,7 @@ namespace rrr {
     int nCreatedJobs;
     int nFinishedJobs;
     time_point start;
-    Partitioner<Ntk> par;
+    Par par;
     std::queue<Job *> qPendingJobs;
     Opt *pOpt; // used only in case of single thread execution
 #ifdef ABC_USE_PTHREADS
@@ -89,8 +88,8 @@ namespace rrr {
 
   /* {{{ Job */
   
-  template <typename Ntk, typename Opt>
-  struct Scheduler<Ntk, Opt>::Job {
+  template <typename Ntk, typename Opt, typename Par>
+  struct Scheduler<Ntk, Opt, Par>::Job {
     // data
     int id;
     Ntk *pNtk;
@@ -104,8 +103,8 @@ namespace rrr {
     }
   };
 
-  template <typename Ntk, typename Opt>
-  struct Scheduler<Ntk, Opt>::CompareJobPointers {
+  template <typename Ntk, typename Opt, typename Par>
+  struct Scheduler<Ntk, Opt, Par>::CompareJobPointers {
     // smaller id comes first in priority_queue
     bool operator()(Job const *lhs, Job const *rhs) const {
       return lhs->id > rhs->id;
@@ -116,8 +115,8 @@ namespace rrr {
 
   /* {{{ Time */
 
-  template <typename Ntk, typename Opt>
-  seconds Scheduler<Ntk, Opt>::GetRemainingTime() const {
+  template <typename Ntk, typename Opt, typename Par>
+  seconds Scheduler<Ntk, Opt, Par>::GetRemainingTime() const {
     if(nTimeout == 0) {
       return 0;
     }
@@ -133,8 +132,8 @@ namespace rrr {
 
   /* {{{ Abc */
 
-  template <typename Ntk, typename Opt>
-  inline void Scheduler<Ntk, Opt>::CallAbc(Ntk *pNtk_, std::string Command) {
+  template <typename Ntk, typename Opt, typename Par>
+  inline void Scheduler<Ntk, Opt, Par>::CallAbc(Ntk *pNtk_, std::string Command) {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -151,8 +150,8 @@ namespace rrr {
   
   /* {{{ Run jobs */
 
-  template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::RunJob(Opt &opt, Job const *pJob) {
+  template <typename Ntk, typename Opt, typename Par>
+  void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job const *pJob) {
     opt.UpdateNetwork(pJob->pNtk);
     // start flow
     switch(nFlow) {
@@ -294,8 +293,8 @@ namespace rrr {
 
   /* {{{ Manage jobs */
 
-  template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::CreateJob(Ntk *pNtk_, int iSeed_) {
+  template <typename Ntk, typename Opt, typename Par>
+  void Scheduler<Ntk, Opt, Par>::CreateJob(Ntk *pNtk_, int iSeed_) {
     Job *pJob = new Job(nCreatedJobs++, pNtk_, iSeed_);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
@@ -310,8 +309,8 @@ namespace rrr {
     qPendingJobs.push(pJob);
   }
   
-  template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::OnJobEnd(std::function<void(Job *pJob)> const &func) {
+  template <typename Ntk, typename Opt, typename Par>
+  void Scheduler<Ntk, Opt, Par>::OnJobEnd(std::function<void(Job *pJob)> const &func) {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       Job *pJob = NULL;
@@ -345,8 +344,8 @@ namespace rrr {
   /* {{{ Thread */
 
 #ifdef ABC_USE_PTHREADS
-  template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::Thread(Parameter const *pPar) {
+  template <typename Ntk, typename Opt, typename Par>
+  void Scheduler<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
     Opt opt(pPar, CostFunction);
     while(true) {
       Job *pJob = NULL;
@@ -376,9 +375,9 @@ namespace rrr {
   /* }}} */
   
   /* {{{ Constructors */
-  
-  template <typename Ntk, typename Opt>
-  Scheduler<Ntk, Opt>::Scheduler(Ntk *pNtk, Parameter const *pPar) :
+
+  template <typename Ntk, typename Opt, typename Par>
+  Scheduler<Ntk, Opt, Par>::Scheduler(Ntk *pNtk, Parameter const *pPar) :
     pNtk(pNtk),
     nVerbose(pPar->nSchedulerVerbose),
     iSeed(pPar->iSeed),
@@ -416,8 +415,8 @@ namespace rrr {
     pOpt = new Opt(pPar, CostFunction);
   }
 
-  template <typename Ntk, typename Opt>
-  Scheduler<Ntk, Opt>::~Scheduler() {
+  template <typename Ntk, typename Opt, typename Par>
+  Scheduler<Ntk, Opt, Par>::~Scheduler() {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -437,9 +436,9 @@ namespace rrr {
   /* }}} */
 
   /* {{{ Run */
-  
-  template <typename Ntk, typename Opt>
-  void Scheduler<Ntk, Opt>::Run() {
+
+  template <typename Ntk, typename Opt, typename Par>
+  void Scheduler<Ntk, Opt, Par>::Run() {
     start = GetCurrentTime();
     if(fPartitioning) {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round

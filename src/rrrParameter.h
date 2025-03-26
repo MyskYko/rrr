@@ -18,6 +18,7 @@ namespace rrr {
     int nSortType = 12;
     int nOptimizerFlow = 0;
     int nSchedulerFlow = 0;
+    int nPartitionType = 0;
     int nDistance = 0;
     int nJobs = 1;
     int nThreads = 1;
