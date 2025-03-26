@@ -32,6 +32,9 @@ namespace rrr {
     void Print(int nVerboseLevel, Args... args);
     
     // subroutines
+    void GetIo(std::set<int> const &sNodes, std::set<int> &sInputs, std::set<int> &sOutputs);
+    std::set<int> GetFanouts(std::set<int> const &sNodes, std::set<int> const &sOutputs);
+    std::set<int> GetUnblockedNeighborsAndInners(int id, int nRadius);
     Ntk *ExtractDisjoint(int id);
     
   public:
@@ -64,37 +67,9 @@ namespace rrr {
   /* {{{ Subroutines */
 
   template <typename Ntk>
-  Ntk *Partitioner<Ntk>::ExtractDisjoint(int id) {
-    // collect neighbor
-    assert(!sBlocked.count(id));
-    int nRadius = 1;
-    std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
-    Print(1, "radius", NS(), nRadius, ":", "size =", int_size(vNodes));
-    std::vector<int> vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
-    Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(vNodesNew));
-    // gradually increase radius until it hits partition size limit
-    while(int_size(vNodesNew) < nPartitionSize / 2) {
-      if(int_size(vNodes) == int_size(vNodesNew)) { // already maximum
-        break;
-      }
-      vNodes = vNodesNew;
-      nRadius++;
-      vNodesNew = pNtk->GetNeighbors(id, false, nRadius + 1);
-      Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(vNodesNew));
-    }
-    std::set<int> sNodes(vNodes.begin(), vNodes.end());
-    sNodes.insert(id);
-    // remove nodes that are already blocked
-    for(std::set<int>::iterator it = sNodes.begin(); it != sNodes.end();) {
-      if(sBlocked.count(*it)) {
-        it = sNodes.erase(it);
-      } else {
-        it++;
-      }
-    }
-    Print(1, "checking:", "size =", int_size(sNodes));
-    // get tentative partition IO
-    std::set<int> sInputs, sOutputs;
+  void Partitioner<Ntk>::GetIo(std::set<int> const &sNodes, std::set<int> &sInputs, std::set<int> &sOutputs) {
+    sInputs.clear();
+    sOutputs.clear();
     for(int id: sNodes) {
       pNtk->ForEachFanin(id, [&](int fi) {
         if(!sNodes.count(fi)) {
@@ -111,11 +86,10 @@ namespace rrr {
         sOutputs.insert(id);
       }
     }
-    Print(2, "nodes:", sNodes);
-    Print(2, "inputs:", sInputs);
-    Print(2, "outputs:", sOutputs);
-    // prevent potential loops while ensuring disjointness
-    // first by including inner nodes
+  }
+
+  template <typename Ntk>
+  std::set<int> Partitioner<Ntk>::GetFanouts(std::set<int> const &sNodes, std::set<int> const &sOutputs) {
     std::set<int> sFanouts;
     for(int id: sOutputs) {
       pNtk->ForEachFanout(id, false, [&](int fo) {
@@ -124,67 +98,101 @@ namespace rrr {
         }
       });
     }
+    return sFanouts;
+  }
+
+  template <typename Ntk>
+  std::set<int> Partitioner<Ntk>::GetUnblockedNeighborsAndInners(int id, int nRadius) {
+    // return empty set on failure
+    // get neighbors
+    std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
+    vNodes.push_back(id);
+    std::set<int> sNodes(vNodes.begin(), vNodes.end());
+    Print(2, "radius", NS(), nRadius, ":", "size =", int_size(sNodes));
+    // remove nodes that are already blocked
+    for(std::set<int>::iterator it = sNodes.begin(); it != sNodes.end();) {
+      if(sBlocked.count(*it)) {
+        it = sNodes.erase(it);
+      } else {
+        it++;
+      }
+    }
+    Print(2, "unblocked:", "size =", int_size(sNodes));
+    if(int_size(sNodes) > nPartitionSize) {
+      // too large
+      return std::set<int>();
+    }
+    // get tentative partition IO
+    std::set<int> sInputs, sOutputs;
+    GetIo(sNodes, sInputs, sOutputs);
+    Print(3, "nodes:", sNodes);
+    Print(3, "inputs:", sInputs);
+    Print(3, "outputs:", sOutputs);
+    // include inner nodes
+    std::set<int> sFanouts = GetFanouts(sNodes, sOutputs);
     std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
     while(!vInners.empty()) {
-      Print(1, "inner =", int_size(vInners));
-      if(int_size(sNodes) + int_size(vInners) > nPartitionSize) {
-        break;
-      }
-      bool fOverlap = false;
+      Print(2, "inner size =", int_size(vInners));
+      // check overlap
       for(int id: vInners) {
         if(sBlocked.count(id)) {
-          fOverlap = true;
-          break;
+          // overlapped
+          return std::set<int>();     
         }
       }
-      if(fOverlap) {
-        break;
-      }
+      // expand
       sNodes.insert(vInners.begin(), vInners.end());
-      Print(1, "expanding:", "size =", int_size(sNodes));
-      sInputs.clear();
-      sOutputs.clear();
-      for(int id: sNodes) {
-        pNtk->ForEachFanin(id, [&](int fi) {
-          if(!sNodes.count(fi)) {
-            sInputs.insert(fi);
-          }
-        });
-        bool fOutput = false;
-        pNtk->ForEachFanout(id, true, [&](int fo) {
-          if(!sNodes.count(fo)) {
-            fOutput = true;
-          }
-        });
-        if(fOutput) {
-          sOutputs.insert(id);
-        }
+      Print(2, "expanded:", "size =", int_size(sNodes));
+      if(int_size(sNodes) > nPartitionSize) {
+        // too large
+        return std::set<int>();
       }
-      Print(2, "nodes:", sNodes);
-      Print(2, "inputs:", sInputs);
-      Print(2, "outputs:", sOutputs);
-      sFanouts.clear();
-      for(int id: sOutputs) {
-        pNtk->ForEachFanout(id, false, [&](int fo) {
-          if(!sNodes.count(fo)) {
-            sFanouts.insert(fo);
-          }
-        });
-      }
+      GetIo(sNodes, sInputs, sOutputs);
+      Print(3, "nodes:", sNodes);
+      Print(3, "inputs:", sInputs);
+      Print(3, "outputs:", sOutputs);
+      // recompute fanouts
+      sFanouts = GetFanouts(sNodes, sOutputs);
       vInners = pNtk->GetInners(sFanouts, sInputs);
     }
+    return sNodes;
+  }
+  
+  template <typename Ntk>
+  Ntk *Partitioner<Ntk>::ExtractDisjoint(int id) {
+    // collect neighbor
+    assert(!sBlocked.count(id));
+    int nRadius = 1;
+    std::set<int> sNodes = GetUnblockedNeighborsAndInners(id, nRadius);
+    Print(1, "radius", NS(), nRadius, ":", "size =", int_size(sNodes));
+    if(sNodes.empty()) {
+      return NULL;
+    }
+    std::set<int> sNodesNew = GetUnblockedNeighborsAndInners(id, nRadius + 1);
+    Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(sNodesNew));
+    // gradually increase radius until it hits partition size limit
+    while(!sNodesNew.empty()) {
+      if(int_size(sNodes) == int_size(sNodesNew)) { // likely already maximum
+        break;
+      }
+      sNodes = sNodesNew;
+      nRadius++;
+      sNodesNew = GetUnblockedNeighborsAndInners(id, nRadius + 1);
+      Print(1, "radius", NS(), nRadius + 1, ":", "size =", int_size(sNodesNew));
+    }
+    if(int_size(sNodes) < nPartitionSizeMin) {
+      // too small
+      return NULL;
+    }
+    std::set<int> sInputs, sOutputs;
+    GetIo(sNodes, sInputs, sOutputs);
+    /* fall back method by removing TFI of outputs reachable to inputs
     if(!vInners.empty()) {
-      // fall back method by removing TFI of outputs reachable to inputs
       for(int id: sOutputs) {
         if(!sNodes.count(id)) { // already removed
           continue;
         }
-        sFanouts.clear();
-        pNtk->ForEachFanout(id, false, [&](int fo) {
-          if(!sNodes.count(fo)) {
-            sFanouts.insert(fo);
-          }
-        });
+        std::set<int> sFanouts = GetFanouts(sNodes, sOutputs);
         if(pNtk->IsReachable(sFanouts, sInputs)) {
           Print(2, "node", id, "is reachable");
           sNodes.erase(id);
@@ -193,7 +201,8 @@ namespace rrr {
             assert(r);
           });
           Print(1, "shrinking:", "size =", int_size(sNodes));
-          if(sNodes.empty()) {
+          if(int_size(sNodes) < nPartitionSizeMin) {
+            // too small
             return NULL;
           }
           // recompute inputs
@@ -205,8 +214,8 @@ namespace rrr {
               }
             });
           }
-          Print(2, "nodes:", sNodes);
-          Print(2, "inputs:", sInputs);
+          Print(3, "nodes:", sNodes);
+          Print(3, "inputs:", sInputs);
         }
       }
       // recompute outputs
@@ -217,11 +226,9 @@ namespace rrr {
           it++;
         }
       }
-      // if(nVerbose) {
-      //   std::cout << "\tnew outputs: " << sOutputs << std::endl;
-      // }
+      Print(3, "new outputs:", sOutputs);
     }
-    assert(int_size(sNodes) <= nPartitionSize);
+    */
     // ensure outputs of both partitions do not reach each other's inputs at the same time
     for(auto const &entry: mSubNtk2Io) {
       if(!pNtk->IsReachable(sOutputs, std::get<1>(entry.second))) {
@@ -235,10 +242,8 @@ namespace rrr {
       // }
       return NULL;
     }
-    if(int_size(sNodes) < nPartitionSizeMin) {
-      // too small
-      return NULL;
-    }
+    assert(int_size(sNodes) <= nPartitionSize);
+    assert(int_size(sNodes) >= nPartitionSizeMin);
     // extract by inputs, internals, and outputs (no checks needed in ntk side)
     std::vector<int> vInputs(sInputs.begin(), sInputs.end());
     std::vector<int> vOutputs(sOutputs.begin(), sOutputs.end());
