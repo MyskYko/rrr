@@ -52,7 +52,7 @@ namespace rrr {
     void SortInts(itr it);
     unsigned StartTraversal(int n = 1);
     void EndTraversal();
-    void ForEachTfiRec(int id, std::function<void(int)> const &f);
+    void ForEachTfiRec(int id, std::function<void(int)> const &func);
     void TakenAction(Action const &action) const;
 
   public:
@@ -126,6 +126,9 @@ namespace rrr {
     void ForEachTfi(int id, bool fPis, std::function<void(int)> const &func);
     template <template <typename...> typename Container, typename... Ts>
     void ForEachTfiEnd(int id, Container<Ts...> const &ends, std::function<void(int)> const &func);
+    void ForEachTfiUpdate(int id, bool fPis, std::function<bool(int)> const &func);
+    template <template <typename...> typename Container, typename... Ts>
+    void ForEachTfisUpdate(Container<Ts...> const &ids, bool fPis, std::function<bool(int)> const &func);
     void ForEachTfo(int id, bool fPos, std::function<void(int)> const &func);
     void ForEachTfoReverse(int id, bool fPos, std::function<void(int)> const &func);
     void ForEachTfoUpdate(int id, bool fPos, std::function<bool(int)> const &func);
@@ -217,7 +220,7 @@ namespace rrr {
       ForEachTfiRec(fi, func);
     }
   }
-  
+
   inline void AndNetwork::TakenAction(Action const &action) const {
     for(Callback const &callback: vCallbacks) {
       callback(action);
@@ -885,6 +888,66 @@ namespace rrr {
       vTrav[end] = iTrav;
     }
     ForEachTfiRec(id, func);
+    EndTraversal();
+  }
+
+  inline void AndNetwork::ForEachTfiUpdate(int id, bool fPis, std::function<bool(int)> const &func) {
+    if(GetNumFanins(id) == 0) {
+      return;
+    }
+    StartTraversal();
+    for(int fi_edge: vvFaninEdges[id]) {
+      vTrav[Edge2Node(fi_edge)] = iTrav;
+    }
+    critr it = std::find(lInts.rbegin(), lInts.rend(), id);
+    assert(it != lInts.rend());
+    it++;
+    for(; it != lInts.rend(); it++) {
+      if(vTrav[*it] == iTrav) {
+        if(func(*it)) {
+          for(int fi_edge: vvFaninEdges[*it]) {
+            vTrav[Edge2Node(fi_edge)] = iTrav;
+          }
+        }
+      }
+    }
+    if(fPis) {
+      for(int pi: vPis) {
+        if(vTrav[pi] == iTrav) {
+          func(pi);
+        }
+      }
+    }
+    EndTraversal();
+  }
+
+  template <template <typename...> typename Container, typename... Ts>
+  inline void AndNetwork::ForEachTfisUpdate(Container<Ts...> const &ids, bool fPis, std::function<bool(int)> const &func) {
+    // this includes ids themselves
+    StartTraversal();
+    for(int id: ids) {
+      vTrav[id] = iTrav;
+    }
+    critr it = lInts.rbegin();
+    while(vTrav[*it] != iTrav && it != lInts.rend()) {
+      it++;
+    }
+    for(; it != lInts.rend(); it++) {
+      if(vTrav[*it] == iTrav) {
+        if(func(*it)) {
+          for(int fi_edge: vvFaninEdges[*it]) {
+            vTrav[Edge2Node(fi_edge)] = iTrav;
+          }
+        }
+      }
+    }
+    if(fPis) {
+      for(int pi: vPis) {
+        if(vTrav[pi] == iTrav) {
+          func(pi);
+        }
+      }
+    }
     EndTraversal();
   }
 
