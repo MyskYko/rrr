@@ -15,7 +15,7 @@ namespace rrr {
     bool fUseBddCspf = false;
     bool fUseBddMspf = false;
     int nConflictLimit = 0;
-    int nSortType = 12;
+    int nSortType = -1;
     int nOptimizerFlow = 0;
     int nSchedulerFlow = 0;
     int nPartitionType = 0;
