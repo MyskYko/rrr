@@ -810,6 +810,7 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "recomputing careset of " << target << std::endl;
       }
+      vValues2.resize(vValues.size());
       pNtk->ForEachPi([&](int id) {
         vValues2[id * nWords + iWord] = vValues[id * nWords + iWord];
       });
