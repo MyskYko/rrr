@@ -728,7 +728,7 @@ namespace rrr {
     // collapse
     pNtk->TrivialCollapse(id);
     // save if wanted
-    int slot;
+    int slot = -2;
     if(fGreedy) {
       slot = pNtk->Save();
     }
@@ -780,7 +780,7 @@ namespace rrr {
     assert(pNtk->GetNumFanouts(id) != 0);
     assert(pNtk->GetNumFanins(id) > 1);
     // save if wanted
-    int slot;
+    int slot = -2;
     if(fGreedy) {
       slot = pNtk->Save();
     }
@@ -1125,7 +1125,7 @@ namespace rrr {
     vRandCosts.clear();
     if(nSortTypeOriginal < 0) {
       nSortType = rng() % 18;
-      std::cout << "sorttype = "  << nSortType << std::endl;
+      Print(0, "sorttype =", nSortType);
     }
     nTimeout = nTimeout_;
     start = GetCurrentTime();
