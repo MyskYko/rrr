@@ -280,9 +280,7 @@ namespace rrr {
     }
     case 3:
       opt.Run(pJob->iSeed, GetRemainingTime());
-      //std::cout << "before c2rs; dc2 part:" << CostFunction(pJob->pNtk) << std::endl; 
       CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
-      //std::cout << "after  c2rs; dc2 part: " << CostFunction(pJob->pNtk) << std::endl;
       break;
     default:
       assert(0);
@@ -465,10 +463,8 @@ namespace rrr {
           });
         }
         if(fOptOnInsert) {
-          //std::cout << "before c2rs; dc2: " << CostFunction(pNtk) << std::endl; 
           CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
           par.UpdateNetwork(pNtk);
-          //std::cout << "after  c2rs; dc2: " << CostFunction(pNtk) << std::endl;
         }
       }
       while(nFinishedJobs < nCreatedJobs) {
@@ -478,10 +474,8 @@ namespace rrr {
         });
       }
       if(fOptOnInsert) {
-        //std::cout << "before c2rs; dc2: " << CostFunction(pNtk) << std::endl; 
         CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
         par.UpdateNetwork(pNtk);
-        //std::cout << "after  c2rs; dc2: " << CostFunction(pNtk) << std::endl;
       }
     } else if(nJobs > 1) {
       double dCost = CostFunction(pNtk);
