@@ -40,6 +40,7 @@ namespace rrr {
     bool fOptOnInsert;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
+    std::string strVerbosePrefix;
     
     // data
     int nCreatedJobs;
@@ -59,6 +60,10 @@ namespace rrr {
     std::condition_variable condFinishedJobs;
 #endif
 
+    // print
+    template<typename... Args>
+    void Print(int nVerboseLevel, Args... args);
+    
     // time
     seconds GetRemainingTime() const;
 
@@ -113,10 +118,27 @@ namespace rrr {
   
   /* }}} */
 
+  /* {{{ Print */
+  
+  template <typename Ntk, typename Opt, typename Par>
+  template<typename... Args>
+  inline void Scheduler<Ntk, Opt, Par>::Print(int nVerboseLevel, Args... args) {
+    if(nVerbose > nVerboseLevel) {
+      std::cout << strVerbosePrefix;
+      for(int i = 0; i < nVerboseLevel; i++) {
+        std::cout << "\t";
+      }
+      PrintNext(std::cout, args...);
+      std::cout << std::endl;
+    }
+  }
+
+  /* }}} */
+  
   /* {{{ Time */
 
   template <typename Ntk, typename Opt, typename Par>
-  seconds Scheduler<Ntk, Opt, Par>::GetRemainingTime() const {
+  inline seconds Scheduler<Ntk, Opt, Par>::GetRemainingTime() const {
     if(nTimeout == 0) {
       return 0;
     }
@@ -438,6 +460,7 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::Run() {
     start = GetCurrentTime();
+    double startCost = CostFunction(pNtk);
     if(fPartitioning) {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
@@ -505,6 +528,9 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "elapsed: " << std::fixed << std::setprecision(3) << elapsed_seconds << "s" << std::endl;
     }
+    double endCost = CostFunction(pNtk);
+    double percentage = 100 * (startCost - endCost) / startCost;
+    Print(0, "cost:", startCost, "->", endCost, NS{}, "(", percentage, "%", "reduction)");
   }
 
   /* }}} */
