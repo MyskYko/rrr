@@ -143,10 +143,50 @@ int main(int argc, char **argv) {
   
   char * fname = argv[globalUtilOptind];
   Gia_Man_t *pGia = Gia_AigerRead(fname, 0, 0, 0);
-  printf("start: %d nodes\n", Gia_ManAndNum(pGia));
+
+  if(nSchedulerVerbose) {
+    Abc_Print( 2, "Using the following parameters\n" );
+    Abc_Print( 2, "\t-X %3d : method ", nOptimizerFlow );
+    switch(nOptimizerFlow) {
+    case 0:
+      Abc_Print( 2, "(0 = single-add resub)" );
+      break;
+    case 1:
+      Abc_Print( 2, "(1 = multi-add resub)" );
+      break;
+    case 2:
+      Abc_Print( 2, "(2 = repeat single-add and multi-add resubs)" );
+      break;
+    case 3:
+      Abc_Print( 2, "(3 = random one meaningful resub)" );
+      break;
+    }
+    Abc_Print( 2, "\n" );
+    Abc_Print( 2, "\t-Y %3d : flow ", nSchedulerFlow );
+    switch(nSchedulerFlow) {
+    case 0:
+      Abc_Print( 2, "(0 = apply method once)" );
+      break;
+    case 1:
+      Abc_Print( 2, "(1 = iterate like transtoch)" );
+      break;
+    case 2:
+      Abc_Print( 2, "(2 = iterate like deepsyn)" );
+      break;
+    }
+    Abc_Print( 2, "\n" );
+    Abc_Print( 2, "\t-N %3d : number of jobs to create by restarting or partitioning\n", nJobs );
+    Abc_Print( 2, "\t-J %3d : number of threads\n", nThreads );
+    Abc_Print( 2, "\t-K %3d : maximum partition size (0 = no partitioning)\n", nPartitionSize );
+    Abc_Print( 2, "\t-L %3d : minimum partition size\n", nPartitionSizeMin );
+    Abc_Print( 2, "\t-B %3d : maximum number of partitions to optimize in parallel\n", nParallelPartitions );
+    Abc_Print( 2, "\t-R %3d : random number generator seed\n", iSeed );
+    Abc_Print( 2, "\t-T %3d : timeout in seconds (0 = no timeout)\n", nTimeout );
+    Abc_Print( 2, "\t-C %3d : conflict limit (0 = no limit)\n", nConflictLimit );
+    Abc_Print( 2, "Use command line switch \"-h\" to see more options\n\n" );
+  }
 
   pNew = Gia_ManRrr(pGia, PARAMS);
-  printf("end:   %d nodes\n", Gia_ManAndNum(pNew));
 
   if(fVerify) {
     if(Cec_ManVerifyTwo(pGia, pNew, 0)) {
@@ -187,10 +227,10 @@ usage:
       Abc_Print( -2, "\t                1: level base\n" );
       Abc_Print( -2, "\t-N num : number of jobs to create by restarting or partitioning [default = %d]\n", nJobs );
       Abc_Print( -2, "\t-J num : number of threads [default = %d]\n", nThreads );
-      Abc_Print( -2, "\t-K num : partition size (0 = no partitioning) [default = %d]\n", nPartitionSize );
-      Abc_Print( -2, "\t-K num : minimum partition size [default = %d]\n", nPartitionSizeMin );
-      Abc_Print( -2, "\t-B num : max number of partitions in parallel [default = %d]\n", nParallelPartitions );
-      Abc_Print( -2, "\t-D num : distance between nodes (0 = no limit) [default = %d]\n", nDistance );
+      Abc_Print( -2, "\t-K num : maximum partition size (0 = no partitioning) [default = %d]\n", nPartitionSize );
+      Abc_Print( -2, "\t-L num : minimum partition size [default = %d]\n", nPartitionSizeMin );
+      Abc_Print( -2, "\t-B num : maximum number of partitions to optimize in parallel [default = %d]\n", nParallelPartitions );
+      Abc_Print( -2, "\t-D num : maximum distance between node and new fanin (0 = no limit) [default = %d]\n", nDistance );
       Abc_Print( -2, "\t-R num : random number generator seed [default = %d]\n", iSeed );
       Abc_Print( -2, "\t-W num : number of simulation words [default = %d]\n", nWords );
       Abc_Print( -2, "\t-T num : timeout in seconds (0 = no timeout) [default = %d]\n", nTimeout );
