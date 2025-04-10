@@ -107,6 +107,7 @@ namespace rrr {
     // constructors
     Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
     void UpdateNetwork(Ntk *pNtk_, bool fSame = false);
+    void SetVerbosePrefix(std::string str);
 
     // run
     void Run(int iSeed = 0, seconds nTimeout_ = 0);
@@ -1112,6 +1113,11 @@ namespace rrr {
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     ana.UpdateNetwork(pNtk, fSame);
+  }
+  
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::SetVerbosePrefix(std::string str) {
+    strVerbosePrefix = str;
   }
   
   /* }}} */

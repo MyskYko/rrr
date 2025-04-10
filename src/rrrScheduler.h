@@ -40,7 +40,6 @@ namespace rrr {
     bool fOptOnInsert;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
-    std::string strVerbosePrefix;
     
     // data
     int nCreatedJobs;
@@ -56,13 +55,14 @@ namespace rrr {
     std::mutex mutexAbc;
     std::mutex mutexPendingJobs;
     std::mutex mutexFinishedJobs;
+    std::mutex mutexPrint;
     std::condition_variable condPendingJobs;
     std::condition_variable condFinishedJobs;
 #endif
 
     // print
     template<typename... Args>
-    void Print(int nVerboseLevel, Args... args);
+    void Print(int nVerboseLevel, std::string prefix, Args... args);
     
     // time
     seconds GetRemainingTime() const;
@@ -122,15 +122,30 @@ namespace rrr {
   
   template <typename Ntk, typename Opt, typename Par>
   template<typename... Args>
-  inline void Scheduler<Ntk, Opt, Par>::Print(int nVerboseLevel, Args... args) {
-    if(nVerbose > nVerboseLevel) {
-      std::cout << strVerbosePrefix;
-      for(int i = 0; i < nVerboseLevel; i++) {
-        std::cout << "\t";
-      }
-      PrintNext(std::cout, args...);
-      std::cout << std::endl;
+  inline void Scheduler<Ntk, Opt, Par>::Print(int nVerboseLevel, std::string prefix, Args... args) {
+    if(nVerbose <= nVerboseLevel) {
+      return;
     }
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPrint);
+        std::cout << prefix;
+        for(int i = 0; i < nVerboseLevel; i++) {
+          std::cout << "\t";
+        }
+        PrintNext(std::cout, args...);
+        std::cout << std::endl;
+      }
+      return;
+    }
+#endif
+    std::cout << prefix;
+    for(int i = 0; i < nVerboseLevel; i++) {
+      std::cout << "\t";
+    }
+    PrintNext(std::cout, args...);
+    std::cout << std::endl;
   }
 
   /* }}} */
@@ -174,6 +189,13 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job const *pJob) {
+    std::string prefix;
+    {
+      std::stringstream ss;
+      PrintNext(ss, "job", pJob->id, ":");
+      prefix = ss.str() + " ";
+    }
+    opt.SetVerbosePrefix(prefix);
     opt.UpdateNetwork(pJob->pNtk);
     // start flow
     switch(nFlow) {
@@ -185,9 +207,6 @@ namespace rrr {
       double dCost = CostFunction(pJob->pNtk);
       double dBestCost = dCost;
       Ntk best(*(pJob->pNtk));
-      if(nVerbose) {
-        std::cout << "start: cost = " << dCost << std::endl;
-      }
       for(int i = 0; i < 10; i++) {
         if(GetRemainingTime() < 0) {
           break;
@@ -196,9 +215,7 @@ namespace rrr {
           CallAbc(pJob->pNtk, "&if -K 6; &mfs; &st");
           dCost = CostFunction(pJob->pNtk);
           opt.UpdateNetwork(pJob->pNtk, true);
-          if(nVerbose) {
-            std::cout << "hop " << std::setw(3) << i << ": cost = " << dCost << std::endl;
-          }
+          Print(1, prefix, "hop", i, ":", "cost", "=", dCost);
         }
         for(int j = 0; true; j++) {
           if(GetRemainingTime() < 0) {
@@ -207,9 +224,7 @@ namespace rrr {
           opt.Run(rng(), GetRemainingTime());
           CallAbc(pJob->pNtk, "&dc2");
           double dNewCost = CostFunction(pJob->pNtk);
-          if(nVerbose) {
-            std::cout << "\tite " << std::setw(3) << j << ": cost = " << dNewCost << std::endl;
-          }
+          Print(1, prefix, "ite", j, ":", "cost", "=", dNewCost);
           if(dNewCost < dCost) {
             dCost = dNewCost;
             opt.UpdateNetwork(pJob->pNtk, true);
@@ -224,9 +239,6 @@ namespace rrr {
         }
       }
       *(pJob->pNtk) = best;
-      if(nVerbose) {
-        std::cout << "end: cost = " << dBestCost << std::endl;
-      }
       break;
     }
     case 2: { // deep
@@ -234,9 +246,6 @@ namespace rrr {
       int n = 0;
       double dCost = CostFunction(pJob->pNtk);
       Ntk best(*(pJob->pNtk));
-      if(nVerbose) {
-        std::cout << "start: cost = " << dCost << std::endl;
-      }
       for(int i = 0; i < 1000000; i++) {
         if(GetRemainingTime() < 0) {
           break;
@@ -266,9 +275,7 @@ namespace rrr {
           Command += "; &fx; &st";
         Command += pComp;
         CallAbc(pJob->pNtk, Command);
-        if(nVerbose) {
-          std::cout << "ite " << std::setw(6) << i << ": cost = " << CostFunction(pJob->pNtk) << std::endl;
-        }
+        Print(1, prefix, "ite", i, ":", "cost", "=", CostFunction(pJob->pNtk));
         // rrr
         for(int j = 0; j < n; j++) {
           if(GetRemainingTime() < 0) {
@@ -281,9 +288,7 @@ namespace rrr {
           } else {
             CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; &get");
           }
-          if(nVerbose) {
-            std::cout << "\trrr " << std::setw(6) << j << ": cost = " << CostFunction(pJob->pNtk) << std::endl;
-          }
+          Print(1, prefix, "rrr", j, ":", "cost", "=", CostFunction(pJob->pNtk));
         }
         // eval
         double dNewCost = CostFunction(pJob->pNtk);
@@ -295,9 +300,6 @@ namespace rrr {
         }
       }
       *(pJob->pNtk) = best;
-      if(nVerbose) {
-        std::cout << "end: cost = " << dCost << std::endl;
-      }
       break;
     }
     case 3:
@@ -530,7 +532,7 @@ namespace rrr {
     }
     double endCost = CostFunction(pNtk);
     double percentage = 100 * (startCost - endCost) / startCost;
-    Print(0, "cost:", startCost, "->", endCost, NS{}, "(", percentage, "%", "reduction)");
+    Print(0, "", "cost", ":", startCost, "->", endCost, NS{}, "(", percentage, "%", "reduction)");
   }
 
   /* }}} */
