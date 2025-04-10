@@ -44,7 +44,7 @@ namespace rrr {
     // data
     int nCreatedJobs;
     int nFinishedJobs;
-    time_point start;
+    time_point timeStart;
     Par par;
     std::queue<Job *> qPendingJobs;
     Opt *pOpt; // used only in case of single thread execution
@@ -157,8 +157,8 @@ namespace rrr {
     if(nTimeout == 0) {
       return 0;
     }
-    time_point current = GetCurrentTime();
-    seconds nRemainingTime = nTimeout - DurationInSeconds(start, current);
+    time_point timeCur = GetCurrentTime();
+    seconds nRemainingTime = nTimeout - DurationInSeconds(timeStart, timeCur);
     if(nRemainingTime == 0) { // avoid glitch
       return -1;
     }
@@ -458,7 +458,7 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::Run() {
-    start = GetCurrentTime();
+    timeStart = GetCurrentTime();
     double costStart = CostFunction(pNtk);
     if(fPartitioning) {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
@@ -522,8 +522,8 @@ namespace rrr {
       CreateJob(pNtk, iSeed);
       OnJobEnd([&](Job *pJob) { (void)pJob; });
     }
-    time_point end = GetCurrentTime();
-    double elapsed_seconds = Duration(start, end);
+    time_point timeEnd = GetCurrentTime();
+    double elapsed_seconds = Duration(timeStart, timeEnd);
     if(nVerbose) {
       std::cout << "elapsed: " << std::fixed << std::setprecision(3) << elapsed_seconds << "s" << std::endl;
     }
