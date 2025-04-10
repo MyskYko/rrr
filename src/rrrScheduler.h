@@ -74,7 +74,7 @@ namespace rrr {
     void RunJob(Opt &opt, Job const *pJob);
 
     // manage jobs
-    void CreateJob(Ntk *pNtk_, int iSeed_);
+    Job *CreateJob(Ntk *pNtk_, int iSeed_);
     void OnJobEnd(std::function<void(Job *pJob)> const &func);
 
     // thread
@@ -99,13 +99,15 @@ namespace rrr {
     int id;
     Ntk *pNtk;
     int iSeed;
+    double costInitial;
     std::string prefix;
     
     // constructor
-    Job(int id, Ntk *pNtk, int iSeed) :
+    Job(int id, Ntk *pNtk, int iSeed, double cost) :
       id(id),
       pNtk(pNtk),
-      iSeed(iSeed) {
+      iSeed(iSeed),
+      costInitial(cost) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
       prefix = ss.str() + " ";
@@ -202,8 +204,8 @@ namespace rrr {
       break;
     case 1: { // transtoch
       std::mt19937 rng(pJob->iSeed);
-      double dCost = CostFunction(pJob->pNtk);
-      double dBestCost = dCost;
+      double cost = pJob->costInitial;
+      double costBest = cost;
       Ntk best(*(pJob->pNtk));
       for(int i = 0; i < 10; i++) {
         if(GetRemainingTime() < 0) {
@@ -211,9 +213,9 @@ namespace rrr {
         }
         if(i != 0) {
           CallAbc(pJob->pNtk, "&if -K 6; &mfs; &st");
-          dCost = CostFunction(pJob->pNtk);
+          cost = CostFunction(pJob->pNtk);
           opt.UpdateNetwork(pJob->pNtk, true);
-          Print(1, pJob->prefix, "hop", i, ":", "cost", "=", dCost);
+          Print(1, pJob->prefix, "hop", i, ":", "cost", "=", cost);
         }
         for(int j = 0; true; j++) {
           if(GetRemainingTime() < 0) {
@@ -221,17 +223,17 @@ namespace rrr {
           }
           opt.Run(rng(), GetRemainingTime());
           CallAbc(pJob->pNtk, "&dc2");
-          double dNewCost = CostFunction(pJob->pNtk);
-          Print(1, pJob->prefix, "ite", j, ":", "cost", "=", dNewCost);
-          if(dNewCost < dCost) {
-            dCost = dNewCost;
+          double costNew = CostFunction(pJob->pNtk);
+          Print(1, pJob->prefix, "ite", j, ":", "cost", "=", costNew);
+          if(costNew < cost) {
+            cost = costNew;
             opt.UpdateNetwork(pJob->pNtk, true);
           } else {
             break;
           }
         }
-        if(dCost < dBestCost) {
-          dBestCost = dCost;
+        if(cost < costBest) {
+          costBest = cost;
           best = *(pJob->pNtk);
           i = 0;
         }
@@ -242,7 +244,7 @@ namespace rrr {
     case 2: { // deep
       std::mt19937 rng(pJob->iSeed);
       int n = 0;
-      double dCost = CostFunction(pJob->pNtk);
+      double cost = pJob->costInitial;
       Ntk best(*(pJob->pNtk));
       for(int i = 0; i < 1000000; i++) {
         if(GetRemainingTime() < 0) {
@@ -289,9 +291,9 @@ namespace rrr {
           Print(1, pJob->prefix, "rrr", j, ":", "cost", "=", CostFunction(pJob->pNtk));
         }
         // eval
-        double dNewCost = CostFunction(pJob->pNtk);
-        if(dNewCost < dCost) {
-          dCost = dNewCost;
+        double costNew = CostFunction(pJob->pNtk);
+        if(costNew < cost) {
+          cost = costNew;
           best = *(pJob->pNtk);
         } else {
           n++;
@@ -314,8 +316,8 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  void Scheduler<Ntk, Opt, Par>::CreateJob(Ntk *pNtk_, int iSeed_) {
-    Job *pJob = new Job(nCreatedJobs++, pNtk_, iSeed_);
+  typename Scheduler<Ntk, Opt, Par>::Job *Scheduler<Ntk, Opt, Par>::CreateJob(Ntk *pNtk_, int iSeed_) {
+    Job *pJob = new Job(nCreatedJobs++, pNtk_, iSeed_, CostFunction(pNtk_));
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -323,10 +325,11 @@ namespace rrr {
         qPendingJobs.push(pJob);
         condPendingJobs.notify_one();
       }
-      return;
+      return pJob;
     }
 #endif
     qPendingJobs.push(pJob);
+    return pJob;
   }
   
   template <typename Ntk, typename Opt, typename Par>
@@ -501,19 +504,19 @@ namespace rrr {
         par.UpdateNetwork(pNtk);
       }
     } else if(nJobs > 1) {
-      double dCost = CostFunction(pNtk);
+      double cost = CostFunction(pNtk);
       for(int i = 0; i < nJobs; i++) {
         Ntk *pCopy = new Ntk(*pNtk);
         CreateJob(pCopy, iSeed + i);
       }
       for(int i = 0; i < nJobs; i++) {
         OnJobEnd([&](Job *pJob) {
-          double dNewCost = CostFunction(pJob->pNtk);
+          double costNew = CostFunction(pJob->pNtk);
           if(nVerbose) {
-            std::cout << "run " << pJob->id << ": cost = " << dNewCost << std::endl;
+            std::cout << "run " << pJob->id << ": cost = " << costNew << std::endl;
           }
-          if(dNewCost < dCost) {
-            dCost = dNewCost;
+          if(costNew < cost) {
+            cost = costNew;
             *pNtk = *(pJob->pNtk);
           }
           delete pJob->pNtk;
