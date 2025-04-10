@@ -76,6 +76,7 @@ namespace rrr {
     int  GetNumPis() const;
     int  GetNumInts() const;
     int  GetNumPos() const;
+    int  GetNumLevels() const;
     int  GetConst0() const;
     int  GetPi(int idx) const;
     int  GetPo(int idx) const;
@@ -355,6 +356,23 @@ namespace rrr {
   
   inline int AndNetwork::GetNumPos() const {
     return int_size(vPos);
+  }
+
+  int AndNetwork::GetNumLevels() const {
+    int nMaxLevel = 0;
+    std::vector<int> vLevels(nNodes);
+    ForEachInt([&](int id) {
+      ForEachFanin(id, [&](int fi) {
+        if(vLevels[id] < vLevels[fi]) {
+          vLevels[id] = vLevels[fi];
+        }
+      });
+      vLevels[id] += 1;
+      if(nMaxLevel < vLevels[id]) {
+        nMaxLevel = vLevels[id];
+      }
+    });
+    return nMaxLevel;
   }
 
   inline int AndNetwork::GetConst0() const {
