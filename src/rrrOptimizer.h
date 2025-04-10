@@ -33,7 +33,7 @@ namespace rrr {
     bool fCompatible;
     bool fGreedy;
     seconds nTimeout; // assigned upon Run
-    std::string strVerbosePrefix;
+    std::function<void(std::string)> PrintLine;
 
     // data
     Ana ana;
@@ -107,7 +107,7 @@ namespace rrr {
     // constructors
     Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
     void UpdateNetwork(Ntk *pNtk_, bool fSame = false);
-    void SetVerbosePrefix(std::string str);
+    void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
 
     // run
     void Run(int iSeed = 0, seconds nTimeout_ = 0);
@@ -120,12 +120,12 @@ namespace rrr {
   template <typename... Args>
   inline void Optimizer<Ntk, Ana>::Print(int nVerboseLevel, Args... args) {
     if(nVerbose > nVerboseLevel) {
-      std::cout << strVerbosePrefix;
+      std::stringstream ss;
       for(int i = 0; i < nVerboseLevel; i++) {
-        std::cout << "\t";
+        ss << "\t";
       }
-      PrintNext(std::cout, args...);
-      std::cout << std::endl;
+      PrintNext(ss, args...);
+      PrintLine(ss.str());
     }
   }
   
@@ -1116,8 +1116,8 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::SetVerbosePrefix(std::string str) {
-    strVerbosePrefix = str;
+  void Optimizer<Ntk, Ana>::SetPrintLine(std::function<void(std::string)> const &PrintLine_) {
+    PrintLine = PrintLine_;
   }
   
   /* }}} */

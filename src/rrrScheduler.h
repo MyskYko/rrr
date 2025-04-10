@@ -137,9 +137,6 @@ namespace rrr {
       {
         std::unique_lock<std::mutex> l(mutexPrint);
         std::cout << prefix;
-        for(int i = 0; i < nVerboseLevel; i++) {
-          std::cout << "\t";
-        }
         PrintNext(std::cout, args...);
         std::cout << std::endl;
       }
@@ -147,9 +144,6 @@ namespace rrr {
     }
 #endif
     std::cout << prefix;
-    for(int i = 0; i < nVerboseLevel; i++) {
-      std::cout << "\t";
-    }
     PrintNext(std::cout, args...);
     std::cout << std::endl;
   }
@@ -196,7 +190,9 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job const *pJob) {
     opt.UpdateNetwork(pJob->pNtk);
-    opt.SetVerbosePrefix(pJob->prefix);
+    opt.SetPrintLine([&](std::string str) {
+      Print(-1, pJob->prefix, str);
+    });
     // start flow
     switch(nFlow) {
     case 0:
