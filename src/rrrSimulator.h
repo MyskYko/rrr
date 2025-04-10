@@ -604,7 +604,7 @@ namespace rrr {
   template <typename Ntk>
   Simulator<Ntk>::~Simulator() {
     if(pNtk) {
-      std::cout << "simulator stats: added CEXs = " << nAdds << ", resets = " << nResets << std::endl;
+      //std::cout << "simulator stats: added CEXs = " << nAdds << ", resets = " << nResets << std::endl;
     }
   }
 

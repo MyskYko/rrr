@@ -266,7 +266,7 @@ namespace rrr {
   template <typename Ntk>
   SatSolver<Ntk>::~SatSolver() {
     sat_solver_delete(pSat);
-    std::cout << "SAT solver stats: calls = " << nCalls << " (SAT = " << nSats << ", UNSAT = " << nUnsats << ", UNDET = " << nCalls - nSats - nUnsats << ")" << std::endl;
+    //std::cout << "SAT solver stats: calls = " << nCalls << " (SAT = " << nSats << ", UNSAT = " << nUnsats << ", UNDET = " << nCalls - nSats - nUnsats << ")" << std::endl;
   }
 
   template <typename Ntk>

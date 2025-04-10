@@ -220,6 +220,14 @@ namespace rrr {
   
   /* }}} */
 
+  /* {{{ Print others */
+
+  static inline void PrintWarning(std::string message) {
+    std::cerr << "[w] " << message << std::endl;
+  }
+
+  /* }}} */
+  
   /* {{{ Combination */
 
   bool ForEachCombinationStopRec(std::vector<int> &v, int n, int k, std::function<bool(std::vector<int> const &)> const &func) {
