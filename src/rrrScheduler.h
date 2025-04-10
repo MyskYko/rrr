@@ -459,7 +459,7 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::Run() {
     start = GetCurrentTime();
-    double startCost = CostFunction(pNtk);
+    double costStart = CostFunction(pNtk);
     if(fPartitioning) {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
@@ -527,9 +527,9 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "elapsed: " << std::fixed << std::setprecision(3) << elapsed_seconds << "s" << std::endl;
     }
-    double endCost = CostFunction(pNtk);
-    double percentage = 100 * (startCost - endCost) / startCost;
-    Print(0, "", "cost", ":", startCost, "->", endCost, NS{}, "(", percentage, "%", "reduction)");
+    double costEnd = CostFunction(pNtk);
+    double percentage = 100 * (costStart - costEnd) / costStart;
+    Print(0, "", "cost", ":", costStart, "->", costEnd, NS{}, "(", percentage, "%", "reduction)");
   }
 
   /* }}} */
