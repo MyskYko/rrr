@@ -99,12 +99,16 @@ namespace rrr {
     int id;
     Ntk *pNtk;
     int iSeed;
+    std::string prefix;
     
     // constructor
     Job(int id, Ntk *pNtk, int iSeed) :
       id(id),
       pNtk(pNtk),
       iSeed(iSeed) {
+      std::stringstream ss;
+      PrintNext(ss, "job", id, ":");
+      prefix = ss.str() + " ";
     }
   };
 
@@ -189,14 +193,8 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job const *pJob) {
-    std::string prefix;
-    {
-      std::stringstream ss;
-      PrintNext(ss, "job", pJob->id, ":");
-      prefix = ss.str() + " ";
-    }
-    opt.SetVerbosePrefix(prefix);
     opt.UpdateNetwork(pJob->pNtk);
+    opt.SetVerbosePrefix(pJob->prefix);
     // start flow
     switch(nFlow) {
     case 0:
@@ -215,7 +213,7 @@ namespace rrr {
           CallAbc(pJob->pNtk, "&if -K 6; &mfs; &st");
           dCost = CostFunction(pJob->pNtk);
           opt.UpdateNetwork(pJob->pNtk, true);
-          Print(1, prefix, "hop", i, ":", "cost", "=", dCost);
+          Print(1, pJob->prefix, "hop", i, ":", "cost", "=", dCost);
         }
         for(int j = 0; true; j++) {
           if(GetRemainingTime() < 0) {
@@ -224,7 +222,7 @@ namespace rrr {
           opt.Run(rng(), GetRemainingTime());
           CallAbc(pJob->pNtk, "&dc2");
           double dNewCost = CostFunction(pJob->pNtk);
-          Print(1, prefix, "ite", j, ":", "cost", "=", dNewCost);
+          Print(1, pJob->prefix, "ite", j, ":", "cost", "=", dNewCost);
           if(dNewCost < dCost) {
             dCost = dNewCost;
             opt.UpdateNetwork(pJob->pNtk, true);
@@ -275,7 +273,7 @@ namespace rrr {
           Command += "; &fx; &st";
         Command += pComp;
         CallAbc(pJob->pNtk, Command);
-        Print(1, prefix, "ite", i, ":", "cost", "=", CostFunction(pJob->pNtk));
+        Print(1, pJob->prefix, "ite", i, ":", "cost", "=", CostFunction(pJob->pNtk));
         // rrr
         for(int j = 0; j < n; j++) {
           if(GetRemainingTime() < 0) {
@@ -288,7 +286,7 @@ namespace rrr {
           } else {
             CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; &get");
           }
-          Print(1, prefix, "rrr", j, ":", "cost", "=", CostFunction(pJob->pNtk));
+          Print(1, pJob->prefix, "rrr", j, ":", "cost", "=", CostFunction(pJob->pNtk));
         }
         // eval
         double dNewCost = CostFunction(pJob->pNtk);

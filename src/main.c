@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
   Gia_Man_t *pGia = Gia_AigerRead(fname, 0, 0, 0);
 
   if(nSchedulerVerbose) {
-    Abc_Print( 2, "Using the following parameters\n" );
+    Abc_Print( 2, "Using the following parameters :\n" );
     Abc_Print( 2, "\t-X %3d : method ", nOptimizerFlow );
     switch(nOptimizerFlow) {
     case 0:
