@@ -498,8 +498,12 @@ namespace rrr {
           });
         }
         if(fOptOnInsert) {
+          time_point timeStartLocal = GetCurrentTime();
           CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+          time_point timeEndLocal = GetCurrentTime();
           par.UpdateNetwork(pNtk);
+          double cost = CostFunction(pNtk);
+          Print(0, "", "c2rs; dc2", ":", std::string(34, ' '), "node", "=", pNtk->GetNumInts(), ",", "level", "=", pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "duration", "=", Duration(timeStartLocal, timeEndLocal), "s", ",", "elapsed", "=", GetElapsedTime(), "s");
         }
       }
       while(nFinishedJobs < nCreatedJobs) {
