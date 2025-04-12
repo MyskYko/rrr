@@ -806,7 +806,7 @@ namespace rrr {
         Undo();
       }
       mapNewFanins.clear();
-      Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), "):", "cost", "=", cost);
+      Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
     }
     if(pNtk->IsInt(id)) {
       pNtk->TrivialDecompose(id);
@@ -891,7 +891,7 @@ namespace rrr {
     int slot = pNtk->Save();
     // remember fanins
     std::set<int> sFanins = pNtk->GetExtendedFanins(id);
-    Print(3, "extended fanins :", sFanins);
+    Print(3, "extended fanins", ":", sFanins);
     // main loop
     bool fChanged = false;
     double cost = CostFunction(pNtk);
@@ -914,7 +914,7 @@ namespace rrr {
             fChanged = true;
           } else {
             std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
-            Print(3, "new extended fanins :", sNewFanins);
+            Print(3, "new extended fanins", ":", sNewFanins);
             if(sFanins != sNewFanins) {
               fChanged = true;
             }
@@ -958,7 +958,7 @@ namespace rrr {
     int slot = pNtk->Save();
     // remember fanins
     std::set<int> sFanins = pNtk->GetExtendedFanins(id);
-    Print(3, "extended fanins :", sFanins);
+    Print(3, "extended fanins", ":", sFanins);
     // collapse
     pNtk->TrivialCollapse(id);
     // resub
@@ -976,7 +976,7 @@ namespace rrr {
             fChanged = true;
           } else {
             std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
-            Print(3, "new extended fanins :", sNewFanins);
+            Print(3, "new extended fanins", ":", sNewFanins);
             if(sFanins != sNewFanins) {
               fChanged = true;
             }
@@ -1030,7 +1030,7 @@ namespace rrr {
       }
     }
     // add while remembering extended fanins
-    Print(2, "targets :", vTargets);
+    Print(2, "targets", ":", vTargets);
     std::vector<std::set<int>> vsFanins;
     for(int id: vTargets) {
       // get candidates
@@ -1043,7 +1043,7 @@ namespace rrr {
       std::shuffle(vCands.begin(), vCands.end(), rng);
       // remember fanins
       std::set<int> sFanins = pNtk->GetExtendedFanins(id);
-      Print(3, "extended fanins :", sFanins);
+      Print(3, "extended fanins", ":", sFanins);
       vsFanins.push_back(std::move(sFanins));
       // add
       MultiAdd(id, vCands, nMax);
@@ -1068,7 +1068,7 @@ namespace rrr {
         }
         for(int i = 0; !fChanged && i < int_size(vTargets); i++) {
           std::set<int> sNewFanins = pNtk->GetExtendedFanins(vTargets[i]);
-          Print(3, "new extended fanins :", sNewFanins);
+          Print(3, "new extended fanins", ":", sNewFanins);
           if(vsFanins[i] != sNewFanins) {
             fChanged = true;
           }
