@@ -159,24 +159,20 @@ namespace rrr {
   
   template <typename T>
   static inline void PrintNext(std::ostream& os, std::vector<T> const &arg) {
-    std::string delim;
-    os << "[";
+    os << "[ ";
     for(T const &e: arg) {
-      os << delim;
       PrintNext(os, e);
-      delim = ", ";
+      os << " ";
     }
     os << "]";
   }
 
   template <typename T, typename... Args>
   static inline void PrintNext(std::ostream& os, std::vector<T> const &arg, Args... args) {
-    std::string delim;
-    os << "[";
+    os << "[ ";
     for(T const &e: arg) {
-      os << delim;
       PrintNext(os, e);
-      delim = ", ";
+      os << " ";
     }
     os << "] ";
     PrintNext(os, args...);
@@ -184,24 +180,20 @@ namespace rrr {
 
   template <typename T>
   static inline void PrintNext(std::ostream& os, std::set<T> const &arg) {
-    std::string delim;
-    os << "{";
+    os << "{ ";
     for(T const &e: arg) {
-      os << delim;
       PrintNext(os, e);
-      delim = ", ";
+      os << " ";
     }
     os << "}";
   }
 
   template <typename T, typename... Args>
   static inline void PrintNext(std::ostream& os, std::set<T> const &arg, Args... args) {
-    std::string delim;
-    os << "{";
+    os << "{ ";
     for(T const &e: arg) {
-      os << delim;
       PrintNext(os, e);
-      delim = ", ";
+      os << " ";
     }
     os << "} ";
     PrintNext(os, args...);
@@ -329,7 +321,7 @@ namespace rrr {
   static inline std::stringstream GetActionDescription(Action const &action) {
     std::stringstream ss;
     ss << GetActionTypeCstr(action);
-    std::string delim = ": ";
+    std::string delim = " : ";
     if(action.id != -1) {
       ss << delim;
       PrintNext(ss, "node", action.id);
@@ -346,15 +338,15 @@ namespace rrr {
     }
     ss << std::endl;
     if(!action.vFanins.empty()) {
-      ss << "fanins: ";
+      ss << "fanins : ";
       PrintNext(ss, action.vFanins);
     }
     if(!action.vIndices.empty()) {
-      ss << "indices: ";
+      ss << "indices : ";
       PrintNext(ss, action.vIndices);
     }
     if(!action.vFanouts.empty()) {
-      ss << "fanouts: ";
+      ss << "fanouts : ";
       PrintNext(ss, action.vFanouts);
     }
     return ss;
