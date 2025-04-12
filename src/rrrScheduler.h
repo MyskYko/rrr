@@ -543,7 +543,7 @@ namespace rrr {
       });
     }
     double cost = CostFunction(pNtk);
-    Print(0, "\n", "summary", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "elapsed", "=", GetElapsedTime(), "s");
+    Print(0, "\n", "summary", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", GetElapsedTime(), "s");
   }
 
   /* }}} */
