@@ -105,6 +105,16 @@ namespace rrr {
   template <typename T, typename... Args>
   void PrintNext(std::ostream &os, T t, Args... args);
   
+  static inline void PrintNext(std::ostream &os, int t) {
+    os << std::setw(4) << t;
+  }
+
+  template <typename... Args>
+  static inline void PrintNext(std::ostream &os, int t, Args... args) {
+    os << std::setw(4) << t << " ";
+    PrintNext(os, args...);
+  }
+
   static inline void PrintNext(std::ostream &os, bool arg) {
     os << arg;
   }
@@ -119,16 +129,6 @@ namespace rrr {
     PrintNext(os, args...);
   }
   
-  static inline void PrintNext(std::ostream &os, int t) {
-    os << std::setw(4) << t;
-  }
-
-  template <typename... Args>
-  static inline void PrintNext(std::ostream &os, int t, Args... args) {
-    os << std::setw(4) << t << " ";
-    PrintNext(os, args...);
-  }
-
   static inline void PrintNext(std::ostream &os, double t) {
     os << std::fixed << std::setprecision(2) << std::setw(8) << t;
   }
@@ -325,12 +325,12 @@ namespace rrr {
     if(action.id != -1) {
       ss << delim;
       PrintNext(ss, "node", action.id);
-      delim = ", ";
+      delim = " , ";
     }
     if(action.fi != -1) {
       ss << delim;
       PrintNext(ss, "fanin", (bool)action.c, action.fi);
-      delim = ", ";
+      delim = " , ";
     }
     if(action.idx != -1) {
       ss << delim;
