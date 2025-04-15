@@ -474,7 +474,7 @@ namespace rrr {
     if(fPartitioning) {
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
-      par.UpdateNetwork(pNtk);
+      par.AssignNetwork(pNtk);
       while(nCreatedJobs < nJobs) {
         assert(nParallelPartitions > 0);
         if(nCreatedJobs < nFinishedJobs + nParallelPartitions) {
@@ -501,7 +501,7 @@ namespace rrr {
           time_point timeStartLocal = GetCurrentTime();
           CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
           time_point timeEndLocal = GetCurrentTime();
-          par.UpdateNetwork(pNtk);
+          par.AssignNetwork(pNtk);
           double cost = CostFunction(pNtk);
           Print(0, "", "c2rs; dc2", ":", std::string(34, ' '), "node", "=", pNtk->GetNumInts(), ",", "level", "=", pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "duration", "=", Duration(timeStartLocal, timeEndLocal), "s", ",", "elapsed", "=", GetElapsedTime(), "s");
         }
@@ -516,7 +516,7 @@ namespace rrr {
       }
       if(fOptOnInsert) {
         CallAbc(pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
-        par.UpdateNetwork(pNtk);
+        par.AssignNetwork(pNtk);
       }
     } else if(nJobs > 1) {
       double costBest = costStart;
