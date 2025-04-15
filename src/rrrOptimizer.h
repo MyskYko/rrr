@@ -763,7 +763,7 @@ namespace rrr {
     pNtk->TrivialCollapse(id);
     // save if wanted
     int slot = -2;
-    if(fGreedy) {
+    if(fGreedy || fCompatible) {
       slot = pNtk->Save();
     }
     // main loop
@@ -803,7 +803,11 @@ namespace rrr {
         }
       } else {
         // assuming addition only always increases cost
-        Undo();
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
       }
       mapNewFanins.clear();
       Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
@@ -815,7 +819,7 @@ namespace rrr {
         RemoveRedundancy();
       }
     }
-    if(fGreedy) {
+    if(fGreedy || fCompatible) {
       pNtk->PopBack();
     }
   }
@@ -829,7 +833,7 @@ namespace rrr {
     nTried++;
     // save if wanted
     int slot = -2;
-    if(fGreedy) {
+    if(fGreedy || fCompatible) {
       slot = pNtk->Save();
     }
     // collapse
@@ -856,7 +860,11 @@ namespace rrr {
           pNtk->Load(slot);
         }
       } else {
-        Undo();
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
         mapNewFanins.clear();
       }
     }
@@ -867,7 +875,7 @@ namespace rrr {
         RemoveRedundancy();
       }
     }
-    if(fGreedy) {
+    if(fGreedy || fCompatible) {
       pNtk->PopBack();
     }
   }
@@ -933,7 +941,11 @@ namespace rrr {
         }
         pNtk->Load(slot);
       } else {
-        Undo();
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
         mapNewFanins.clear();
       }
     }

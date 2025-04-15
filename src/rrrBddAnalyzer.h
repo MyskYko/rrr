@@ -165,6 +165,11 @@ namespace rrr {
       vGUpdates[action.fi] = true;
       DecRef(vvCs[action.id][action.idx]);
       vvCs[action.id].erase(vvCs[action.id].begin() + action.idx);
+      if(target != action.id) {
+        // require resimulate before next fesibility check
+        // (this is not mandatory if no pending updates are in TFI of new fanin, but we would rather update than checking every time)
+        target = -1;
+      }
       break;
     case REMOVE_UNUSED:
       if(vGUpdates[action.id] || vCUpdates[action.id]) {
@@ -205,6 +210,7 @@ namespace rrr {
       DelVec(vvCs[action.id]);
       break;
     case ADD_FANIN:
+      assert(action.id == target);
       vUpdates[action.id] = true;
       vCUpdates[action.id] = true;
       vvCs[action.id].insert(vvCs[action.id].begin() + action.idx, LitMax);
@@ -245,8 +251,19 @@ namespace rrr {
       for(int index: action.vIndices) {
         vvCs[action.id].push_back(vCs[index]);
       }
-      if(!fResim && target != -1 && target != action.id) {
-        pNtk->ForEachTfo(target, false, [&](int fo) {
+      if(!fResim) {
+        fResim = true;
+        /* commenting out the following because it might not be worth checking
+        // if sorted node is in TFO of functionally updated nodes, resimulation is required
+        std::vector<int> vFanouts;
+        pNtk->ForEachInt([&](int id) {
+          if(vUpdates[id]) {
+            pNtk->ForEachFanout(id, false, [&](int fo) {
+              vFanouts.push_back(fo);
+            });
+          }
+        });
+        pNtk->ForEachTfos(vFanouts, false, [&](int fo) {
           if(fResim) {
             return;
           }
@@ -254,6 +271,7 @@ namespace rrr {
             fResim = true;
           }
         });
+        */
       }
       vCUpdates[action.id] = true;
       break;
@@ -571,6 +589,7 @@ namespace rrr {
   bool BddAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
     if(fResim) {
       Simulate();
+      fResim = false;
     }
     Cspf(id);
     switch(pNtk->GetNodeType(id)) {
@@ -597,10 +616,13 @@ namespace rrr {
   
   template <typename Ntk>
   bool BddAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
-    if(target != id) { // simualte if there has been update in non-tfo of this node
+    // resimulation is required if there are pending updates in TFI of new fanin
+    // but it seems not worthwhile to check that condition every time
+    // so we update if pending updates are not only at current target
+    if(target != id && (target == -1 || vUpdates[target])) {
       Simulate();
-      target = id;
     }
+    target = id;
     Cspf(id, false);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
