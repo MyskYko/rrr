@@ -92,7 +92,7 @@ namespace rrr {
     // constructors
     Simulator();
     Simulator(Parameter const *pPar);
-    void AssignNetwork(Ntk *pNtk_);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -681,8 +681,10 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void Simulator<Ntk>::AssignNetwork(Ntk *pNtk_) {
-    fGenerated = false;
+  void Simulator<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+    if(!fReuse) {
+      fGenerated = false;
+    }
     fInitialized = false;
     target = -1;
     fUpdate = false;

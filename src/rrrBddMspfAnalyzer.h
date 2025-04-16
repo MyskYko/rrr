@@ -63,7 +63,7 @@ namespace rrr {
     void Mspf(int id = -1, bool fC = true);
 
     // preparation
-    void Reset();
+    void Reset(bool fReuse = false);
     void Initialize();
 
     // save & load
@@ -76,7 +76,7 @@ namespace rrr {
     BddMspfAnalyzer();
     BddMspfAnalyzer(Parameter const *pPar);
     ~BddMspfAnalyzer();
-    void AssignNetwork(Ntk *pNtk_);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -291,11 +291,7 @@ namespace rrr {
       }
       break;
     case READ:
-      Reset();
-      if(action.fNew) {
-        delete pBdd;
-        pBdd = NULL;
-      }
+      Reset(!action.fNew);
       break;
     case SAVE:
       Save(action.idx);
@@ -557,7 +553,7 @@ namespace rrr {
   /* {{{ Preparation */
 
   template <typename Ntk>
-  void BddMspfAnalyzer<Ntk>::Reset() {
+  void BddMspfAnalyzer<Ntk>::Reset(bool fReuse) {
     while(!vBackups.empty()) {
       PopBack();
     }
@@ -570,6 +566,10 @@ namespace rrr {
     vGUpdates.clear();
     vCUpdates.clear();
     vVisits.clear();
+    if(!fReuse) {
+      delete pBdd;
+      pBdd = NULL;
+    }
   }
 
   template <typename Ntk>
@@ -679,14 +679,11 @@ namespace rrr {
   template <typename Ntk>
   BddMspfAnalyzer<Ntk>::~BddMspfAnalyzer() {
     Reset();
-    delete pBdd;
   }
 
   template <typename Ntk>
-  void BddMspfAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_) {
-    Reset();
-    delete pBdd;
-    pBdd = NULL;
+  void BddMspfAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+    Reset(fReuse);
     pNtk = pNtk_;
     pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }

@@ -112,7 +112,7 @@ namespace rrr {
   public:
     // constructors
     Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
-    void AssignNetwork(Ntk *pNtk_);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse = false);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
 
     // run
@@ -1287,11 +1287,11 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_) {
+  void Optimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
-    ana.AssignNetwork(pNtk);
+    ana.AssignNetwork(pNtk, fReuse);
   }
   
   template <typename Ntk, typename Ana>

@@ -45,7 +45,7 @@ namespace rrr {
     // constructors
     SatSolver(Parameter const *pPar);
     ~SatSolver();
-    void AssignNetwork(Ntk *pNtk_);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse);
     
     // checks
     SatResult CheckRedundancy(int id, int idx);
@@ -280,7 +280,8 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void SatSolver<Ntk>::AssignNetwork(Ntk *pNtk_) {
+  void SatSolver<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+    (void)fReuse;
     status = false;
     target = -1;
     fUpdate = false;

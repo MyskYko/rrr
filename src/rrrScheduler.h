@@ -208,7 +208,7 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     time_point timeStartLocal = GetCurrentTime();
-    opt.AssignNetwork(pJob->pNtk);
+    opt.AssignNetwork(pJob->pNtk, !fPartitioning); // reuse backend if restarting
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });

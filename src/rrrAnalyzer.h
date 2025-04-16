@@ -21,7 +21,7 @@ namespace rrr {
   public:
     // constructors
     Analyzer(Parameter const *pPar);
-    void AssignNetwork(Ntk *pNtk_);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -44,10 +44,10 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Sim, typename Sol>
-  void Analyzer<Ntk, Sim, Sol>::AssignNetwork(Ntk *pNtk_) {
+  void Analyzer<Ntk, Sim, Sol>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
-    sim.AssignNetwork(pNtk);
-    sol.AssignNetwork(pNtk);
+    sim.AssignNetwork(pNtk, fReuse);
+    sol.AssignNetwork(pNtk, fReuse);
   }
 
   /* }}} */
