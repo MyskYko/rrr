@@ -782,6 +782,7 @@ namespace rrr {
       if(it == vCands.end()) {
         break;
       }
+      Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
       if(RemoveRedundancy()) {
         double costNew = CostFunction(pNtk);
         // stats
@@ -813,7 +814,6 @@ namespace rrr {
         }
       }
       mapNewFanins.clear();
-      Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
     }
     if(pNtk->IsInt(id)) {
       pNtk->TrivialDecompose(id);
@@ -915,7 +915,7 @@ namespace rrr {
       if(it == vCands.end()) {
         break;
       }
-      Print(3, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")");
+      Print(3, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
       if(RemoveRedundancy()) {
         mapNewFanins.clear();
         double costNew = CostFunction(pNtk);
