@@ -51,14 +51,9 @@ namespace rrr {
     std::vector<bool> vTfoMarks;
 
     // statistics
-    int nTriedFis;
-    int nAddedFis;
-    int nTried;
-    int nAdded;
-    int nChanged;
-    int nUps;
-    int nEqs;
-    int nDowns;
+    struct Stats;
+    std::map<std::string, Stats> stats;
+    Stats statsLocal;
 
     // print
     template<typename... Args>
@@ -84,7 +79,7 @@ namespace rrr {
     bool ReduceFaninsOneRandom(int id, bool fRemoveUnused = false);
 
     // reduce
-    bool Reduce();
+    bool Reduce(bool fSubRoutine = false);
     void ReduceRandom();
 
     // remove redundancy
@@ -119,15 +114,69 @@ namespace rrr {
     Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
     void AssignNetwork(Ntk *pNtk_);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
-    void ResetStats();
 
     // run
     void Run(int iSeed = 0, seconds nTimeout_ = 0);
-    
+
+    // summary
+    void ResetSummary();
+    std::vector<std::pair<std::string, int>> GetStatsSummary() const;
+    std::vector<std::pair<std::string, double>> GetTimesSummary() const;
   };
 
-  /* {{{ Print */
+  /* {{{ Stats */
   
+  template <typename Ntk, typename Ana>
+  struct Optimizer<Ntk, Ana>::Stats {
+    int nTriedFis = 0;
+    int nAddedFis = 0;
+    int nTried = 0;
+    int nAdded = 0;
+    int nChanged = 0;
+    int nUps = 0;
+    int nEqs = 0;
+    int nDowns = 0;
+    double durationAdd = 0;
+    double durationReduce = 0;
+
+    void Reset() {
+      nTriedFis = 0;
+      nAddedFis = 0;
+      nTried = 0;
+      nAdded = 0;
+      nChanged = 0;
+      nUps = 0;
+      nEqs = 0;
+      nDowns = 0;
+      durationAdd = 0;
+      durationReduce = 0;
+    }
+
+    Stats& operator+=(Stats const &other) {
+      this->nTriedFis += other.nTriedFis;
+      this->nAddedFis += other.nAddedFis;
+      this->nTried    += other.nTried;
+      this->nAdded    += other.nAdded;
+      this->nChanged  += other.nChanged;
+      this->nUps      += other.nUps;
+      this->nEqs      += other.nEqs;
+      this->nDowns    += other.nDowns;
+      this->durationAdd    += other.durationAdd;
+      this->durationReduce += other.durationReduce;
+      return *this;
+    }
+
+    std::string GetString() const {
+      std::stringstream ss;
+      PrintNext(ss, "tried node/fanin", "=", nTried, "/", nTriedFis, ",", "added node/fanin", "=", nAdded, "/", nAddedFis, ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
+      return ss.str();
+    }
+  };
+  
+  /* }}} */
+
+  /* {{{ Print */
+
   template <typename Ntk, typename Ana>
   template <typename... Args>
   inline void Optimizer<Ntk, Ana>::Print(int nVerboseLevel, Args... args) {
@@ -556,7 +605,8 @@ namespace rrr {
   /* {{{ Reduce */
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::Reduce() {
+  bool Optimizer<Ntk, Ana>::Reduce(bool fSubRoutine) {
+    time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
@@ -571,6 +621,10 @@ namespace rrr {
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
+    }
+    if(!fSubRoutine) {
+      time_point timeEnd = GetCurrentTime();
+      statsLocal.durationReduce += Duration(timeStart, timeEnd);
     }
     return fReduced;
   }
@@ -603,37 +657,40 @@ namespace rrr {
   
   template <typename Ntk, typename Ana>
   bool Optimizer<Ntk, Ana>::RemoveRedundancy() {
+    time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     if(fCompatible) {
-      while(Reduce()) {
+      while(Reduce(true)) {
         fReduced = true;
         SortFanins();
       }
-      return fReduced;
+    } else {
+      std::vector<int> vInts = pNtk->GetInts();
+      for(critr it = vInts.rbegin(); it != vInts.rend();) {
+        if(!pNtk->IsInt(*it)) {
+          it++;
+          continue;
+        }
+        if(pNtk->GetNumFanouts(*it) == 0) {
+          pNtk->RemoveUnused(*it);
+          it++;
+          continue;
+        }
+        SortFanins(*it);
+        bool fReduced_ = ReduceFanins(*it);
+        fReduced |= fReduced_;
+        if(pNtk->GetNumFanins(*it) <= 1) {
+          pNtk->Propagate(*it);
+        }
+        if(fReduced_) {
+          it = vInts.rbegin();
+        } else {
+          it++;
+        }
+      }
     }
-    std::vector<int> vInts = pNtk->GetInts();
-    for(critr it = vInts.rbegin(); it != vInts.rend();) {
-      if(!pNtk->IsInt(*it)) {
-        it++;
-        continue;
-      }
-      if(pNtk->GetNumFanouts(*it) == 0) {
-        pNtk->RemoveUnused(*it);
-        it++;
-        continue;
-      }
-      SortFanins(*it);
-      bool fReduced_ = ReduceFanins(*it);
-      fReduced |= fReduced_;
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-      }
-      if(fReduced_) {
-        it = vInts.rbegin();
-      } else {
-        it++;
-      }
-    }
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationReduce += Duration(timeStart, timeEnd);
     return fReduced;
   }
 
@@ -674,6 +731,7 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   template <typename T>
   T Optimizer<Ntk, Ana>::SingleAdd(int id, T begin, T end) {
+    time_point timeStart = GetCurrentTime();
     MarkTfo(id);
     pNtk->ForEachFanin(id, [&](int fi) {
       vTfoMarks[fi] = true;
@@ -686,13 +744,13 @@ namespace rrr {
       if(vTfoMarks[*it]) {
         continue;
       }
-      nTriedFis++;
+      statsLocal.nTriedFis++;
       if(ana.CheckFeasibility(id, *it, false)) {
         pNtk->AddFanin(id, *it, false);
-        nAddedFis++;
+        statsLocal.nAddedFis++;
       } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, *it, true)) {
         pNtk->AddFanin(id, *it, true);
-        nAddedFis++;
+        statsLocal.nAddedFis++;
       } else {
         continue;
       }
@@ -702,11 +760,14 @@ namespace rrr {
     pNtk->ForEachFanin(id, [&](int fi) {
       vTfoMarks[fi] = false;
     });
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationAdd += Duration(timeStart, timeEnd);
     return it;
   }
 
   template <typename Ntk, typename Ana>
   int Optimizer<Ntk, Ana>::MultiAdd(int id, std::vector<int> const &vCands, int nMax) {
+    time_point timeStart = GetCurrentTime();
     MarkTfo(id);
     pNtk->ForEachFanin(id, [&](int fi) {
       vTfoMarks[fi] = true;
@@ -719,13 +780,13 @@ namespace rrr {
       if(vTfoMarks[cand]) {
         continue;
       }
-      nTriedFis++;
+      statsLocal.nTriedFis++;
       if(ana.CheckFeasibility(id, cand, false)) {
         pNtk->AddFanin(id, cand, false);
-        nAddedFis++;
+        statsLocal.nAddedFis++;
       } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, cand, true)) {
         pNtk->AddFanin(id, cand, true);
-        nAddedFis++;
+        statsLocal.nAddedFis++;
       } else {
         continue;
       }
@@ -738,6 +799,8 @@ namespace rrr {
     pNtk->ForEachFanin(id, [&](int fi) {
       vTfoMarks[fi] = false;
     });
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationAdd += Duration(timeStart, timeEnd);
     return nAddedFis_;
   }
 
@@ -771,6 +834,7 @@ namespace rrr {
     }
     // main loop
     double cost = CostFunction(pNtk);
+    bool fTried = false, fAdded = false;
     for(citr it = vCands.begin(); it != vCands.end(); it++) {
       if(Timeout()) {
         break;
@@ -778,21 +842,23 @@ namespace rrr {
       if(!pNtk->IsInt(id)) {
         break;
       }
+      fTried = true;
       it = SingleAdd<citr>(id, it, vCands.end());
       if(it == vCands.end()) {
         break;
       }
+      fAdded = true;
       Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
       if(RemoveRedundancy()) {
         double costNew = CostFunction(pNtk);
         // stats
-        nChanged++;
+        statsLocal.nChanged++;
         if(costNew < cost) {
-          nDowns++;
+          statsLocal.nDowns++;
         } else if (costNew == cost) {
-          nEqs++;
+          statsLocal.nEqs++;
         } else {
-          nUps++;
+          statsLocal.nUps++;
         }
         // greedy
         if(fGreedy) {
@@ -825,6 +891,12 @@ namespace rrr {
     if(fGreedy || fCompatible) {
       pNtk->PopBack();
     }
+    if(fTried) {
+      statsLocal.nTried++;
+    }
+    if(fAdded) {
+      statsLocal.nAdded++;
+    }
   }
 
   template <typename Ntk, typename Ana>
@@ -833,7 +905,7 @@ namespace rrr {
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
     assert(pNtk->GetNumFanins(id) > 1);
-    nTried++;
+    statsLocal.nTried++;
     // save if wanted
     int slot = -2;
     if(fGreedy || fCompatible) {
@@ -844,19 +916,19 @@ namespace rrr {
     // resub
     double cost = CostFunction(pNtk);
     if(MultiAdd(id, vCands, nMax)) {
-      nAdded++;
+      statsLocal.nAdded++;
       if(RemoveRedundancy()) {
         mapNewFanins.clear();
         RemoveRedundancy();
         double costNew = CostFunction(pNtk);
         // stats
-        nChanged++;
+        statsLocal.nChanged++;
         if(costNew < cost) {
-          nDowns++;
+          statsLocal.nDowns++;
         } else if (costNew == cost) {
-          nEqs++;
+          statsLocal.nEqs++;
         } else {
-          nUps++;
+          statsLocal.nUps++;
         }
         // greedy
         if(fGreedy && costNew > cost) {
@@ -906,15 +978,18 @@ namespace rrr {
     // main loop
     bool fChanged = false;
     double cost = CostFunction(pNtk);
+    bool fTried = false, fAdded = false;
     for(citr it = vCands.begin(); it != vCands.end(); it++) {
       if(Timeout()) {
         break;
       }
       assert(pNtk->IsInt(id));
+      fTried = true;
       it = SingleAdd<citr>(id, it, vCands.end());
       if(it == vCands.end()) {
         break;
       }
+      fAdded = true;
       Print(3, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
       if(RemoveRedundancy()) {
         mapNewFanins.clear();
@@ -931,13 +1006,13 @@ namespace rrr {
             }
           }
           if(fChanged) {
-            nChanged++;
+            statsLocal.nChanged++;
             if(costNew < cost) {
-              nDowns++;
+              statsLocal.nDowns++;
             } else if (costNew == cost) {
-              nEqs++;
+              statsLocal.nEqs++;
             } else {
-              nUps++;
+              statsLocal.nUps++;
             }
             break;
           }
@@ -956,6 +1031,12 @@ namespace rrr {
       pNtk->TrivialDecompose(id);
     }
     pNtk->PopBack();
+    if(fTried) {
+      statsLocal.nTried++;
+    }
+    if(fAdded) {
+      statsLocal.nAdded++;
+    }
     return fChanged;
   }
 
@@ -968,7 +1049,7 @@ namespace rrr {
     assert(pNtk->GetNumFanouts(id) != 0);
     assert(pNtk->GetNumFanins(id) > 1);
     Print(2, "method", "=", "multi");
-    nTried++;
+    statsLocal.nTried++;
     // save
     int slot = pNtk->Save();
     // remember fanins
@@ -980,7 +1061,7 @@ namespace rrr {
     bool fChanged = false;
     double cost = CostFunction(pNtk);
     if(MultiAdd(id, vCands, nMax)) {
-      nAdded++;
+      statsLocal.nAdded++;
       if(RemoveRedundancy()) {
         mapNewFanins.clear();
         RemoveRedundancy();
@@ -997,13 +1078,13 @@ namespace rrr {
             }
           }
           if(fChanged) {
-            nChanged++;
+            statsLocal.nChanged++;
             if(costNew < cost) {
-              nDowns++;
+              statsLocal.nDowns++;
             } else if (costNew == cost) {
-              nEqs++;
+              statsLocal.nEqs++;
             } else {
-              nUps++;
+              statsLocal.nUps++;
             }
           }
         }
@@ -1203,7 +1284,6 @@ namespace rrr {
     fGreedy(pPar->fGreedy),
     ana(pPar),
     target(-1) {
-    ResetStats();
   }
   
   template <typename Ntk, typename Ana>
@@ -1217,18 +1297,6 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::SetPrintLine(std::function<void(std::string)> const &PrintLine_) {
     PrintLine = PrintLine_;
-  }
-  
-  template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::ResetStats() {
-    nTriedFis = 0;
-    nAddedFis = 0;
-    nTried = 0;
-    nAdded = 0;
-    nChanged = 0;
-    nUps = 0;
-    nEqs = 0;
-    nDowns = 0;
   }
   
   /* }}} */
@@ -1249,7 +1317,7 @@ namespace rrr {
     switch(nFlow) {
     case 0:
       RemoveRedundancy();
-      ResetStats();
+      statsLocal.Reset();
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
@@ -1259,11 +1327,12 @@ namespace rrr {
         }
         SingleResub(id, vCands);
       });
-      Print(0, "tried", "=", nTriedFis, ",", "added", "=", nAddedFis, ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
+      stats["single"] += statsLocal;
+      Print(0, statsLocal.GetString());
       break;
     case 1:
       RemoveRedundancy();
-      ResetStats();
+      statsLocal.Reset();
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
@@ -1273,13 +1342,14 @@ namespace rrr {
         }
         MultiResub(id, vCands);
       });
-      Print(0, "tried", "=", nTried, "(", nTriedFis, "fanins", ")", ",", "added", "=", nAdded, "(", nAddedFis, "fanins", ")", ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
+      stats["multi"] += statsLocal;
+      Print(0, statsLocal.GetString());
       break;
     case 2: {
       RemoveRedundancy();
       double dCost = CostFunction(pNtk);
       while(true) {
-        ResetStats();
+        statsLocal.Reset();
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
@@ -1289,8 +1359,9 @@ namespace rrr {
           }
           SingleResub(id, vCands);
         });
-        Print(0, "single", ":", "cost", "=", CostFunction(pNtk), ",", "tried", "=", nTriedFis, ",", "added", "=", nAddedFis, ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
-        ResetStats();
+        stats["single"] += statsLocal;
+        Print(0, "single", ":", "cost", "=", CostFunction(pNtk), ",", statsLocal.GetString());
+        statsLocal.Reset();
         ApplyReverseTopologically([&](int id) {
           std::vector<int> vCands;
           if(nDistance) {
@@ -1301,7 +1372,8 @@ namespace rrr {
           }
           MultiResub(id, vCands);
         });
-        Print(0, "multi ", ":", "cost", "=", CostFunction(pNtk), ",", "tried", "=", nTried, "(", nTriedFis, "fanins", ")", ",", "added", "=", nAdded, "(", nAddedFis, "fanins", ")", ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
+        stats["multi"] += statsLocal;
+        Print(0, "multi ", ":", "cost", "=", CostFunction(pNtk), ",", statsLocal.GetString());
         double dNewCost = CostFunction(pNtk);
         if(dNewCost < dCost) {
           dCost = dNewCost;
@@ -1318,10 +1390,9 @@ namespace rrr {
         vCands = pNtk->GetPisInts();
         std::shuffle(vCands.begin(), vCands.end(), rng);
       }
-      int nTriedFisSingle = 0, nAddedFisSingle = 0, nChangedSingle = 0, nUpsSingle = 0, nEqsSingle = 0, nDownsSingle = 0;
-      int nTriedMulti = 0, nAddedMulti = 0, nTriedFisMulti = 0, nAddedFisMulti = 0, nChangedMulti = 0, nUpsMulti = 0, nEqsMulti = 0, nDownsMulti = 0;
+      Stats statsSingle, statsMulti;
       ApplyRandomlyStop([&](int id) {
-        ResetStats();
+        statsLocal.Reset();
         if(nDistance) {
           vCands = pNtk->GetNeighbors(id, true, nDistance);
           std::shuffle(vCands.begin(), vCands.end(), rng);
@@ -1329,27 +1400,15 @@ namespace rrr {
         bool fChanged;
         if(rng() & 1) {
           fChanged = SingleResubStop(id, vCands);
-          nTriedFisSingle += nTriedFis;
-          nAddedFisSingle += nAddedFis;
-          nChangedSingle += nChanged;
-          nUpsSingle += nUps;
-          nEqsSingle += nEqs;
-          nDownsSingle += nDowns;
+          statsSingle += statsLocal;
         } else {
           fChanged = MultiResubStop(id, vCands);
-          nTriedMulti += nTried;
-          nAddedMulti += nAdded;
-          nTriedFisMulti += nTriedFis;
-          nAddedFisMulti += nAddedFis;
-          nChangedMulti += nChanged;
-          nUpsMulti += nUps;
-          nEqsMulti += nEqs;
-          nDownsMulti += nDowns;
+          statsMulti += statsLocal;
         }
         return fChanged;
       });
-      Print(0, "single", ":", "tried", "=", nTriedFisSingle, ",", "added", "=", nAddedFisSingle, ",", "changed", "=", nChangedSingle, ",", "up/eq/dn", "=", nUpsSingle, "/", nEqsSingle, "/", nDownsSingle);
-      Print(0, "multi ", ":", "tried", "=", nTriedMulti, "(", nTriedFisMulti, "fanins", ")", ",", "added", "=", nAddedMulti, "(", nAddedFisMulti, "fanins", ")", ",", "changed", "=", nChangedMulti, ",", "up/eq/dn", "=", nUpsMulti, "/", nEqsMulti, "/", nDownsMulti);
+      Print(0, "single", ":", statsSingle.GetString());
+      Print(0, "multi ", ":", statsMulti.GetString());
       break;
     }
     case 4: {
@@ -1362,6 +1421,41 @@ namespace rrr {
     default:
       assert(0);
     }
+  }
+  
+  /* }}} */
+
+  /* {{{ Summary */
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ResetSummary() {
+    stats.clear();
+  }
+  
+  template <typename Ntk, typename Ana>
+  std::vector<std::pair<std::string, int>> Optimizer<Ntk, Ana>::GetStatsSummary() const {
+    std::vector<std::pair<std::string, int>> v;
+    for(auto const &entry: stats) {
+      v.emplace_back("opt " + entry.first + " tried node", entry.second.nTried);
+      v.emplace_back("opt " + entry.first + " tried fanin", entry.second.nTriedFis);
+      v.emplace_back("opt " + entry.first + " added node", entry.second.nAdded);
+      v.emplace_back("opt " + entry.first + " added fanin", entry.second.nAddedFis);
+      v.emplace_back("opt " + entry.first + " changed", entry.second.nChanged);
+      v.emplace_back("opt " + entry.first + " up", entry.second.nUps);
+      v.emplace_back("opt " + entry.first + " eq", entry.second.nEqs);
+      v.emplace_back("opt " + entry.first + " dn", entry.second.nDowns);
+    }
+    return v;
+  }
+
+  template <typename Ntk, typename Ana>
+  std::vector<std::pair<std::string, double>> Optimizer<Ntk, Ana>::GetTimesSummary() const {
+    std::vector<std::pair<std::string, double>> v;
+    for(auto const &entry: stats) {
+      v.emplace_back("opt " + entry.first + " add", entry.second.durationAdd);
+      v.emplace_back("opt " + entry.first + " reduce", entry.second.durationReduce);
+    }
+    return v;
   }
   
   /* }}} */

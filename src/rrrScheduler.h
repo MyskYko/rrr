@@ -48,6 +48,10 @@ namespace rrr {
     Par par;
     std::queue<Job *> qPendingJobs;
     Opt *pOpt; // used only in case of single thread execution
+    std::vector<std::string> vStatsSummaryKeys;
+    std::map<std::string, int> mStatsSummary;
+    std::vector<std::string> vTimesSummaryKeys;
+    std::map<std::string, double> mTimesSummary;
 #ifdef ABC_USE_PTHREADS
     bool fTerminate;
     std::vector<std::thread> vThreads;
@@ -61,7 +65,7 @@ namespace rrr {
 #endif
 
     // print
-    template<typename... Args>
+    template <typename... Args>
     void Print(int nVerboseLevel, std::string prefix, Args... args);
     
     // time
@@ -83,6 +87,10 @@ namespace rrr {
     void Thread(Parameter const *pPar);
 #endif
     
+    // summary
+    template <typename T>
+    void AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, std::vector<std::pair<std::string, T>> const &result) const;
+
   public:
     // constructors
     Scheduler(Ntk *pNtk, Parameter const *pPar);
@@ -103,6 +111,8 @@ namespace rrr {
     double costInitial;
     std::string prefix;
     double duration;
+    std::vector<std::pair<std::string, int>> stats;
+    std::vector<std::pair<std::string, double>> times;
     
     // constructor
     Job(int id, Ntk *pNtk, int iSeed, double cost) :
@@ -313,6 +323,9 @@ namespace rrr {
     }
     time_point timeEndLocal = GetCurrentTime();
     pJob->duration = Duration(timeStartLocal, timeEndLocal);
+    pJob->stats = opt.GetStatsSummary();
+    pJob->times = opt.GetTimesSummary();
+    opt.ResetSummary();
   }
 
   /* }}} */
@@ -351,6 +364,8 @@ namespace rrr {
       }
       assert(pJob != NULL);
       func(pJob);
+      AddToSummary(vStatsSummaryKeys, mStatsSummary, pJob->stats);
+      AddToSummary(vTimesSummaryKeys, mTimesSummary, pJob->times);
       delete pJob;
       nFinishedJobs++;
       return;
@@ -362,6 +377,8 @@ namespace rrr {
     qPendingJobs.pop();
     RunJob(*pOpt, pJob);
     func(pJob);
+    AddToSummary(vStatsSummaryKeys, mStatsSummary, pJob->stats);
+    AddToSummary(vTimesSummaryKeys, mTimesSummary, pJob->times);
     delete pJob;
     nFinishedJobs++;
   }
@@ -401,6 +418,28 @@ namespace rrr {
 
   /* }}} */
   
+  /* {{{ Summary */
+
+  template <typename Ntk, typename Opt, typename Par>
+  template <typename T>
+  void Scheduler<Ntk, Opt, Par>::AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, std::vector<std::pair<std::string, T>> const &result) const {
+    std::vector<std::string>::iterator it = keys.begin();
+    for(auto const &entry: result) {
+      if(m.count(entry.first)) {
+        m[entry.first] += entry.second;
+        it = std::find(it, keys.end(), entry.first);
+        assert(it != keys.end());
+        it++;
+      } else {
+        m[entry.first] = entry.second;
+        it = keys.insert(it, entry.first);
+        it++;          
+      }
+    }
+  }
+  
+  /* }}} */
+
   /* {{{ Constructors */
 
   template <typename Ntk, typename Opt, typename Par>
@@ -540,7 +579,16 @@ namespace rrr {
       });
     }
     double cost = CostFunction(pNtk);
-    Print(0, "\n", "summary", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", GetElapsedTime(), "s");
+    double duration = GetElapsedTime();
+    Print(0, "\n", "end", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", duration, "s");
+    Print(0, "stats summary", ":");
+    for(std::string key: vStatsSummaryKeys) {
+      Print(0, "\t", SW{30, true}, key, ":", SW{6}, mStatsSummary[key]);
+    }
+    Print(0, "runtime summary ", ":");
+    for(std::string key: vTimesSummaryKeys) {
+      Print(0, "\t", SW{30, true}, key, ":", SW{6}, mTimesSummary[key], "s", "(", 100 * mTimesSummary[key] / duration, "%", ")");
+    }
   }
 
   /* }}} */

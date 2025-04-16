@@ -95,7 +95,8 @@ namespace rrr {
   /* {{{ Print next */
 
   struct SW {
-    int width;
+    int width = 0;
+    bool left = false;
   };
 
   struct NS {}; // no space
@@ -141,12 +142,24 @@ namespace rrr {
 
   template <typename T>
   static inline void PrintNext(std::ostream &os, SW sw, T arg) {
+    if(sw.left) {
+      os << std::left;
+    }
     os << std::setw(sw.width) << arg;
+    if(sw.left) {
+      os << std::right;
+    }
   }
 
   template <typename T, typename... Args>
   static inline void PrintNext(std::ostream &os, SW sw, T arg, Args... args) {
+    if(sw.left) {
+      os << std::left;
+    }
     os << std::setw(sw.width) << arg << " ";
+    if(sw.left) {
+      os << std::right;
+    }
     PrintNext(os, args...);
   }
 
