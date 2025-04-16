@@ -683,7 +683,7 @@ namespace rrr {
     delete pBdd;
     pBdd = NULL;
     pNtk = pNtk_;
-    pNtk_->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
   
   /* }}} */

@@ -27,6 +27,8 @@ namespace rrr {
     int nWords;
 
     // data
+    bool fGenerated;
+    bool fInitialized;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
@@ -75,6 +77,9 @@ namespace rrr {
     // careset computation
     void ComputeCare(int id);
 
+    // preparation
+    void Initialize();
+
     // save & load
     void Save(int slot);
     void Load(int slot);
@@ -84,11 +89,7 @@ namespace rrr {
     Simulator();
     Simulator(Parameter const *pPar);
     ~Simulator();
-    void UpdateNetwork(Ntk *pNtk_, bool fSame);
-    void AssignNetwork(Ntk *pNtk_) {
-      pNtk_->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));      
-      UpdateNetwork(pNtk_, false);
-    }
+    void AssignNetwork(Ntk *pNtk_);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -199,6 +200,7 @@ namespace rrr {
   void Simulator<Ntk>::ActionCallback(Action const &action) {
     switch(action.type) {
     case REMOVE_FANIN:
+      assert(fInitialized);
       if(target != -1) {
         if(action.id == target) {
           fUpdate = true;
@@ -211,26 +213,29 @@ namespace rrr {
       break;
     case REMOVE_BUFFER:
     case REMOVE_CONST:
-      if(target != -1) {
-        if(action.id == target) {
-          if(fUpdate) {
-            for(int fo: action.vFanouts) {
-              sUpdates.insert(fo);
+      if(fInitialized) {
+        if(target != -1) {
+          if(action.id == target) {
+            if(fUpdate) {
+              for(int fo: action.vFanouts) {
+                sUpdates.insert(fo);
+              }
+              fUpdate = false;
             }
-            fUpdate = false;
-          }
-          target = -1;
-        } else {
-          if(sUpdates.count(action.id)) {
-            sUpdates.erase(action.id);
-            for(int fo: action.vFanouts) {
-              sUpdates.insert(fo);
+            target = -1;
+          } else {
+            if(sUpdates.count(action.id)) {
+              sUpdates.erase(action.id);
+              for(int fo: action.vFanouts) {
+                sUpdates.insert(fo);
+              }
             }
           }
         }
       }
       break;
     case ADD_FANIN:
+      assert(fInitialized);
       if(target != -1) {
         if(action.id == target) {
           fUpdate = true;
@@ -242,15 +247,20 @@ namespace rrr {
     case TRIVIAL_COLLAPSE:
       break;
     case TRIVIAL_DECOMPOSE:
-      if(target != -1) {
-        vValues.resize(nWords * pNtk->GetNumNodes());
-        SimulateNode(vValues, action.fi);
+      if(fInitialized) {
+        if(target != -1) {
+          vValues.resize(nWords * pNtk->GetNumNodes());
+          SimulateNode(vValues, action.fi);
+        }
       }
       break;
     case SORT_FANINS:
       break;
     case READ:
-      UpdateNetwork(pNtk, !action.fNew);
+      fInitialized = false;
+      if(action.fNew) {
+        fGenerated = false;
+      }
       break;
     case SAVE:
       Save(action.idx);
@@ -498,6 +508,28 @@ namespace rrr {
   
   /* }}} */
 
+  /* {{{ Preparation */
+
+  template <typename Ntk>
+  void Simulator<Ntk>::Initialize() {
+    if(!fGenerated) {
+      // TODO: reset nWords to default here maybe, if such a mechanism that changes nWords has been implemneted
+      vValues.resize(nWords * pNtk->GetNumNodes());
+      iPivot = 0;
+      vAssignedStimuli.clear();
+      vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
+      GenerateRandomStimuli();
+      fGenerated = true;
+    } else {
+      // use same nWords as we are reusing patterns even if nWords has changed
+      vValues.resize(nWords * pNtk->GetNumNodes());
+    }
+    Simulate();
+    fInitialized = true;
+  }
+
+  /* }}} */
+
   /* {{{ Save & load */
 
   template <typename Ntk>
@@ -577,7 +609,7 @@ namespace rrr {
           }
         }
       } else {
-        // when nWords has changed
+        // TODO: when nWords has changed
         assert(0);
       }
     }
@@ -592,6 +624,8 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(0),
     nWords(0),
+    fGenerated(false),
+    fInitialized(false),
     target(-1),
     iPivot(0),
     fUpdate(false),
@@ -604,6 +638,8 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
+    fGenerated(false),
+    fInitialized(false),
     target(-1),
     iPivot(0),
     fUpdate(false),
@@ -621,20 +657,14 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
-    pNtk = pNtk_;
-    // TODO: what if nWords has changed? shall we reset it to default?
-    vValues.resize(nWords * pNtk->GetNumNodes());
+  void Simulator<Ntk>::AssignNetwork(Ntk *pNtk_) {
+    fGenerated = false;
+    fInitialized = false;
     target = -1;
     fUpdate = false;
     sUpdates.clear();
-    if(!fSame) { // reset stimuli if network function changed
-      iPivot = 0;
-      vAssignedStimuli.clear();
-      vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
-      GenerateRandomStimuli();
-    }
-    Simulate();
+    pNtk = pNtk_;
+    pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   /* }}} */
@@ -643,6 +673,9 @@ namespace rrr {
   
   template <typename Ntk>
   bool Simulator<Ntk>::CheckRedundancy(int id, int idx) {
+    if(!fInitialized) {
+      Initialize();
+    }
     ComputeCare(id);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
@@ -680,6 +713,9 @@ namespace rrr {
 
   template <typename Ntk>
   bool Simulator<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+    if(!fInitialized) {
+      Initialize();
+    }
     ComputeCare(id);
     switch(pNtk->GetNodeType(id)) {
     case AND: {
