@@ -257,10 +257,9 @@ namespace rrr {
     case TRIVIAL_DECOMPOSE:
       if(fInitialized) {
         if(target != -1) {
-          time_point timeStart = GetCurrentTime();
           vValues.resize(nWords * pNtk->GetNumNodes());
           SimulateNode(vValues, action.fi);
-          durationSimulation += Duration(timeStart, GetCurrentTime());
+          // time of this simulation is not measured for simplicity sake
         }
       }
       break;
