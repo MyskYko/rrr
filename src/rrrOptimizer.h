@@ -1407,6 +1407,8 @@ namespace rrr {
         }
         return fChanged;
       });
+      stats["single"] += statsSingle;
+      stats["multi"] += statsMulti;
       Print(0, "single", ":", statsSingle.GetString());
       Print(0, "multi ", ":", statsMulti.GetString());
       break;
