@@ -117,7 +117,7 @@ namespace rrr {
   public:
     // constructors
     Optimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
-    void UpdateNetwork(Ntk *pNtk_, bool fSame = false);
+    void AssignNetwork(Ntk *pNtk_);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
     void ResetStats();
 
@@ -181,6 +181,9 @@ namespace rrr {
       target = -1;
       break;
     case SORT_FANINS:
+      break;
+    case READ:
+      target = -1;
       break;
     case SAVE:
       break;
@@ -1204,11 +1207,11 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
+  void Optimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
-    ana.UpdateNetwork(pNtk, fSame);
+    ana.AssignNetwork(pNtk);
   }
   
   template <typename Ntk, typename Ana>

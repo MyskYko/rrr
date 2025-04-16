@@ -85,6 +85,10 @@ namespace rrr {
     Simulator(Parameter const *pPar);
     ~Simulator();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
+    void AssignNetwork(Ntk *pNtk_) {
+      pNtk_->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));      
+      UpdateNetwork(pNtk_, false);
+    }
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -193,52 +197,60 @@ namespace rrr {
   
   template <typename Ntk>
   void Simulator<Ntk>::ActionCallback(Action const &action) {
-    if(target == -1) {
-      return;
-    }
     switch(action.type) {
     case REMOVE_FANIN:
-      if(action.id == target) {
-        fUpdate = true;
-      } else {
-        sUpdates.insert(action.id);
+      if(target != -1) {
+        if(action.id == target) {
+          fUpdate = true;
+        } else {
+          sUpdates.insert(action.id);
+        }
       }
       break;
     case REMOVE_UNUSED:
       break;
     case REMOVE_BUFFER:
     case REMOVE_CONST:
-      if(action.id == target) {
-        if(fUpdate) {
-          for(int fo: action.vFanouts) {
-            sUpdates.insert(fo);
+      if(target != -1) {
+        if(action.id == target) {
+          if(fUpdate) {
+            for(int fo: action.vFanouts) {
+              sUpdates.insert(fo);
+            }
+            fUpdate = false;
           }
-          fUpdate = false;
-        }
-        target = -1;
-      } else {
-        if(sUpdates.count(action.id)) {
-          sUpdates.erase(action.id);
-          for(int fo: action.vFanouts) {
-            sUpdates.insert(fo);
+          target = -1;
+        } else {
+          if(sUpdates.count(action.id)) {
+            sUpdates.erase(action.id);
+            for(int fo: action.vFanouts) {
+              sUpdates.insert(fo);
+            }
           }
         }
       }
       break;
     case ADD_FANIN:
-      if(action.id == target) {
-        fUpdate = true;
-      } else {
-        sUpdates.insert(action.id);
+      if(target != -1) {
+        if(action.id == target) {
+          fUpdate = true;
+        } else {
+          sUpdates.insert(action.id);
+        }
       }
       break;
     case TRIVIAL_COLLAPSE:
       break;
     case TRIVIAL_DECOMPOSE:
-      vValues.resize(nWords * pNtk->GetNumNodes());
-      SimulateNode(vValues, action.fi);
+      if(target != -1) {
+        vValues.resize(nWords * pNtk->GetNumNodes());
+        SimulateNode(vValues, action.fi);
+      }
       break;
     case SORT_FANINS:
+      break;
+    case READ:
+      UpdateNetwork(pNtk, !action.fNew);
       break;
     case SAVE:
       Save(action.idx);
@@ -611,7 +623,6 @@ namespace rrr {
   template <typename Ntk>
   void Simulator<Ntk>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
     pNtk = pNtk_;
-    pNtk->AddCallback(std::bind(&Simulator<Ntk>::ActionCallback, this, std::placeholders::_1));
     // TODO: what if nWords has changed? shall we reset it to default?
     vValues.resize(nWords * pNtk->GetNumNodes());
     target = -1;

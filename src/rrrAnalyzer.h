@@ -21,7 +21,7 @@ namespace rrr {
   public:
     // constructors
     Analyzer(Parameter const *pPar);
-    void UpdateNetwork(Ntk *pNtk_, bool fSame);
+    void AssignNetwork(Ntk *pNtk_);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -37,12 +37,12 @@ namespace rrr {
     sim(pPar),
     sol(pPar) {
   }
-  
+
   template <typename Ntk, typename Sim, typename Sol>
-  void Analyzer<Ntk, Sim, Sol>::UpdateNetwork(Ntk *pNtk_, bool fSame) {
+  void Analyzer<Ntk, Sim, Sol>::AssignNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
-    sim.UpdateNetwork(pNtk, fSame);
-    sol.UpdateNetwork(pNtk, fSame);
+    sim.AssignNetwork(pNtk);
+    sol.AssignNetwork(pNtk);
   }
 
   /* }}} */
@@ -68,6 +68,10 @@ namespace rrr {
         }
         sim.AddCex(sol.GetCex());
       }
+    } else {
+      // if(nVerbose) {
+      //   std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is not redundant" << std::endl;
+      // }
     }
     return false;
   }
@@ -91,6 +95,10 @@ namespace rrr {
         }
         sim.AddCex(sol.GetCex());
       }
+    } else {
+      // if(nVerbose) {
+      //   std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is not feasible" << std::endl;
+      // }
     }
     return false;
   }

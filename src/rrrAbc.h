@@ -76,7 +76,7 @@ namespace rrr {
       assert(r == 0);
       Abc_FrameSetBatchMode(0);
     }
-    pNtk->Read(Abc_FrameReadGia(pAbc), GiaReader<Ntk>);
+    pNtk->Read(Abc_FrameReadGia(pAbc), GiaReader<Ntk>, false);
   }
 
 }

@@ -198,7 +198,7 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     time_point timeStartLocal = GetCurrentTime();
-    opt.UpdateNetwork(pJob->pNtk);
+    opt.AssignNetwork(pJob->pNtk);
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });
@@ -219,7 +219,6 @@ namespace rrr {
         if(i != 0) {
           CallAbc(pJob->pNtk, "&if -K 6; &mfs; &st");
           cost = CostFunction(pJob->pNtk);
-          opt.UpdateNetwork(pJob->pNtk, true);
           Print(1, pJob->prefix, "hop", i, ":", "cost", "=", cost);
         }
         for(int j = 0; true; j++) {
@@ -232,7 +231,6 @@ namespace rrr {
           Print(1, pJob->prefix, "ite", j, ":", "cost", "=", costNew);
           if(costNew < cost) {
             cost = costNew;
-            opt.UpdateNetwork(pJob->pNtk, true);
           } else {
             break;
           }
@@ -286,7 +284,6 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.UpdateNetwork(pJob->pNtk, true);
           opt.Run(rng(), GetRemainingTime());
           if(rng() & 1) {
             CallAbc(pJob->pNtk, "&dc2");

@@ -73,6 +73,11 @@ namespace rrr {
     ~BddMspfAnalyzer();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
 
+    void AssignNetwork(Ntk *pNtk_) {
+      pNtk_->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
+      UpdateNetwork(pNtk_, false);
+    };
+
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
@@ -269,6 +274,9 @@ namespace rrr {
       }
       break;
     }
+    case READ:
+      UpdateNetwork(pNtk, !action.fNew);
+      break;
     case SAVE:
       Save(action.idx);
       break;
@@ -642,7 +650,6 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, 0);
       vGUpdates[fi]  = true;
     });
-    pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
   
   template <typename Ntk>

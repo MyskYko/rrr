@@ -304,6 +304,8 @@ namespace rrr {
       return "trivial decompose";
     case SORT_FANINS:
       return "sort fanins";
+    case READ:
+      return "read";
     case SAVE:
       return "save";
     case LOAD:
@@ -335,6 +337,9 @@ namespace rrr {
     if(action.idx != -1) {
       ss << delim;
       PrintNext(ss, "index", action.idx);
+    }
+    if(action.fNew) {
+      ss << " new";
     }
     ss << std::endl;
     if(!action.vFanins.empty()) {

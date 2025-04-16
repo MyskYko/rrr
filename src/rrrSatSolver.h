@@ -44,6 +44,10 @@ namespace rrr {
     SatSolver(Parameter const *pPar);
     ~SatSolver();
     void UpdateNetwork(Ntk *pNtk_, bool fSame);
+    void AssignNetwork(Ntk *pNtk_) {
+      pNtk_->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
+      UpdateNetwork(pNtk_, false);
+    }
     
     // checks
     SatResult CheckRedundancy(int id, int idx);
@@ -85,6 +89,9 @@ namespace rrr {
       fUpdate = true;
       break;
     case SORT_FANINS:
+      break;
+    case READ:
+      UpdateNetwork(pNtk, !action.fNew);
       break;
     case SAVE:
       break;
@@ -276,7 +283,6 @@ namespace rrr {
     status = false;
     target = -1;
     fUpdate = false;
-    pNtk->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   /* }}} */
