@@ -47,8 +47,12 @@ namespace rrr {
     std::vector<Simulator> vBackups;
 
     // stats
-    int nAdds;
-    int nResets;
+    int nCex;
+    int nDiscarded;
+    std::vector<int> vPackedCount;
+    std::vector<int> vPackedCountEvicted;
+    double durationSimulation;
+    double durationCare;
     
     // vector computations
     void Clear(int n, itr x) const;
@@ -88,7 +92,6 @@ namespace rrr {
     // constructors
     Simulator();
     Simulator(Parameter const *pPar);
-    ~Simulator();
     void AssignNetwork(Ntk *pNtk_);
 
     // checks
@@ -99,9 +102,9 @@ namespace rrr {
     void AddCex(std::vector<VarValue> const &vCex);
 
     // summary
-    void ResetSummary() {};
-    summary<int> GetStatsSummary() const {return summary<int>();};
-    summary<double> GetTimesSummary() const {return summary<double>();};
+    void ResetSummary();
+    summary<int> GetStatsSummary() const;
+    summary<double> GetTimesSummary() const;
   };
 
 
@@ -254,8 +257,10 @@ namespace rrr {
     case TRIVIAL_DECOMPOSE:
       if(fInitialized) {
         if(target != -1) {
+          time_point timeStart = GetCurrentTime();
           vValues.resize(nWords * pNtk->GetNumNodes());
           SimulateNode(vValues, action.fi);
+          durationSimulation += Duration(timeStart, GetCurrentTime());
         }
       }
       break;
@@ -370,6 +375,7 @@ namespace rrr {
   
   template <typename Ntk>
   void Simulator<Ntk>::Simulate() {
+    time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "simulating" << std::endl;
     }
@@ -381,10 +387,12 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
+    durationSimulation += Duration(timeStart, GetCurrentTime());
   }
   
   template <typename Ntk>
   void Simulator<Ntk>::Resimulate() {
+    time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "resimulating" << std::endl;
     }
@@ -407,10 +415,12 @@ namespace rrr {
       }
     });
     */
+    durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
   template <typename Ntk>
   void Simulator<Ntk>::SimulateOneWord(int offset) {
+    time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "simulating word " << offset << std::endl;
     }
@@ -422,6 +432,7 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
+    durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
   /* }}} */
@@ -465,6 +476,7 @@ namespace rrr {
       sUpdates.clear();
     }
     target = id;
+    time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "computing careset of " << target << std::endl;
     }
@@ -475,6 +487,7 @@ namespace rrr {
         Print(nWords, care.begin());
         std::cout << std::endl;
       }
+      durationCare += Duration(timeStart, GetCurrentTime());
       return;
     }
     vValues2 = vValues;
@@ -509,6 +522,7 @@ namespace rrr {
       Print(nWords, care.begin());
       std::cout << std::endl;
     }
+    durationCare += Duration(timeStart, GetCurrentTime());
   }
   
   /* }}} */
@@ -523,6 +537,13 @@ namespace rrr {
       iPivot = 0;
       vAssignedStimuli.clear();
       vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
+      for(int count: vPackedCount) {
+        if(count) {
+          vPackedCountEvicted.push_back(count);
+        }
+      }
+      vPackedCount.clear();
+      vPackedCount.resize(nWords * 64);
       GenerateRandomStimuli();
       fGenerated = true;
     } else {
@@ -564,6 +585,10 @@ namespace rrr {
     vBackups[slot].iPivot = iPivot;
     vBackups[slot].vAssignedStimuli = vAssignedStimuli;
     target = vBackups[slot].target; // assigned to -1 when careset needs updating
+    if(!fKeepStimula) {
+      vBackups[slot].nCex = nCex;
+      vBackups[slot].vPackedCount = vPackedCount;
+    }
   }
 
   template <typename Ntk>
@@ -579,6 +604,9 @@ namespace rrr {
       care    = vBackups[slot].care;
       iPivot  = vBackups[slot].iPivot;
       vAssignedStimuli = vBackups[slot].vAssignedStimuli;
+      nDiscarded += nCex - vBackups[slot].nCex;
+      nCex = vBackups[slot].nCex;
+      vPackedCount = vBackups[slot].vPackedCount;
       tmp.resize(nWords);
     } else {
       std::vector<int> vOffsets;
@@ -633,9 +661,8 @@ namespace rrr {
     fInitialized(false),
     target(-1),
     iPivot(0),
-    fUpdate(false),
-    nAdds(0),
-    nResets(0) {
+    fUpdate(false) {
+    ResetSummary();
   }
   
   template <typename Ntk>
@@ -647,18 +674,10 @@ namespace rrr {
     fInitialized(false),
     target(-1),
     iPivot(0),
-    fUpdate(false),
-    nAdds(0),
-    nResets(0) {
+    fUpdate(false) {
     care.resize(nWords);
     tmp.resize(nWords);
-  }
-
-  template <typename Ntk>
-  Simulator<Ntk>::~Simulator() {
-    if(pNtk) {
-      //std::cout << "simulator stats: added CEXs = " << nAdds << ", resets = " << nResets << std::endl;
-    }
+    ResetSummary();
   }
 
   template <typename Ntk>
@@ -818,6 +837,7 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "fusing into stimulus word " << iWord << " bit " << iBit << std::endl;
       }
+      vPackedCount[iWord * 64 + iBit]++;
     } else {
       // no bits are compatible, so reset at pivot
       iWord = iPivot / 64;
@@ -825,6 +845,11 @@ namespace rrr {
       if(nVerbose) {
         std::cout << "resetting stimulus word " << iWord << " bit " << iBit << std::endl;
       }
+      if(vPackedCount[iWord * 64 + iBit]) {
+        // this can be zero only when stats has been reset
+        vPackedCountEvicted.push_back(vPackedCount[iWord * 64 + iBit]);
+      }
+      vPackedCount[iWord * 64 + iBit] = 1;
       word mask = 1ull << iBit;
       for(int idx = 0; idx < pNtk->GetNumPis(); idx++) {
         vAssignedStimuli[idx * nWords + iWord] &= ~mask;
@@ -833,7 +858,6 @@ namespace rrr {
       if(iPivot == 64 * nWords) {
         iPivot = 0;
       }
-      nResets++;
     }
     // update stimulus
     for(int idx: vCarePiIdxs) {
@@ -858,6 +882,7 @@ namespace rrr {
     // simulate
     SimulateOneWord(iWord);
     // recompute care with new stimulus
+    time_point timeStart = GetCurrentTime();
     if(target != -1 && !pNtk->IsPoDriver(target)) {
       if(nVerbose) {
         std::cout << "recomputing careset of " << target << std::endl;
@@ -888,8 +913,50 @@ namespace rrr {
         std::cout << std::endl;
       }
     }
-    nAdds++;
+    durationCare += Duration(timeStart, GetCurrentTime());
+    nCex++;
   }
+  
+  /* }}} */
+
+  /* {{{ Summary */
+  
+  template <typename Ntk>
+  void Simulator<Ntk>::ResetSummary() {
+    nCex = 0;
+    nDiscarded = 0;
+    vPackedCount.clear();
+    vPackedCount.resize(64 * nWords);
+    vPackedCountEvicted.clear();
+    durationSimulation = 0;
+    durationCare = 0;
+  };
+  
+  template <typename Ntk>
+  summary<int> Simulator<Ntk>::GetStatsSummary() const {
+    summary<int> v;
+    v.emplace_back("sim cex", nCex);
+    if(!fKeepStimula) {
+      v.emplace_back("sim discarded cex", nDiscarded);
+    }
+    int nPackedCount = vPackedCountEvicted.size();
+    for(int count: vPackedCount) {
+      if(count) {
+        nPackedCount++;
+      }
+    }
+    v.emplace_back("sim packed pattern", nPackedCount);
+    v.emplace_back("sim evicted pattern", vPackedCountEvicted.size());
+    return v;
+  };
+  
+  template <typename Ntk>
+  summary<double> Simulator<Ntk>::GetTimesSummary() const {
+    summary<double> v;
+    v.emplace_back("sim simulation", durationSimulation);
+    v.emplace_back("sim care computation", durationCare);
+    return v;
+  };
   
   /* }}} */
   
