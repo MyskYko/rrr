@@ -34,6 +34,14 @@ namespace rrr {
     // backups
     std::vector<BddMspfAnalyzer> vBackups;
 
+    // stats
+    uint64_t nNodesOld;
+    uint64_t nNodesAccumulated;
+    double durationSimulation;
+    double durationPf;
+    double durationCheck;
+    double durationReorder;
+    
     // BDD utils
     void IncRef(lit x) const;
     void DecRef(lit x) const;
@@ -83,9 +91,9 @@ namespace rrr {
     bool CheckFeasibility(int id, int fi, bool c);
     
     // summary
-    void ResetSummary() {};
-    summary<int> GetStatsSummary() const {return summary<int>();};
-    summary<double> GetTimesSummary() const {return summary<double>();};
+    void ResetSummary();
+    summary<int> GetStatsSummary() const;
+    summary<double> GetTimesSummary() const;
   };
   
   /* {{{ BDD utils */
@@ -249,6 +257,7 @@ namespace rrr {
       if(fInitialized) {
         Allocate();
         SimulateNode(action.fi, vFs);
+        // time of this simulation is not measured for simplicity sake
         assert(vGs[action.fi] == LitMax);
         std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
         assert(vvCs[action.fi].empty());
@@ -348,6 +357,7 @@ namespace rrr {
   
   template <typename Ntk>
   void BddMspfAnalyzer<Ntk>::Simulate() {
+    time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "symbolic simulation with BDD" << std::endl;
     }
@@ -362,6 +372,7 @@ namespace rrr {
         vUpdates[id] = false;
       }
     });
+    durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
   /* }}} */
@@ -529,6 +540,7 @@ namespace rrr {
 
   template <typename pNtk>
   void BddMspfAnalyzer<pNtk>::Mspf(int id, bool fC) {
+    time_point timeStart = GetCurrentTime();
     if(id != -1) {
       pNtk->ForEachTfoReverse(id, false, [&](int fo) {
         MspfNode(fo);
@@ -546,6 +558,7 @@ namespace rrr {
         MspfNode(id);
       });
     }
+    durationPf += Duration(timeStart, GetCurrentTime());
   }
 
   /* }}} */
@@ -567,6 +580,10 @@ namespace rrr {
     vCUpdates.clear();
     vVisits.clear();
     if(!fReuse) {
+      nNodesOld = 0;
+      if(pBdd) {
+        nNodesAccumulated += pBdd->GetNumTotalCreatedNodes();
+      }
       delete pBdd;
       pBdd = NULL;
     }
@@ -598,8 +615,10 @@ namespace rrr {
     });
     Simulate();
     if(fUseReo) {
+      time_point timeStart = GetCurrentTime();
       pBdd->Reorder();
       pBdd->TurnOffReo();
+      durationReorder += Duration(timeStart, GetCurrentTime());
     }
     pNtk->ForEachInt([&](int id) {
       vvCs[id].resize(pNtk->GetNumFanins(id), LitMax);
@@ -665,6 +684,7 @@ namespace rrr {
     fInitialized(false),
     pBdd(NULL),
     fUpdate(false) {
+    ResetSummary();
   }
   
   template <typename Ntk>
@@ -674,6 +694,7 @@ namespace rrr {
     fInitialized(false),
     pBdd(NULL),
     fUpdate(false) {
+    ResetSummary();
   }
 
   template <typename Ntk>
@@ -701,16 +722,15 @@ namespace rrr {
       fUpdate = false;
     }
     Mspf(id);
+    time_point timeStart = GetCurrentTime();
+    bool fRedundant = false;
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       lit x = pBdd->Or(pBdd->LitNotCond(vFs[fi], c), vvCs[id][idx]);
       if(pBdd->IsConst1(x)) {
-        if(nVerbose) {
-          std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is redundant" << std::endl;
-        }
-        return true;
+        fRedundant = true;
       }
       break;
     }
@@ -718,9 +738,14 @@ namespace rrr {
       assert(0);
     }
     if(nVerbose) {
-      std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
+      if(fRedundant) {
+        std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is redundant" << std::endl;
+      } else {
+        std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is NOT redundant" << std::endl;
+      }
     }
-    return false;
+    durationCheck += Duration(timeStart, GetCurrentTime());
+    return fRedundant;
   }
   
   template <typename Ntk>
@@ -732,6 +757,8 @@ namespace rrr {
       fUpdate = false;
     }
     Mspf(id, false);
+    time_point timeStart = GetCurrentTime();
+    bool fFeasible = false;
     switch(pNtk->GetNodeType(id)) {
     case AND: {
       lit x = pBdd->Or(pBdd->LitNot(vFs[id]), vGs[id]);
@@ -739,9 +766,7 @@ namespace rrr {
       lit y = pBdd->Or(x, pBdd->LitNotCond(vFs[fi], c));
       DecRef(x);
       if(pBdd->IsConst1(y)) {
-        if(nVerbose) {
-          std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is feasible" << std::endl;
-        }
+        fFeasible = true;
         return true;
       }
       break;
@@ -750,9 +775,49 @@ namespace rrr {
       assert(0);
     }
     if(nVerbose) {
-      std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+      if(fFeasible) {
+        std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is feasible" << std::endl;
+      } else {
+        std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is NOT feasible" << std::endl;
+      }
     }
-    return false;
+    durationCheck += Duration(timeStart, GetCurrentTime());
+    return fFeasible;
+  }
+
+  /* }}} */
+  
+  /* {{{ Summary */
+
+  template <typename Ntk>
+  void BddMspfAnalyzer<Ntk>::ResetSummary() {
+    if(pBdd) {
+      nNodesOld = pBdd->GetNumTotalCreatedNodes();
+    } else {
+      nNodesOld = 0;
+    }
+    nNodesAccumulated = 0;
+    durationSimulation = 0;
+    durationPf = 0;
+    durationCheck = 0;
+    durationReorder = 0;
+  }
+  
+  template <typename Ntk>
+  summary<int> BddMspfAnalyzer<Ntk>::GetStatsSummary() const {
+    summary<int> v;
+    v.emplace_back("bdd node", pBdd->GetNumTotalCreatedNodes() - nNodesOld + nNodesAccumulated);
+    return v;
+  }
+  
+  template <typename Ntk>
+  summary<double> BddMspfAnalyzer<Ntk>::GetTimesSummary() const {
+    summary<double> v;
+    v.emplace_back("bdd symbolic simulation", durationSimulation);
+    v.emplace_back("bdd care computation", durationPf);
+    v.emplace_back("bdd check", durationCheck);
+    v.emplace_back("bdd reorder", durationReorder);
+    return v;
   }
 
   /* }}} */
