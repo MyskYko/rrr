@@ -120,8 +120,8 @@ namespace rrr {
 
     // summary
     void ResetSummary();
-    std::vector<std::pair<std::string, int>> GetStatsSummary() const;
-    std::vector<std::pair<std::string, double>> GetTimesSummary() const;
+    summary<int> GetStatsSummary() const;
+    summary<double> GetTimesSummary() const;
   };
 
   /* {{{ Stats */
@@ -1430,11 +1430,12 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::ResetSummary() {
     stats.clear();
+    ana.ResetSummary();
   }
   
   template <typename Ntk, typename Ana>
-  std::vector<std::pair<std::string, int>> Optimizer<Ntk, Ana>::GetStatsSummary() const {
-    std::vector<std::pair<std::string, int>> v;
+  summary<int> Optimizer<Ntk, Ana>::GetStatsSummary() const {
+    summary<int> v;
     for(auto const &entry: stats) {
       v.emplace_back("opt " + entry.first + " tried node", entry.second.nTried);
       v.emplace_back("opt " + entry.first + " tried fanin", entry.second.nTriedFis);
@@ -1445,16 +1446,20 @@ namespace rrr {
       v.emplace_back("opt " + entry.first + " eq", entry.second.nEqs);
       v.emplace_back("opt " + entry.first + " dn", entry.second.nDowns);
     }
+    summary<int> v2 = ana.GetStatsSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
     return v;
   }
 
   template <typename Ntk, typename Ana>
-  std::vector<std::pair<std::string, double>> Optimizer<Ntk, Ana>::GetTimesSummary() const {
-    std::vector<std::pair<std::string, double>> v;
+  summary<double> Optimizer<Ntk, Ana>::GetTimesSummary() const {
+    summary<double> v;
     for(auto const &entry: stats) {
       v.emplace_back("opt " + entry.first + " add", entry.second.durationAdd);
       v.emplace_back("opt " + entry.first + " reduce", entry.second.durationReduce);
     }
+    summary<double> v2 = ana.GetTimesSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
     return v;
   }
   

@@ -26,6 +26,11 @@ namespace rrr {
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
+
+    // summary
+    void ResetSummary();
+    summary<int> GetStatsSummary() const;
+    summary<double> GetTimesSummary() const;
   };
 
   /* {{{ Constructors */
@@ -101,6 +106,32 @@ namespace rrr {
       // }
     }
     return false;
+  }
+
+  /* }}} */
+
+  /* {{{ Summary */
+  
+  template <typename Ntk, typename Sim, typename Sol>
+  void Analyzer<Ntk, Sim, Sol>::ResetSummary() {
+    sim.ResetSummary();
+    sol.ResetSummary();
+  }
+  
+  template <typename Ntk, typename Sim, typename Sol>
+  summary<int> Analyzer<Ntk, Sim, Sol>::GetStatsSummary() const {
+    summary<int> v = sim.GetStatsSummary();
+    summary<int> v2 = sol.GetStatsSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
+    return v;
+  }
+
+  template <typename Ntk, typename Sim, typename Sol>
+  summary<double> Analyzer<Ntk, Sim, Sol>::GetTimesSummary() const {
+    summary<double> v = sim.GetTimesSummary();
+    summary<double> v2 = sol.GetTimesSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
+    return v;
   }
 
   /* }}} */

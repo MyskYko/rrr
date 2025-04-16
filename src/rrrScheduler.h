@@ -89,7 +89,7 @@ namespace rrr {
     
     // summary
     template <typename T>
-    void AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, std::vector<std::pair<std::string, T>> const &result) const;
+    void AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, summary<T> const &result) const;
 
   public:
     // constructors
@@ -111,8 +111,8 @@ namespace rrr {
     double costInitial;
     std::string prefix;
     double duration;
-    std::vector<std::pair<std::string, int>> stats;
-    std::vector<std::pair<std::string, double>> times;
+    summary<int> stats;
+    summary<double> times;
     
     // constructor
     Job(int id, Ntk *pNtk, int iSeed, double cost) :
@@ -422,7 +422,7 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   template <typename T>
-  void Scheduler<Ntk, Opt, Par>::AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, std::vector<std::pair<std::string, T>> const &result) const {
+  void Scheduler<Ntk, Opt, Par>::AddToSummary(std::vector<std::string> &keys, std::map<std::string, T> &m, summary<T> const &result) const {
     std::vector<std::string>::iterator it = keys.begin();
     for(auto const &entry: result) {
       if(m.count(entry.first)) {

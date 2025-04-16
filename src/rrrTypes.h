@@ -60,4 +60,7 @@ namespace rrr {
   using clock_type = std::chrono::steady_clock;
   using time_point = std::chrono::time_point<clock_type>;
 
+  template <typename T>
+  using summary = std::vector<std::pair<std::string, T>>;
+
 }

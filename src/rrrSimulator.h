@@ -46,7 +46,7 @@ namespace rrr {
     // backups
     std::vector<Simulator> vBackups;
 
-    // statistics
+    // stats
     int nAdds;
     int nResets;
     
@@ -97,6 +97,11 @@ namespace rrr {
 
     // cex
     void AddCex(std::vector<VarValue> const &vCex);
+
+    // summary
+    void ResetSummary() {};
+    summary<int> GetStatsSummary() const {return summary<int>();};
+    summary<double> GetTimesSummary() const {return summary<double>();};
   };
 
 

@@ -79,6 +79,11 @@ namespace rrr {
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
+
+    // summary
+    void ResetSummary() {};
+    summary<int> GetStatsSummary() const {return summary<int>();};
+    summary<double> GetTimesSummary() const {return summary<double>();};
   };
   
   /* {{{ BDD utils */
