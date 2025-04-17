@@ -49,6 +49,7 @@ namespace rrr {
     // stats
     int nCex;
     int nDiscarded;
+    int nPackedCountOld;
     std::vector<int> vPackedCount;
     std::vector<int> vPackedCountEvicted;
     double durationSimulation;
@@ -586,7 +587,9 @@ namespace rrr {
     target = vBackups[slot].target; // assigned to -1 when careset needs updating
     if(!fKeepStimula) {
       vBackups[slot].nCex = nCex;
+      vBackups[slot].nPackedCountOld = nPackedCountOld;
       vBackups[slot].vPackedCount = vPackedCount;
+      vBackups[slot].vPackedCountEvicted = vPackedCountEvicted;
     }
   }
 
@@ -605,7 +608,9 @@ namespace rrr {
       vAssignedStimuli = vBackups[slot].vAssignedStimuli;
       nDiscarded += nCex - vBackups[slot].nCex;
       nCex = vBackups[slot].nCex;
+      nPackedCountOld = vBackups[slot].nPackedCountOld;
       vPackedCount = vBackups[slot].vPackedCount;
+      vPackedCountEvicted = vBackups[slot].vPackedCountEvicted;
       tmp.resize(nWords);
     } else {
       std::vector<int> vOffsets;
@@ -926,8 +931,12 @@ namespace rrr {
   void Simulator<Ntk>::ResetSummary() {
     nCex = 0;
     nDiscarded = 0;
-    vPackedCount.clear();
-    vPackedCount.resize(64 * nWords);
+    nPackedCountOld = 0;
+    for(int count: vPackedCount) {
+      if(count) {
+        nPackedCountOld++;
+      }
+    }
     vPackedCountEvicted.clear();
     durationSimulation = 0;
     durationCare = 0;
@@ -940,7 +949,7 @@ namespace rrr {
     if(!fKeepStimula) {
       v.emplace_back("sim discarded cex", nDiscarded);
     }
-    int nPackedCount = vPackedCountEvicted.size();
+    int nPackedCount = vPackedCountEvicted.size() - nPackedCountOld;
     for(int count: vPackedCount) {
       if(count) {
         nPackedCount++;

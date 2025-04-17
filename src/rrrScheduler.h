@@ -583,11 +583,11 @@ namespace rrr {
     Print(0, "\n", "end", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", duration, "s");
     Print(0, "", "stats summary", ":");
     for(std::string key: vStatsSummaryKeys) {
-      Print(0, "\t", SW{30, true}, key, ":", SW{6}, mStatsSummary[key]);
+      Print(0, "\t", SW{30, true}, key, ":", SW{10}, mStatsSummary[key]);
     }
     Print(0, "", "runtime summary", ":");
     for(std::string key: vTimesSummaryKeys) {
-      Print(0, "\t", SW{30, true}, key, ":", SW{6}, mTimesSummary[key], "s", "(", 100 * mTimesSummary[key] / duration, "%", ")");
+      Print(0, "\t", SW{30, true}, key, ":", mTimesSummary[key], "s", "(", 100 * mTimesSummary[key] / duration, "%", ")");
     }
   }
 
