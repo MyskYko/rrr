@@ -580,8 +580,7 @@ namespace rrr {
     }
     double cost = CostFunction(pNtk);
     double duration = GetElapsedTime();
-    Print(0, "\n", "end", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", duration, "s");
-    Print(0, "", "stats summary", ":");
+    Print(0, "\n", "stats summary", ":");
     for(std::string key: vStatsSummaryKeys) {
       Print(0, "\t", SW{30, true}, key, ":", SW{10}, mStatsSummary[key]);
     }
@@ -589,6 +588,7 @@ namespace rrr {
     for(std::string key: vTimesSummaryKeys) {
       Print(0, "\t", SW{30, true}, key, ":", mTimesSummary[key], "s", "(", 100 * mTimesSummary[key] / duration, "%", ")");
     }
+    Print(0, "", "end", ":", "cost", "=", cost, "(", 100 * (cost - costStart) / costStart, "%", ")", ",", "time", "=", duration, "s");
   }
 
   /* }}} */
