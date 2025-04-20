@@ -66,7 +66,9 @@ namespace rrr {
     void Reserve(int nReserve);
     int  AddPi();
     int  AddAnd(int id0, int id1, bool c0, bool c1);
+    int  AddAnd(std::vector<int> const &vFanins, std::vector<bool> const &vCompls);
     int  AddPo(int id, bool c);
+    void Read(AndNetwork *pFrom, bool fNew = true);
     template <typename Ntk, typename Reader>
     void Read(Ntk *pFrom, Reader &reader, bool fNew = true);
 
@@ -320,6 +322,21 @@ namespace rrr {
     return nNodes++;
   }
 
+  inline int AndNetwork::AddAnd(std::vector<int> const &vFanins, std::vector<bool> const &vCompls) {
+    lInts.push_back(nNodes);
+    sInts.insert(nNodes);
+    assert(vFanins.size() == vCompls.size());
+    vvFaninEdges.emplace_back(vFanins.size());
+    for(int i = 0; i < int_size(vFanins); i++) {
+      assert(vFanins[i] < nNodes);
+      vRefs[vFanins[i]]++;
+      vvFaninEdges[nNodes][i] = Node2Edge(vFanins[i], vCompls[i]);
+    }
+    vRefs.push_back(0);
+    assert(!check_int_max(nNodes));
+    return nNodes++;
+  }
+
   inline int AndNetwork::AddPo(int id, bool c) {
     assert(id < nNodes);
     vPos.push_back(nNodes);
@@ -328,6 +345,21 @@ namespace rrr {
     vRefs.push_back(0);
     assert(!check_int_max(nNodes));
     return nNodes++;
+  }
+
+  inline void AndNetwork::Read(AndNetwork *pFrom, bool fNew) {
+    Clear(false);
+    nNodes       = pFrom->nNodes;
+    vPis         = pFrom->vPis;
+    lInts        = pFrom->lInts;
+    sInts        = pFrom->sInts;
+    vPos         = pFrom->vPos;
+    vvFaninEdges = pFrom->vvFaninEdges;
+    vRefs        = pFrom->vRefs;
+    Action action;
+    action.type = READ;
+    action.fNew = fNew;
+    TakenAction(action);
   }
 
   template <typename Ntk, typename Reader>
