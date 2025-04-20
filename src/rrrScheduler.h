@@ -221,7 +221,7 @@ namespace rrr {
       std::mt19937 rng(pJob->iSeed);
       double cost = pJob->costInitial;
       double costBest = cost;
-      Ntk best(*(pJob->pNtk));
+      int slot = pJob->pNtk->Save();
       for(int i = 0; i < 10; i++) {
         if(GetRemainingTime() < 0) {
           break;
@@ -247,18 +247,19 @@ namespace rrr {
         }
         if(cost < costBest) {
           costBest = cost;
-          best = *(pJob->pNtk);
+          pJob->pNtk->Save(slot);
           i = 0;
         }
       }
-      *(pJob->pNtk) = best;
+      pJob->pNtk->Load(slot);
+      pJob->pNtk->PopBack();
       break;
     }
     case 2: { // deep
       std::mt19937 rng(pJob->iSeed);
       int n = 0;
       double cost = pJob->costInitial;
-      Ntk best(*(pJob->pNtk));
+      int slot = pJob->pNtk->Save();
       for(int i = 0; i < 1000000; i++) {
         if(GetRemainingTime() < 0) {
           break;
@@ -306,12 +307,13 @@ namespace rrr {
         double costNew = CostFunction(pJob->pNtk);
         if(costNew < cost) {
           cost = costNew;
-          best = *(pJob->pNtk);
+          pJob->pNtk->Save(slot);
         } else {
           n++;
         }
       }
-      *(pJob->pNtk) = best;
+      pJob->pNtk->Load(slot);
+      pJob->pNtk->PopBack();
       break;
     }
     case 3:
@@ -566,7 +568,7 @@ namespace rrr {
           Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", "duration", "=", pJob->duration, "s", ",", "elapsed", "=", GetElapsedTime(), "s");
           if(cost < costBest) {
             costBest = cost;
-            *pNtk = *(pJob->pNtk);
+            pNtk->Read(*(pJob->pNtk), false);
           }
           delete pJob->pNtk;
         });

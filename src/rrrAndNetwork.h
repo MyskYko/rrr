@@ -53,22 +53,22 @@ namespace rrr {
     unsigned StartTraversal(int n = 1);
     void EndTraversal();
     void ForEachTfiRec(int id, std::function<void(int)> const &func);
+    void Copy(AndNetwork const &from);
     void TakenAction(Action const &action) const;
 
   public:
     // constructors
     AndNetwork();
     AndNetwork(AndNetwork const &x);
-    AndNetwork &operator=(AndNetwork const &x);
 
     // initialization APIs (should not be called after optimization has started)
-    void Clear(bool fClearCallbacks = true);
+    void Clear(bool fClearCallbacks = true, bool fClearBackups = true);
     void Reserve(int nReserve);
     int  AddPi();
     int  AddAnd(int id0, int id1, bool c0, bool c1);
     int  AddAnd(std::vector<int> const &vFanins, std::vector<bool> const &vCompls);
     int  AddPo(int id, bool c);
-    void Read(AndNetwork *pFrom, bool fNew = true);
+    void Read(AndNetwork const &from, bool fNew = true);
     template <typename Ntk, typename Reader>
     void Read(Ntk *pFrom, Reader &reader, bool fNew = true);
 
@@ -224,6 +224,16 @@ namespace rrr {
     }
   }
 
+  inline void AndNetwork::Copy(AndNetwork const &from) {
+    nNodes       = from.nNodes;
+    vPis         = from.vPis;
+    lInts        = from.lInts;
+    sInts        = from.sInts;
+    vPos         = from.vPos;
+    vvFaninEdges = from.vvFaninEdges;
+    vRefs        = from.vRefs;
+  }
+
   inline void AndNetwork::TakenAction(Action const &action) const {
     for(Callback const &callback: vCallbacks) {
       callback(action);
@@ -249,31 +259,14 @@ namespace rrr {
     fLockTrav(false),
     iTrav(0),
     fPropagating(false) {
-    nNodes       = x.nNodes;
-    vPis         = x.vPis;
-    lInts        = x.lInts;
-    sInts        = x.sInts;
-    vPos         = x.vPos;
-    vvFaninEdges = x.vvFaninEdges;
-    vRefs        = x.vRefs;
-  }
-  
-  AndNetwork &AndNetwork::operator=(AndNetwork const &x) {
-    nNodes       = x.nNodes;
-    vPis         = x.vPis;
-    lInts        = x.lInts;
-    sInts        = x.sInts;
-    vPos         = x.vPos;
-    vvFaninEdges = x.vvFaninEdges;
-    vRefs        = x.vRefs;
-    return *this;
+    Copy(x);
   }
   
   /* }}} */
 
   /* {{{ Initialization APIs */
 
-  void AndNetwork::Clear(bool fClearCallbacks) {
+  void AndNetwork::Clear(bool fClearCallbacks, bool fClearBackups) {
     nNodes = 0;
     vPis.clear();
     lInts.clear();
@@ -288,7 +281,9 @@ namespace rrr {
     if(fClearCallbacks) {
       vCallbacks.clear();
     }
-    vBackups.clear();
+    if(fClearBackups) {
+      vBackups.clear();
+    }
     // add constant node
     vvFaninEdges.emplace_back();
     vRefs.push_back(0);
@@ -347,15 +342,9 @@ namespace rrr {
     return nNodes++;
   }
 
-  inline void AndNetwork::Read(AndNetwork *pFrom, bool fNew) {
-    Clear(false);
-    nNodes       = pFrom->nNodes;
-    vPis         = pFrom->vPis;
-    lInts        = pFrom->lInts;
-    sInts        = pFrom->sInts;
-    vPos         = pFrom->vPos;
-    vvFaninEdges = pFrom->vvFaninEdges;
-    vRefs        = pFrom->vRefs;
+  inline void AndNetwork::Read(AndNetwork const &from, bool fNew) {
+    Clear(false, fNew);
+    Copy(from);
     Action action;
     action.type = READ;
     action.fNew = fNew;
@@ -364,7 +353,7 @@ namespace rrr {
 
   template <typename Ntk, typename Reader>
   void AndNetwork::Read(Ntk *pFrom, Reader &reader, bool fNew) {
-    Clear(false);
+    Clear(false, fNew);
     reader(pFrom, this);
     Action action;
     action.type = READ;
@@ -1601,11 +1590,11 @@ namespace rrr {
     action.type = SAVE;
     if(slot < 0) {
       slot = int_size(vBackups);
-      vBackups.push_back(*this);
+      vBackups.emplace_back(*this);
       assert(check_int_size(vBackups));
     } else {
       assert(slot < int_size(vBackups));
-      vBackups[slot] = *this;
+      vBackups[slot].Copy(*this);
     }
     action.idx = slot;
     TakenAction(action);
@@ -1618,7 +1607,7 @@ namespace rrr {
     Action action;
     action.type = LOAD;
     action.idx = slot;
-    *this = vBackups[slot];
+    Copy(vBackups[slot]);
     TakenAction(action);
   }
 

@@ -444,7 +444,7 @@ namespace rrr {
       ntk.AddPo(fi, c);
     });
     // read
-    pNtk->Read(&ntk, true);
+    pNtk->Read(ntk, true);
   }
 
   /* }}} */
