@@ -300,7 +300,7 @@ namespace rrr {
       }
       break;
     case READ:
-      Reset(!action.fNew);
+      Reset(true);
       break;
     case SAVE:
       Save(action.idx);

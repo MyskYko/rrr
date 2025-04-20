@@ -50,7 +50,6 @@ namespace rrr {
     int idx = -1;
     int fi = -1;
     bool c = false;
-    bool fNew = false;
     std::vector<int> vFanins;
     std::vector<int> vIndices;
     std::vector<int> vFanouts;

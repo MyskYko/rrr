@@ -568,7 +568,7 @@ namespace rrr {
           Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", "duration", "=", pJob->duration, "s", ",", "elapsed", "=", GetElapsedTime(), "s");
           if(cost < costBest) {
             costBest = cost;
-            pNtk->Read(*(pJob->pNtk), false);
+            pNtk->Read(*(pJob->pNtk));
           }
           delete pJob->pNtk;
         });

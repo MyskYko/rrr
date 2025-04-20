@@ -268,9 +268,6 @@ namespace rrr {
       break;
     case READ:
       fInitialized = false;
-      if(action.fNew) {
-        fGenerated = false;
-      }
       break;
     case SAVE:
       Save(action.idx);

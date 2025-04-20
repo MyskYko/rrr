@@ -351,9 +351,6 @@ namespace rrr {
       ss << delim;
       PrintNext(ss, "index", action.idx);
     }
-    if(action.fNew) {
-      ss << " new";
-    }
     ss << std::endl;
     if(!action.vFanins.empty()) {
       ss << "fanins : ";

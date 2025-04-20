@@ -68,12 +68,13 @@ namespace rrr {
     int  AddAnd(int id0, int id1, bool c0, bool c1);
     int  AddAnd(std::vector<int> const &vFanins, std::vector<bool> const &vCompls);
     int  AddPo(int id, bool c);
-    void Read(AndNetwork const &from, bool fNew = true);
+    void Read(AndNetwork const &from);
     template <typename Ntk, typename Reader>
-    void Read(Ntk const &from, Reader const &reader, bool fNew = true);
+    void Read(Ntk &from, Reader const &reader);
 
     // network properties
     bool UseComplementedEdges() const;
+    bool HasMultipleNodeTypes() const;
     int  GetNumNodes() const; // number of allocated nodes (max id + 1)
     int  GetNumPis() const;
     int  GetNumInts() const;
@@ -342,22 +343,20 @@ namespace rrr {
     return nNodes++;
   }
 
-  inline void AndNetwork::Read(AndNetwork const &from, bool fNew) {
-    Clear(false, fNew);
+  inline void AndNetwork::Read(AndNetwork const &from) {
+    Clear(false, false);
     Copy(from);
     Action action;
     action.type = READ;
-    action.fNew = fNew;
     TakenAction(action);
   }
 
   template <typename Ntk, typename Reader>
-  void AndNetwork::Read(Ntk const &from, Reader const &reader, bool fNew) {
-    Clear(false, fNew);
+  void AndNetwork::Read(Ntk &from, Reader const &reader) {
+    Clear(false, false);
     reader(from, this);
     Action action;
     action.type = READ;
-    action.fNew = fNew;
     TakenAction(action);
   }
   
@@ -367,6 +366,10 @@ namespace rrr {
   
   inline bool AndNetwork::UseComplementedEdges() const {
     return true;
+  }
+  
+  inline bool AndNetwork::HasMultipleNodeTypes() const {
+    return false;
   }
   
   inline int AndNetwork::GetNumNodes() const {
