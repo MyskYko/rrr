@@ -439,10 +439,14 @@ namespace rrr {
       vOld2New[id] = ntk.AddPi();
       vUniques[id] = idx + 1;
     });
+    std::vector<std::pair<int, bool>> vPoDrivers;
     pNtk->ForEachPoDriver([&](int id, bool c) {
       int fi = ConstructRec(&ntk, id);
-      ntk.AddPo(fi, c);
+      vPoDrivers.emplace_back(fi, c);
     });
+    for(std::pair<int, bool> const &entry: vPoDrivers) {
+      ntk.AddPo(entry.first, entry.second);
+    }
     // read
     pNtk->Read(ntk);
   }
@@ -450,37 +454,3 @@ namespace rrr {
   /* }}} */
   
 }
-
-
-
-
-/*
-
-
-
-
-
-
-
-
-
-
-
-
-int Gia_ObjFixedCompareByValue( Gia_Obj_t ** pp1, Gia_Obj_t ** pp2 )
-{
-    Gia_Obj_t * pObj1 = *pp1;
-    Gia_Obj_t * pObj2 = *pp2;
-//    assert( pObj1->Value != pObj2->Value );
-    return (int)pObj1->Value - (int)pObj2->Value;
-}
-void Gia_ManFixedFindCaninicalOrder( Gia_Man_t * p, Vec_Int_t * vCis, Vec_Int_t * vAnds, Vec_Int_t * vCos, Vec_Int_t ** pvPiPerm )
-{
-}
-
-
-
-Gia_Man_t * Gia_ManCanonicalize( Gia_Man_t * p, int fKeepIoOrder, int fVerbose )
-{
-}
-*/

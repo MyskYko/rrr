@@ -124,6 +124,8 @@ namespace rrr {
     template <typename Func>
     void ForEachFaninIdx(int id, Func const &func) const; // func(index of fi in fanin list of id, fi[, c])
     template <typename Func>
+    void ForEachFaninReverse(int id, Func const &func) const;
+    template <typename Func>
     void ForEachFanout(int id, bool fPos, Func const &func) const;
     template <typename Func>
     void ForEachFanoutRidx(int id, bool fPos, Func const &func) const; // func(fo[, c], index of id in fanin list of fo)
@@ -832,6 +834,18 @@ namespace rrr {
     }
   }
   
+  template <typename Func>
+  inline void AndNetwork::ForEachFaninReverse(int id, Func const &func) const {
+    static_assert(is_invokable<Func, int>::value || is_invokable<Func, int, bool>::value, "for each edge function format error");
+    for(std::vector<int>::const_reverse_iterator it = vvFaninEdges[id].rbegin(); it != vvFaninEdges[id].rend(); it++) {
+      if constexpr(is_invokable<Func, int>::value) {
+        func(Edge2Node(*it));
+      } else if constexpr(is_invokable<Func, int, bool>::value) {
+        func(Edge2Node(*it), EdgeIsCompl(*it));
+      }
+    }
+  }
+
   template <typename Func>
   inline void AndNetwork::ForEachFanout(int id, bool fPos, Func const &func) const {
     static_assert(is_invokable<Func, int>::value || is_invokable<Func, int, bool>::value, "for each edge function format error");
