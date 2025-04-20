@@ -70,7 +70,7 @@ namespace rrr {
     int  AddPo(int id, bool c);
     void Read(AndNetwork const &from, bool fNew = true);
     template <typename Ntk, typename Reader>
-    void Read(Ntk *pFrom, Reader &reader, bool fNew = true);
+    void Read(Ntk const &from, Reader const &reader, bool fNew = true);
 
     // network properties
     bool UseComplementedEdges() const;
@@ -352,9 +352,9 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Reader>
-  void AndNetwork::Read(Ntk *pFrom, Reader &reader, bool fNew) {
+  void AndNetwork::Read(Ntk const &from, Reader const &reader, bool fNew) {
     Clear(false, fNew);
-    reader(pFrom, this);
+    reader(from, this);
     Action action;
     action.type = READ;
     action.fNew = fNew;
