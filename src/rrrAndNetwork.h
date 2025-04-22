@@ -154,6 +154,7 @@ namespace rrr {
     void RemoveConst(int id);
     void AddFanin(int id, int fi, bool c);
     void TrivialCollapse(int id);
+    void TrivialCollapse();
     void TrivialDecompose(int id);
     template <typename Func>
     void SortFanins(int id, Func const &cost);
@@ -169,7 +170,8 @@ namespace rrr {
     void PopBack(); // deletes the last entry of backups
 
     // misc
-    void AddCallback(Callback const &callback);
+    int AddCallback(Callback const &callback);
+    void DeleteCallback(int index);
     void Print() const;
   };
 
@@ -1422,6 +1424,15 @@ namespace rrr {
       }
     }
   }
+  
+  void AndNetwork::TrivialCollapse() {
+    std::list<int> lInts_ = lInts;
+    for(critr it = lInts_.rbegin(); it != lInts_.rend(); it++) {
+      if(IsInt(*it)) {
+        TrivialCollapse(*it);
+      }
+    }
+  }
 
   void AndNetwork::TrivialDecompose(int id) {
     while(GetNumFanins(id) > 2) {
@@ -1641,8 +1652,15 @@ namespace rrr {
   
   /* {{{ Misc */
 
-  void AndNetwork::AddCallback(Callback const &callback) {
+  int AndNetwork::AddCallback(Callback const &callback) {
     vCallbacks.push_back(callback);
+    return int_size(vCallbacks) - 1;
+  }
+
+  void AndNetwork::DeleteCallback(int index) {
+    vCallbacks[index] = [&](Action const &action) {
+      (void)action;
+    };
   }
   
   void AndNetwork::Print() const {

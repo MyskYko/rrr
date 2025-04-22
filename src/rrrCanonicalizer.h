@@ -246,6 +246,7 @@ namespace rrr {
       }
     }
     // print the results
+    /*
     for(int i = 0; i < int_size(vClasses) / 2; i++) {
       std::cout << "class " << i << "(" << vClasses[i + i] << ", " << vClasses[i + i + 1] << "):" << std::endl << "\t";
       for(int j = 0; j < vClasses[i + i + 1]; j++) {
@@ -261,6 +262,7 @@ namespace rrr {
       }
     });
     std::cout << std::endl;
+    */
   }
 
   template <typename Ntk>
