@@ -82,10 +82,12 @@ namespace rrr {
         encode(ss, fi_edge);
       });
       */
+      /* this must have been done by canonicalizer
       pNtk->SortFanins(id, [&](int i, bool ci, int j, bool cj) {
         (void)ci;
         return i < j || (i == j && cj);
       });
+      */
       int base = id << 1;
       pNtk->ForEachFaninReverse(id, [&](int fi, bool c) {
         int fi_edge = (fi << 1) + (int)c;

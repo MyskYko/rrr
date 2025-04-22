@@ -385,13 +385,22 @@ namespace rrr {
     });
     std::sort(vFaninIdxs.begin(), vFaninIdxs.end());
     int i = 0;
-    std::vector<int> vFanins(vFaninIdxs.size());
-    std::vector<bool> vCompls(vFaninIdxs.size());
+    std::vector<std::pair<int, bool>> vFaninEdges(vFaninIdxs.size());
     for(std::pair<int, int> const &entry: vFaninIdxs) {
       int idx = entry.second;
       int fi = pNtk->GetFanin(id, idx);
-      vFanins[i] = ConstructRec(pNew, fi);
-      vCompls[i] = pNtk->GetCompl(id, idx);
+      vFaninEdges[i].first = ConstructRec(pNew, fi);
+      vFaninEdges[i].second = pNtk->GetCompl(id, idx);
+      i++;
+    }
+    // sort fanin by id
+    std::sort(vFaninEdges.begin(), vFaninEdges.end());
+    std::vector<int> vFanins(vFaninIdxs.size());
+    std::vector<bool> vCompls(vFaninIdxs.size());
+    i = 0;
+    for(std::pair<int, bool> const &entry: vFaninEdges) {
+      vFanins[i] = entry.first;
+      vCompls[i] = entry.second;
       i++;
     }
     vOld2New[id] = pNew->AddAnd(vFanins, vCompls);
