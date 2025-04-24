@@ -189,7 +189,7 @@ namespace rrr {
       //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "phase", "=", (pJob->fAdd? "   add": "reduce"), ",", "choice", "=", int_size(v));
       CreateJobs(pJob->src, v, false);
       delete pJob->target.first;
-    } else if(!pJob->fAdd && pJob->target.second.back().type != ADD_FANIN) {
+    } else if(!pJob->fAdd && (pJob->target.second.empty() || pJob->target.second.back().type != ADD_FANIN)) {
       Canonicalizer<Ntk> can;
       can.Run(pJob->target.first);
       std::string str = CreateBinary(pJob->target.first);
@@ -267,10 +267,25 @@ namespace rrr {
   void Scheduler2<Ntk, Opt, Par>::Wait() {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
-      {
-        std::unique_lock<std::mutex> l(mutexFinishedJobs);
-        while(nCreatedJobs > nFinishedJobs) {
-          condFinishedJobs.wait(l);
+      while(true) {
+        int nFinishedJobs_;
+        {
+          std::unique_lock<std::mutex> l(mutexFinishedJobs);
+          nFinishedJobs_ = nFinishedJobs;
+        }
+        int nCreatedJobs_;
+        {
+          std::unique_lock<std::mutex> l(mutexPendingJobs);
+          if(nCreatedJobs == nFinishedJobs) {
+            break;
+          }
+          nCreatedJobs_ = nCreatedJobs;
+        }
+        {
+          std::unique_lock<std::mutex> l(mutexFinishedJobs);
+          while(nCreatedJobs_ > nFinishedJobs) {
+            condFinishedJobs.wait(l);
+          }
         }
       }
       return;
@@ -374,25 +389,38 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler2<Ntk, Opt, Par>::Run() {
-    // some preprocessing
-    pOpt->Prepare(pOriginal);
-    Canonicalizer<Ntk> can;
-    can.Run(pOriginal);
-    std::string str = CreateBinary(pOriginal);
-    std::vector<Action> vActions;
-    int index;
-    Register(str, 0, vActions, index);
-    
-    // create the first job
-    Ntk *pNtk = new Ntk;
-    pNtk->Read(str, BinaryReader<Ntk>);
-    std::pair<Ntk *, std::vector<Action>> input(pNtk, vActions);
-    CreateJob(index, input, true);
+    bool fPreprocess = false;
+    if(fPreprocess) {
+      // some preprocessing
+      pOpt->Prepare(pOriginal);
+      Print(-1, "","preprocessed", "=", CostFunction(pOriginal));
+      Canonicalizer<Ntk> can;
+      can.Run(pOriginal);
+      std::string str = CreateBinary(pOriginal);
+      std::vector<Action> vActions;
+      int index;
+      Register(str, 0, vActions, index);
+      
+      // create the first job
+      Ntk *pNtk = new Ntk;
+      pNtk->Read(str, BinaryReader<Ntk>);
+      std::pair<Ntk *, std::vector<Action>> input(pNtk, vActions);
+      CreateJob(index, input, true);
+    } else {
+      pOriginal->Sweep(true);
+      pOriginal->TrivialCollapse();
+      Canonicalizer<Ntk> can;
+      can.Run(pOriginal);
+      Ntk *pNtk = new Ntk(*pOriginal);
+      std::vector<Action> vActions;
+      std::pair<Ntk *, std::vector<Action>> input(pNtk, vActions);
+      CreateJob(-1, input, false);
+    }
 
     // wait until all jobs are done
     Wait();
 
-    Print(0, "","unique", "=", nUniques);
+    Print(-1, "","unique", "=", nUniques);
     
     // for(std::string s: strs) {
     //   Ntk a;

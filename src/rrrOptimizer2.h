@@ -190,10 +190,9 @@ namespace rrr {
         }
       });
     } else {
-      assert(!input.second.empty());
       int added_id = -1;
       int added_fi = -1;
-      if(input.second.back().type == ADD_FANIN) {
+      if(!input.second.empty() && input.second.back().type == ADD_FANIN) {
         added_id = input.second.back().id;
         added_fi = input.second.back().fi;
       }
