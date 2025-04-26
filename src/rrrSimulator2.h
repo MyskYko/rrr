@@ -267,6 +267,7 @@ namespace rrr {
     case SAVE:
       break;
     case LOAD:
+      fInitialized = false;
       break;
     case POP_BACK:
       break;
@@ -455,7 +456,6 @@ namespace rrr {
       Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
     });
     fGenerated = true;
-    std::cout << vValues.size() << std::endl;
   }
 
   /* }}} */
