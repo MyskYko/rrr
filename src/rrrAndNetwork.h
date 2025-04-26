@@ -7,6 +7,7 @@
 
 #include "rrrParameter.h"
 #include "rrrUtils.h"
+#include "rrrPattern.h"
 
 namespace rrr {
 
@@ -27,6 +28,9 @@ namespace rrr {
     std::vector<int> vPos;
     std::vector<std::vector<int>> vvFaninEdges; // complementable edges, no duplicated fanins allowed (including complements), and nodes without fanins are treated as const-1
     std::vector<int> vRefs; // reference count (number of fanouts)
+
+    // pattern
+    Pattern *pPat;
 
     // mark for network traversal
     bool fLockTrav;
@@ -172,6 +176,8 @@ namespace rrr {
     // misc
     int AddCallback(Callback const &callback);
     void DeleteCallback(int index);
+    void RegisterPattern(Pattern *pPat_);
+    Pattern *GetPattern();
     void Print() const;
   };
 
@@ -237,6 +243,7 @@ namespace rrr {
     vPos         = from.vPos;
     vvFaninEdges = from.vvFaninEdges;
     vRefs        = from.vRefs;
+    pPat         = from.pPat;
   }
 
   inline void AndNetwork::TakenAction(Action const &action) const {
@@ -251,6 +258,7 @@ namespace rrr {
 
   AndNetwork::AndNetwork() :
     nNodes(0),
+    pPat(NULL),
     fLockTrav(false),
     iTrav(0),
     fPropagating(false) {
@@ -279,6 +287,7 @@ namespace rrr {
     vPos.clear();
     vvFaninEdges.clear();
     vRefs.clear();
+    pPat = NULL;
     fLockTrav = false;
     iTrav = 0;
     vTrav.clear();
@@ -1661,6 +1670,14 @@ namespace rrr {
     vCallbacks[index] = [&](Action const &action) {
       (void)action;
     };
+  }
+
+  void AndNetwork::RegisterPattern(Pattern *pPat_) {
+    pPat = pPat_;
+  }
+
+  Pattern *AndNetwork::GetPattern() {
+    return pPat;
   }
   
   void AndNetwork::Print() const {
