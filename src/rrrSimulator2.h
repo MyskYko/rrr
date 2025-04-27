@@ -37,6 +37,10 @@ namespace rrr {
     std::vector<word> care; // careset
     std::vector<word> tmp;
 
+    // marks
+    unsigned iTrav;
+    std::vector<unsigned> vTrav;
+
     // partial cex
     int iPivot;
     std::vector<word> vAssignedStimuli;
@@ -67,6 +71,9 @@ namespace rrr {
     // callback
     void ActionCallback(Action const &action);
 
+    // topology
+    unsigned StartTraversal(int n = 1);
+    
     // simulation
     void SimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     bool ResimulateNode(std::vector<word> &v, int id, int to_negate = -1);
@@ -281,6 +288,25 @@ namespace rrr {
   
   /* }}} */
 
+  /* {{{ Topology */
+  
+  template <typename Ntk>
+  inline unsigned Simulator2<Ntk>::StartTraversal(int n) {
+    do {
+      for(int i = 0; i < n; i++) {
+        iTrav++;
+        if(iTrav == 0) {
+          vTrav.clear();
+          break;
+        }
+      }
+    } while(iTrav == 0);
+    vTrav.resize(pNtk->GetNumNodes());
+    return iTrav - n + 1;
+  }
+
+  /* }}} */
+  
   /* {{{ Simulation */
   
   template <typename Ntk>
@@ -519,31 +545,57 @@ namespace rrr {
       durationCare += Duration(timeStart, GetCurrentTime());
       return;
     }
-    vValues2 = vValues;
+    // alternative of vValues2 = vValues;
+    vValues2.resize(nStimuli * pNtk->GetNumNodes());
+    StartTraversal();
     pNtk->ForEachTfo(target, false, [&](int id) {
-      SimulateNode(vValues2, id, target);
+      // alternative of SimulateNode(vValues2, id, target);
+      int to_negate = target;
+      itr x = vValues2.end();
+      itr y = vValues2.begin() + id * nStimuli;
+      bool cx = false;
+      switch(pNtk->GetNodeType(id)) {
+      case AND:
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(x == vValues2.end()) {
+            if(vTrav[fi] != iTrav) {
+              x = vValues.begin() + fi * nStimuli;
+            } else {
+              x = vValues2.begin() + fi * nStimuli;
+            }
+            cx = c ^ (fi == to_negate);
+          } else {
+            if(vTrav[fi] != iTrav) {
+              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+            } else {
+              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+            }
+            x = y;
+            cx = false;
+          }
+        });
+        if(x == vValues2.end()) {
+          Fill(nStimuli, y);
+        }
+      break;
+      default:
+        assert(0);
+      }
+      vTrav[id] = iTrav;
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nStimuli, vValues2.begin() + id * nStimuli);
         std::cout << std::endl;
       }
     });
-    /* alternative version that updates only affected TFO
-    pNtk->ForEachTfoUpdate(target, false, [&](int id) {
-      bool fUpdated = ResimulateNode(vValues2, id, target);
-      if(nVerbose) {
-        std::cout << "node " << std::setw(3) << id << ": ";
-        Print(nStimuli, vValues2.begin() + id * nStimuli);
-        std::cout << std::endl;
-      }
-      return fUpdated;
-    });
-    */
     Clear(nStimuli, care.begin());
     pNtk->ForEachPoDriver([&](int fi) {
       assert(fi != target);
       for(int i = 0; i < nStimuli; i++) {
-        care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+        // skip unaffected POs
+        if(vTrav[fi] == iTrav) {
+          care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+        }
       }
     });
     if(nVerbose) {
@@ -632,6 +684,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     target(-1),
+    iTrav(0),
     iPivot(0),
     fUpdate(false) {
     ResetSummary();
@@ -646,6 +699,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     target(-1),
+    iTrav(0),
     iPivot(0),
     fUpdate(false) {
     care.resize(nWords);
