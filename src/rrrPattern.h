@@ -9,13 +9,14 @@ namespace rrr {
   class Pattern {
   private:
     using word = unsigned long long;
-  public:
+
     int nWords;
     std::vector<std::vector<word>> data;
 
   public:
     void Read(std::string filename, int nInputs = 1);
-    std::vector<word>::const_iterator GetIterator(int index);
+    std::vector<word>::const_iterator GetIterator(int index) const;
+    int GetNumWords() const;
   };
 
   void Pattern::Read(std::string filename, int nInputs) {
@@ -57,7 +58,11 @@ namespace rrr {
     }
   }
 
-  std::vector<unsigned long long>::const_iterator Pattern::GetIterator(int index) {
+  std::vector<unsigned long long>::const_iterator Pattern::GetIterator(int index) const {
     return data[index].cbegin();
+  }
+
+  int Pattern::GetNumWords() const {
+    return nWords;
   }
 }

@@ -450,7 +450,7 @@ namespace rrr {
 
   template <typename Ntk>
   void Simulator2<Ntk>::ReadStimuli(Pattern *pPat) {
-    nWords = pPat->nWords;
+    nWords = pPat->GetNumWords();
     vValues.resize(nWords * pNtk->GetNumNodes());
     pNtk->ForEachPiIdx([&](int index, int id) {
       Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
