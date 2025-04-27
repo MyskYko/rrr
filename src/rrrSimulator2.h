@@ -71,6 +71,7 @@ namespace rrr {
     void SimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     bool ResimulateNode(std::vector<word> &v, int id, int to_negate = -1);
     void SimulateOneWordNode(std::vector<word> &v, int id, int offset, int to_negate = -1);
+    void SimulatePartNode(std::vector<word> &v, int id, int n, int offset, int to_negate = -1);
     void Simulate();
     void Resimulate();
     void SimulateOneWord(int offset);
@@ -81,6 +82,7 @@ namespace rrr {
 
     // careset computation
     void ComputeCare(int id);
+    void ComputeCarePart(int nWords_, int offset);
 
     // preparation
     void Initialize();
@@ -365,6 +367,32 @@ namespace rrr {
   }
   
   template <typename Ntk>
+  void Simulator2<Ntk>::SimulatePartNode(std::vector<word> &v, int id, int n, int offset, int to_negate) {
+    itr x = v.end();
+    itr y = v.begin() + id * nStimuli + offset;
+    bool cx = false;
+    switch(pNtk->GetNodeType(id)) {
+    case AND:
+      pNtk->ForEachFanin(id, [&](int fi, bool c) {
+        if(x == v.end()) {
+          x = v.begin() + fi * nStimuli + offset;
+          cx = c ^ (fi == to_negate);
+        } else {
+          And(n, y, x, v.begin() + fi * nStimuli + offset, cx, c ^ (fi == to_negate));
+          x = y;
+          cx = false;
+        }
+      });
+      if(x == v.end()) {
+        Fill(n, y);
+      }
+      break;
+    default:
+      assert(0);
+    }
+  }
+  
+  template <typename Ntk>
   void Simulator2<Ntk>::Simulate() {
     time_point timeStart = GetCurrentTime();
     if(nVerbose) {
@@ -525,7 +553,43 @@ namespace rrr {
     }
     durationCare += Duration(timeStart, GetCurrentTime());
   }
-  
+
+  template <typename Ntk>
+  void Simulator2<Ntk>::ComputeCarePart(int nWords_, int offset) {
+    if(nVerbose) {
+      std::cout << "computing careset of " << target << " offset " << offset << std::endl;
+    }
+    if(pNtk->IsPoDriver(target)) {
+      Fill(nWords_, care.begin());
+      if(nVerbose) {
+        std::cout << "care " << std::setw(3) << target << ": ";
+        Print(nWords_, care.begin());
+        std::cout << std::endl;
+      }
+      return;
+    }
+    pNtk->ForEachTfo(target, false, [&](int id) {
+      SimulatePartNode(vValues2, id, nWords_, offset, target);
+      if(nVerbose) {
+        std::cout << "node " << std::setw(3) << id << ": ";
+        Print(nWords_, vValues2.begin() + id * nStimuli + offset);
+        std::cout << std::endl;
+      }
+    });
+    Clear(nWords_, care.begin());
+    pNtk->ForEachPoDriver([&](int fi) {
+      assert(fi != target);
+      for(int i = 0; i < nWords_; i++) {
+        care[i] = care[i] | (vValues[fi * nStimuli + i + offset] ^ vValues2[fi * nStimuli + i + offset]);
+      }
+    });
+    if(nVerbose) {
+      std::cout << "care " << std::setw(3) << target << ": ";
+      Print(nWords_, care.begin());
+      std::cout << std::endl;
+    }
+  }
+
   /* }}} */
 
   /* {{{ Preparation */
@@ -603,6 +667,8 @@ namespace rrr {
     Pattern *pPat = pNtk->GetPattern();
     if(pPat) {
       ReadStimuli(pPat);
+      care.resize(nStimuli);
+      tmp.resize(nStimuli);
     }
   }
 
@@ -648,6 +714,67 @@ namespace rrr {
       assert(0);
     }
     return false;
+    /* simulate for every nWords 
+    assert(nStimuli > nWords);
+    // prepare sim
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
+    if(!sUpdates.empty()) {
+      Resimulate();
+      sUpdates.clear();
+    }
+    target = id;
+    // check for every nWords
+    time_point timeStart = GetCurrentTime();
+    vValues2 = vValues;
+    int offset = 0;
+    bool fRedundant = true;
+    while(fRedundant && offset < nStimuli) {
+      int nWords_ = nWords;
+      if(offset + nWords > nStimuli) {
+        nWords_ = nStimuli - offset;
+      }
+      ComputeCarePart(nWords_, offset);
+      // check
+      switch(pNtk->GetNodeType(id)) {
+      case AND: {
+        itr x = vValues.end();
+        bool cx = false;
+        pNtk->ForEachFaninIdx(id, [&](int idx2, int fi, bool c) {
+          if(idx == idx2) {
+            return;
+          }
+          if(x == vValues.end()) {
+            x = vValues.begin() + fi * nStimuli + offset;
+            cx = c;
+          } else {
+            And(nWords_, tmp.begin(), x, vValues.begin() + fi * nStimuli + offset, cx, c);
+            x = tmp.begin();
+            cx = false;
+          }
+        });
+        if(x == vValues.end()) {
+          x = care.begin();
+        } else {
+          And(nWords_, tmp.begin(), x, care.begin(), cx, false);
+          x = tmp.begin();
+        }
+        int fi = pNtk->GetFanin(id, idx);
+        bool c = pNtk->GetCompl(id, idx);
+        And(nWords_, tmp.begin(), x, vValues.begin() + fi * nStimuli + offset, false, !c);
+        fRedundant &= IsZero(nWords_, tmp.begin());
+        break;
+      }
+      default:
+        assert(0);
+      }
+      offset += nWords;
+    }
+    durationCare += Duration(timeStart, GetCurrentTime());
+    return fRedundant;
+    */
   }
 
   template <typename Ntk>
