@@ -884,10 +884,10 @@ namespace rrr {
     std::vector<int> vCarePiIdxs;
     for(int idx = 0; idx < pNtk->GetNumPis(); idx++) {
       switch(vCex[idx]) {
-      case TRUE:
+      case rrrTRUE:
         vCarePiIdxs.push_back(idx);
         break;
-      case FALSE:
+      case rrrFALSE:
         vCarePiIdxs.push_back(idx);
         break;
       default:
@@ -904,10 +904,10 @@ namespace rrr {
       for(int idx: vCarePiIdxs) {
         int id = pNtk->GetPi(idx);
         bool c;
-        if(vCex[idx] == TRUE) {
+        if(vCex[idx] == rrrTRUE) {
           c = false;
         } else {
-          assert(vCex[idx] == FALSE);
+          assert(vCex[idx] == rrrFALSE);
           c = true;
         }
         itr x = vValues.begin() + id * nStimuli + iWord;
@@ -959,10 +959,10 @@ namespace rrr {
     for(int idx: vCarePiIdxs) {
       int id = pNtk->GetPi(idx);
       word mask = 1ull << iBit;
-      if(vCex[idx] == TRUE) {
+      if(vCex[idx] == rrrTRUE) {
         vValues[id * nStimuli + iWord] |= mask;
       } else {
-        assert(vCex[idx] == FALSE);
+        assert(vCex[idx] == rrrFALSE);
         vValues[id * nStimuli + iWord] &= ~mask;
       }
       vAssignedStimuli[idx * nStimuli + iWord] |= mask;

@@ -21,8 +21,8 @@ namespace rrr {
 
   enum VarValue: char {
     UNDEF,
-    TRUE,
-    FALSE,
+    rrrTRUE,
+    rrrFALSE,
     TEMP_TRUE,
     TEMP_FALSE
   };

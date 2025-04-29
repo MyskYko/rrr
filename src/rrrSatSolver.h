@@ -457,23 +457,23 @@ namespace rrr {
     pNtk->ForEachIntReverse([&](int id) {
       switch(pNtk->GetNodeType(id)) {
       case AND:
-        if(vValues[id] == TRUE) {
+        if(vValues[id] == rrrTRUE) {
           pNtk->ForEachFanin(id, [&](int fi, bool c) {
-            assert((vValues[fi] == TEMP_TRUE || vValues[fi] == TRUE) ^ c);
+            assert((vValues[fi] == TEMP_TRUE || vValues[fi] == rrrTRUE) ^ c);
             vValues[fi] = DecideVarValue(vValues[fi]);
           });
-        } else if(vValues[id] == FALSE) {
+        } else if(vValues[id] == rrrFALSE) {
           bool fFound =  false;
           pNtk->ForEachFanin(id, [&](int fi, bool c) {
             if(fFound) {
               return;
             }
             if(c) {
-              if(vValues[fi] == TRUE) {
+              if(vValues[fi] == rrrTRUE) {
                 fFound = true;
               }
             } else {
-              if(vValues[fi] == FALSE) {
+              if(vValues[fi] == rrrFALSE) {
                 fFound = true;
               }
             }
@@ -513,23 +513,23 @@ namespace rrr {
     pNtk->ForEachInt([&](int id) {
       switch(pNtk->GetNodeType(id)) {
       case AND:
-        if(vValues[id] == TRUE) {
+        if(vValues[id] == rrrTRUE) {
           pNtk->ForEachFanin(id, [&](int fi, bool c) {
-            assert(c || vValues[fi] == TRUE);
-            assert(!c || vValues[fi] == FALSE);
+            assert(c || vValues[fi] == rrrTRUE);
+            assert(!c || vValues[fi] == rrrFALSE);
           });
-        } else if(vValues[id] == FALSE) {
+        } else if(vValues[id] == rrrFALSE) {
           bool fFound =  false;
           pNtk->ForEachFanin(id, [&](int fi, bool c) {
             if(fFound) {
               return;
             }
             if(c) {
-              if(vValues[fi] == TRUE) {
+              if(vValues[fi] == rrrTRUE) {
                 fFound = true;
               }
             } else {
-              if(vValues[fi] == FALSE) {
+              if(vValues[fi] == rrrFALSE) {
                 fFound = true;
               }
             }
@@ -544,7 +544,7 @@ namespace rrr {
     // retrieve partial cex
     std::vector<VarValue> vPartialCex;
     pNtk->ForEachPi([&](int id) {
-      if(vValues[id] == TRUE || vValues[id] == FALSE) {
+      if(vValues[id] == rrrTRUE || vValues[id] == rrrFALSE) {
         vPartialCex.push_back(vValues[id]);
       } else {
         vPartialCex.push_back(UNDEF);

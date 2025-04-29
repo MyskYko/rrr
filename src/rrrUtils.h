@@ -263,14 +263,14 @@ namespace rrr {
     switch(x) {
     case UNDEF:
       assert(0);
-    case TRUE:
-      return TRUE;
-    case FALSE:
-      return FALSE;
+    case rrrTRUE:
+      return rrrTRUE;
+    case rrrFALSE:
+      return rrrFALSE;
     case TEMP_TRUE:
-      return TRUE;
+      return rrrTRUE;
     case TEMP_FALSE:
-      return FALSE;
+      return rrrFALSE;
     default:
       assert(0);
     }
@@ -281,9 +281,9 @@ namespace rrr {
     switch(x) {
     case UNDEF:
       return 'x';
-    case TRUE:
+    case rrrTRUE:
       return '1';
-    case FALSE:
+    case rrrFALSE:
       return '0';
     case TEMP_TRUE:
       return 't';
