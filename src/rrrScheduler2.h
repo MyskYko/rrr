@@ -70,8 +70,7 @@ namespace rrr {
     void RunJob(Opt &opt, Job *pJob);
 
     // manage jobs
-    Job *CreateJob(int src, std::pair<Ntk *, std::vector<Action>> const &target, bool fAdd);
-    void CreateJobs(int src, std::vector<std::pair<Ntk *, std::vector<Action>>> const &targets, bool fAdd);
+    Job *CreateJob(int src, bool fAdd);
     void Wait();
 
     // thread
@@ -95,15 +94,13 @@ namespace rrr {
     // data
     int id;
     int src;
-    std::pair<Ntk *, std::vector<Action>> target;
     bool fAdd;
     std::string prefix;
     
     // constructor
-    Job(int id, int src, std::pair<Ntk *, std::vector<Action>> const &target, bool fAdd) :
+    Job(int id, int src, bool fAdd) :
       id(id),
       src(src),
-      target(target),
       fAdd(fAdd) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
@@ -184,28 +181,39 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler2<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
-    auto v = opt.Run(pJob->target, pJob->fAdd);
-    if(!v.empty()) {
-      //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "phase", "=", (pJob->fAdd? "   add": "reduce"), ",", "choice", "=", int_size(v));
-      CreateJobs(pJob->src, v, false);
-      delete pJob->target.first;
-    } else if(!pJob->fAdd && (pJob->target.second.empty() || pJob->target.second.back().type != ADD_FANIN)) {
-      Canonicalizer<Ntk> can;
-      can.Run(pJob->target.first);
-      std::string str = CreateBinary(pJob->target.first);
-      int index;
-      bool fNew = Register(str, pJob->src, pJob->target.second, index);
-      if(fNew) {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "phase", "=", (pJob->fAdd? "   add": "reduce"), ",", "choice", "=", int_size(v), ",", "cost", "=", CostFunction(pJob->target.first), ",", "result", "=", index, "(new)");
-        std::pair<Ntk *, std::vector<Action>> new_target(pJob->target.first, std::vector<Action>());
-        CreateJob(index, new_target, true);
-      } else {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "phase", "=", (pJob->fAdd? "   add": "reduce"), ",", "choice", "=", int_size(v), ",", "cost", "=", CostFunction(pJob->target.first), ",", "result", "=", index);
-        delete pJob->target.first;
+    Ntk ntk;
+    ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
+    opt.AssignNetwork(&ntk, pJob->fAdd);
+    int nChoices = 0, nNews = 0;
+    while(true) {
+      auto vActions = opt.Run();
+      if(vActions.empty()) {
+        break;
       }
-    } else {
-      //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "phase", "=", (pJob->fAdd? "   add": "reduce"), ",", "choice", "=", int_size(v));
-      delete pJob->target.first;
+      Ntk ntk2;
+      ntk2.Read(ntk);
+      Canonicalizer<Ntk> can;
+      can.Run(&ntk2);
+      std::string str = CreateBinary(&ntk2);
+      int index;
+      bool fNew = Register(str, pJob->src, vActions, index);
+      if(fNew) {
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk2), ",", "result", "=", index, "(new)");
+        CreateJob(index, true);
+        nNews++;
+      } else {
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk2), ",", "result", "=", index);
+      }
+      /*
+      for(auto action: vActions) {
+        auto ss = GetActionDescription(action);
+        std::string str;
+        std::getline(ss, str);
+        std::cout << str << std::endl;
+      }
+      std::cout << std::endl;
+      */
+      nChoices++;
     }
     delete pJob;
 #ifdef ABC_USE_PTHREADS
@@ -226,8 +234,8 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename Scheduler2<Ntk, Opt, Par>::Job *Scheduler2<Ntk, Opt, Par>::CreateJob(int src, std::pair<Ntk *, std::vector<Action>> const &target, bool fAdd) {
-    Job *pJob = new Job(nCreatedJobs++, src, target, fAdd);
+  typename Scheduler2<Ntk, Opt, Par>::Job *Scheduler2<Ntk, Opt, Par>::CreateJob(int src, bool fAdd) {
+    Job *pJob = new Job(nCreatedJobs++, src, fAdd);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -240,27 +248,6 @@ namespace rrr {
 #endif
     qPendingJobs.push(pJob);
     return pJob;
-  }
-  
-  template <typename Ntk, typename Opt, typename Par>
-  void Scheduler2<Ntk, Opt, Par>::CreateJobs(int src, std::vector<std::pair<Ntk *, std::vector<Action>>> const &targets, bool fAdd) {
-#ifdef ABC_USE_PTHREADS
-    if(fMultiThreading) {
-      {
-        std::unique_lock<std::mutex> l(mutexPendingJobs);
-        for(auto const &target: targets) {
-          Job *pJob = new Job(nCreatedJobs++, src, target, fAdd);
-          qPendingJobs.push(pJob);
-        }
-        condPendingJobs.notify_all();
-      }
-      return;
-    }
-#endif
-    for(auto const &target: targets) {
-      Job *pJob = new Job(nCreatedJobs++, src, target, fAdd);
-      qPendingJobs.push(pJob);
-    }
   }
   
   template <typename Ntk, typename Opt, typename Par>
@@ -389,38 +376,22 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler2<Ntk, Opt, Par>::Run() {
-    bool fPreprocess = false;
-    if(fPreprocess) {
-      // some preprocessing
-      pOpt->Prepare(pOriginal);
-      Print(-1, "","preprocessed", "=", CostFunction(pOriginal));
-      Canonicalizer<Ntk> can;
-      can.Run(pOriginal);
-      std::string str = CreateBinary(pOriginal);
-      std::vector<Action> vActions;
-      int index;
-      Register(str, 0, vActions, index);
-      
-      // create the first job
-      Ntk *pNtk = new Ntk;
-      pNtk->Read(str, BinaryReader<Ntk>);
-      std::pair<Ntk *, std::vector<Action>> input(pNtk, vActions);
-      CreateJob(index, input, true);
-    } else {
-      pOriginal->Sweep(true);
-      pOriginal->TrivialCollapse();
-      Canonicalizer<Ntk> can;
-      can.Run(pOriginal);
-      Ntk *pNtk = new Ntk(*pOriginal);
-      std::vector<Action> vActions;
-      std::pair<Ntk *, std::vector<Action>> input(pNtk, vActions);
-      CreateJob(-1, input, false);
-    }
+    pOriginal->Sweep(true);
+    pOriginal->TrivialCollapse();
+    bool fRedundant = pOpt->IsRedundant(pOriginal);
+    Canonicalizer<Ntk> can;
+    can.Run(pOriginal);
+    std::string str = CreateBinary(pOriginal);
+    std::vector<Action> vActions;
+    int index;
+    Register(str, -1, vActions, index);
+    CreateJob(index, !fRedundant);
 
     // wait until all jobs are done
     Wait();
 
-    Print(-1, "","unique", "=", nUniques);
+    Print(-1, "","unique", "=", nUniques - (int)fRedundant);
+    Print(-1, "","jobs", "=", nFinishedJobs);
     
     // for(std::string s: strs) {
     //   Ntk a;

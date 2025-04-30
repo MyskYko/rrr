@@ -119,6 +119,7 @@ namespace rrr {
     void ForEachPiIdx(std::function<void(int, int)> const &func) const; // func(index, id)
     void ForEachInt(std::function<void(int)> const &func) const;
     void ForEachIntReverse(std::function<void(int)> const &func) const;
+    void ForEachIntStop(std::function<bool(int)> const &func) const;
     void ForEachPiInt(std::function<void(int)> const &func) const;
     void ForEachPo(std::function<void(int)> const &func) const;
     template <typename Func>
@@ -791,6 +792,14 @@ namespace rrr {
   inline void AndNetwork::ForEachIntReverse(std::function<void(int)> const &func) const {
     for(critr it = lInts.rbegin(); it != lInts.rend(); it++) {
       func(*it);
+    }
+  }
+  
+  inline void AndNetwork::ForEachIntStop(std::function<bool(int)> const &func) const {
+    for(int id: lInts) {
+      if(func(id)) {
+        break;
+      }
     }
   }
 

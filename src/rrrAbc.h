@@ -64,6 +64,16 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  void DumpAig(std::string filename, Ntk *pNtk, bool fHash) {
+    Gia_Man_t *pGia = CreateGia(pNtk, fHash);
+    char *cfilename = (char *)malloc(filename.size() + 1);
+    strcpy(cfilename, filename.c_str());
+    Gia_AigerWrite(pGia, cfilename, 0, 0, 0);
+    free(cfilename);
+    Gia_ManStop(pGia);
+  }
+
+  template <typename Ntk>
   void Abc9Execute(Ntk *pNtk, std::string Command) {
     Abc_Frame_t *pAbc = Abc_FrameGetGlobalFrame();
     Abc_FrameUpdateGia(pAbc, CreateGia(pNtk));

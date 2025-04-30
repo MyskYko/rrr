@@ -562,6 +562,10 @@ namespace rrr {
     if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
+    vBackups[slot].fInitialized = fInitialized;
+    if(!fInitialized) {
+      return;
+    }
     vBackups[slot].nWords = nWords;
     if(sUpdates.empty()) {
       vBackups[slot].target = target;
@@ -596,6 +600,10 @@ namespace rrr {
     assert(slot < int_size(vBackups));
     fUpdate = false;
     sUpdates.clear();
+    if(!vBackups[slot].fInitialized) {
+      fInitialized = false;
+      return;
+    }
     if(!fKeepStimula) {
       nWords  = vBackups[slot].nWords;
       target  = vBackups[slot].target;
