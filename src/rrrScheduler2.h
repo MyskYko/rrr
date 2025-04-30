@@ -64,7 +64,7 @@ namespace rrr {
     void Print(int nVerboseLevel, std::string prefix, Args... args);
 
     // table
-    bool Register(std::string const &str, int src, std::vector<Action> const &vActions, int &index);
+    bool Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index);
     
     // run jobs
     void RunJob(Opt &opt, Job *pJob);
@@ -139,7 +139,15 @@ namespace rrr {
   /* {{{ Table */
 
   template <typename Ntk, typename Opt, typename Par>
-  bool Scheduler2<Ntk, Opt, Par>::Register(std::string const &str, int src, std::vector<Action> const &vActions, int &index) {
+  bool Scheduler2<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
+    std::string str;
+    {
+      Ntk ntk;
+      ntk.Read(*pNtk);
+      Canonicalizer<Ntk> can;
+      can.Run(&ntk);
+      str = CreateBinary(&ntk);
+    }
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -190,19 +198,14 @@ namespace rrr {
       if(vActions.empty()) {
         break;
       }
-      Ntk ntk2;
-      ntk2.Read(ntk);
-      Canonicalizer<Ntk> can;
-      can.Run(&ntk2);
-      std::string str = CreateBinary(&ntk2);
       int index;
-      bool fNew = Register(str, pJob->src, vActions, index);
+      bool fNew = Register(&ntk, pJob->src, vActions, index);
       if(fNew) {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk2), ",", "result", "=", index, "(new)");
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
         CreateJob(index, true);
         nNews++;
       } else {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk2), ",", "result", "=", index);
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
       /*
       for(auto action: vActions) {
@@ -379,12 +382,9 @@ namespace rrr {
     pOriginal->Sweep(true);
     pOriginal->TrivialCollapse();
     bool fRedundant = pOpt->IsRedundant(pOriginal);
-    Canonicalizer<Ntk> can;
-    can.Run(pOriginal);
-    std::string str = CreateBinary(pOriginal);
     std::vector<Action> vActions;
     int index;
-    Register(str, -1, vActions, index);
+    Register(pOriginal, -1, vActions, index);
     CreateJob(index, !fRedundant);
 
     // wait until all jobs are done
