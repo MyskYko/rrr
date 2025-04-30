@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 project(rrr LANGUAGES C CXX)
 
 set(ABC_SKIP_TESTS true)
+add_compile_options(-O3)
 
 add_subdirectory(abc)
 
