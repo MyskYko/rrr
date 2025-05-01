@@ -72,6 +72,7 @@ namespace rrr {
     int  AddAnd(int id0, int id1, bool c0, bool c1);
     int  AddAnd(std::vector<int> const &vFanins, std::vector<bool> const &vCompls);
     int  AddPo(int id, bool c);
+    void ChangePiOrder(std::vector<int> const &vOrder);
     void Read(AndNetwork const &from);
     template <typename Ntk, typename Reader>
     void Read(Ntk &from, Reader const &reader);
@@ -355,6 +356,16 @@ namespace rrr {
     vRefs.push_back(0);
     assert(!check_int_max(nNodes));
     return nNodes++;
+  }
+
+  inline void AndNetwork::ChangePiOrder(std::vector<int> const &vOrder) {
+    assert(vOrder.size() == vPis.size());
+    std::vector<int> vPisNew(vPis.size());
+    for(int idx = 0; idx < int_size(vPis); idx++) {
+      int old_idx = vOrder[idx];
+      vPisNew[idx] = vPis[old_idx];
+    }
+    vPis = vPisNew;
   }
 
   inline void AndNetwork::Read(AndNetwork const &from) {

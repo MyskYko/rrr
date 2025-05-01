@@ -38,6 +38,7 @@ namespace rrr {
     bool fOptOnInsert;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
+    static constexpr bool fTwoArgSym = false;
     
     // data
     int nUniques;
@@ -140,13 +141,25 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   bool Scheduler2<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
-    std::string str;
+    std::string str, str_sym;
     {
       Ntk ntk;
       ntk.Read(*pNtk);
       Canonicalizer<Ntk> can;
       can.Run(&ntk);
       str = CreateBinary(&ntk);
+      if(fTwoArgSym) {
+        std::vector<int> vOrder;
+        for(int i = 0; i < ntk.GetNumPis() / 2; i++) {
+          vOrder.push_back(i + ntk.GetNumPis() / 2);
+        }
+        for(int i = 0; i < ntk.GetNumPis() / 2; i++) {
+          vOrder.push_back(i);
+        }        
+        ntk.ChangePiOrder(vOrder);
+        can.Run(&ntk);
+        str_sym = CreateBinary(&ntk);
+      }
     }
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
@@ -156,6 +169,13 @@ namespace rrr {
           index = table[str];
           history[index].emplace_back(src, vActions);
           return false;
+        }
+        if(fTwoArgSym) {
+          if(table.count(str_sym)) {
+            index = table[str_sym];
+            history[index].emplace_back(src, vActions);
+            return false;
+          }
         }
         index = nUniques++;
         table[str] = index;
@@ -172,6 +192,13 @@ namespace rrr {
       index = table[str];
       history[index].emplace_back(src, vActions);
       return false;
+    }
+    if(fTwoArgSym) {
+      if(table.count(str_sym)) {
+        index = table[str_sym];
+        history[index].emplace_back(src, vActions);
+        return false;
+      }
     }
     index = nUniques++;
     table[str] = index;
