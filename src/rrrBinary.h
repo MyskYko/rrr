@@ -26,7 +26,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void BinaryReader(std::string &str, Ntk *pNtk) {
+  void BinaryReader(std::string const &str, Ntk *pNtk) {
     std::stringstream in(str);
     int nPis = decode(in);
     int nPos = decode(in);
