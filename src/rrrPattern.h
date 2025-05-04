@@ -40,7 +40,7 @@ namespace rrr {
         for(int k = 0; k < 8; k++) { // 8 bytes
           f.get(c);
           data[j][i] = data[j][i] << 8;
-          data[j][i] += c;
+          data[j][i] += (unsigned char)c;
         }
       }
       if(nSize % 8) {
@@ -49,7 +49,7 @@ namespace rrr {
         for(; k < nRemainder; k++) {
           f.get(c);
           data[j][i] = data[j][i] << 8;
-          data[j][i] += c;
+          data[j][i] += (unsigned char)c;
         }
         for(; k < 8; k++) {
           data[j][i] = data[j][i] << 8;
