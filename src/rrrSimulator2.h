@@ -36,6 +36,7 @@ namespace rrr {
     std::vector<word> vValues2; // simulation with an inverter
     std::vector<word> care; // careset
     std::vector<word> tmp;
+    //std::vector<std::vector<word>> vPoValues;
 
     // marks
     unsigned iTrav;
@@ -65,7 +66,7 @@ namespace rrr {
     void And(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
     bool IsZero(int n, citr x) const;
-    bool IsEq(int n, citr x, citr y) const;
+    bool IsEq(int n, citr x, citr y, bool c) const;
     void Print(int n, citr x) const;
 
     // callback
@@ -188,10 +189,18 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline bool Simulator2<Ntk>::IsEq(int n, citr x, citr y) const {
-    for(int i = 0; i < n; i++, x++, y++) {
-      if(*x != *y) {
-        return false;
+  inline bool Simulator2<Ntk>::IsEq(int n, citr x, citr y, bool c) const {
+    if(!c) {
+      for(int i = 0; i < n; i++, x++, y++) {
+	if(*x != *y) {
+	  return false;
+	}
+      }
+    } else {
+      for(int i = 0; i < n; i++, x++, y++) {
+	if(*x != ~*y) {
+	  return false;
+	}
       }
     }
     return true;
@@ -359,7 +368,7 @@ namespace rrr {
       assert(0);
     }
     itr y = v.begin() + id * nStimuli;
-    if(IsEq(nStimuli, y, tmp.begin())) {
+    if(IsEq(nStimuli, y, tmp.begin(), false)) {
       return false;
     }
     Copy(nStimuli, y, tmp.begin(), false);
@@ -432,6 +441,15 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
+    /*
+    vPoValues.resize(pNtk->GetNumPos());
+    int index = 0;
+    pNtk->ForEachPoDriver([&](int fi, bool c){
+      vPoValues[index].resize(nStimuli);
+      Copy(nStimuli, vPoValues[index].begin(), vValues.begin() + fi * nStimuli, c);
+      index++;
+    });
+    */
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
   
@@ -458,6 +476,13 @@ namespace rrr {
         Print(nStimuli, vValues.begin() + fo * nStimuli);
         std::cout << std::endl;
       }
+    });
+    */
+    /*
+    int index = 0;
+    pNtk->ForEachPoDriver([&](int fi, bool c){
+      assert(IsEq(nStimuli, vPoValues[index].begin(), vValues.begin() + fi * nStimuli, c));
+      index++;
     });
     */
     durationSimulation += Duration(timeStart, GetCurrentTime());
