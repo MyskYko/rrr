@@ -14,6 +14,7 @@
 #include "rrrAbc.h"
 #include "rrrBinary.h"
 #include "rrrCanonicalizer.h"
+#include "rrrTable.h"
 
 namespace rrr {
 
@@ -41,6 +42,7 @@ namespace rrr {
     static constexpr bool fTwoArgSym = false;
     
     // data
+    Table tab;
     int nUniques;
     std::map<std::string, int> table;
     std::vector<std::string> strs;
@@ -165,12 +167,14 @@ namespace rrr {
     if(fMultiThreading) {
       {
         std::unique_lock<std::mutex> l(mutexTable);
+        return tab.Register(str, src, vActions, index, str_sym);
+        /*
         if(table.count(str)) {
           index = table[str];
           history[index].emplace_back(src, vActions);
           return false;
         }
-        if(fTwoArgSym) {
+        if(fTwoArgSym && str != str_sym) {
           if(table.count(str_sym)) {
             index = table[str_sym];
             history[index].emplace_back(src, vActions);
@@ -185,9 +189,12 @@ namespace rrr {
         }
         history[index].emplace_back(src, vActions);
         return true;
+        */
       }
     }
 #endif
+    return tab.Register(str, src, vActions, index, str_sym);
+    /*
     if(table.count(str)) {
       index = table[str];
       history[index].emplace_back(src, vActions);
@@ -208,6 +215,7 @@ namespace rrr {
     }
     history[index].emplace_back(src, vActions);
     return true;
+    */
   }
   
   /* }}} */
@@ -217,7 +225,8 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler2<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     Ntk ntk;
-    ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
+    //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
+    ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
     opt.AssignNetwork(&ntk, pJob->fAdd);
     int nChoices = 0, nNews = 0;
     while(true) {
@@ -228,11 +237,12 @@ namespace rrr {
       int index;
       bool fNew = Register(&ntk, pJob->src, vActions, index);
       if(fNew) {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
+        if(index % 1000 == 0)
+          Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
         CreateJob(index, true);
         nNews++;
       } else {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
       /*
       for(auto action: vActions) {
@@ -361,6 +371,7 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
+    tab(27),
     nUniques(0),
     nCreatedJobs(0),
     nFinishedJobs(0) {
@@ -417,7 +428,8 @@ namespace rrr {
     // wait until all jobs are done
     Wait();
 
-    Print(-1, "","unique", "=", nUniques - (int)fRedundant);
+    //Print(-1, "","unique", "=", nUniques - (int)fRedundant);
+    Print(-1, "","unique", "=", tab.Size() - (int)fRedundant);
     Print(-1, "","jobs", "=", nFinishedJobs);
     
     // for(std::string s: strs) {
