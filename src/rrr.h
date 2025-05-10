@@ -34,7 +34,7 @@ namespace rrr {
         Scheduler<Ntk, Optimizer<Ntk, BddMspfAnalyzer<Ntk>>, Partitioner<Ntk>> sch(pNtk, pPar);
         sch.Run();
       } else {
-        Scheduler<Ntk, Optimizer<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+        Scheduler<Ntk, Optimizer<Ntk, ApproxAnalyzer<Ntk, Simulator2<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
         sch.Run();
       }
       break;
