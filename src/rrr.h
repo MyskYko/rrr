@@ -6,15 +6,24 @@
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
 #include "rrrAnalyzer.h"
+#include "rrrApproxAnalyzer.h"
 #include "rrrSatSolver.h"
 #include "rrrSimulator.h"
+#include "rrrSimulator2.h"
 #include "rrrPartitioner.h"
 #include "rrrLevelBasePartitioner.h"
+#include "rrrPattern.h"
 
 namespace rrr {
 
   template <typename Ntk>
   void Perform(Ntk *pNtk, Parameter const *pPar) {
+    Pattern *pPat = NULL;
+    if(!pPar->strPattern.empty()) {
+      pPat = new Pattern;
+      pPat->Read(pPar->strPattern, pNtk->GetNumPis());
+      pNtk->RegisterPattern(pPat);
+    }
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     switch(pPar->nPartitionType) {
     case 0:
@@ -43,6 +52,9 @@ namespace rrr {
       break;
     default:
       assert(0);
+    }
+    if(pPat) {
+      delete pPat;
     }
   }
   

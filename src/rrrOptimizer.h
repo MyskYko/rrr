@@ -32,6 +32,7 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     bool fGreedy;
+    std::string strTemporary;
     seconds nTimeout; // assigned upon Run
     std::function<void(std::string)> PrintLine;
 
@@ -609,6 +610,7 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
+    int n = 0;
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
         continue;
@@ -620,6 +622,10 @@ namespace rrr {
       fReduced |= ReduceFanins(*it);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
+      }
+      if(!strTemporary.empty() && n++ % 1000 == 0) {
+	std::string str = strTemporary + std::to_string(n / 1000) + ".aig";
+	DumpAig(str, pNtk, false);
       }
     }
     if(!fSubRoutine) {
@@ -1282,6 +1288,7 @@ namespace rrr {
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
+    strTemporary(pPar->strTemporary),
     ana(pPar),
     target(-1) {
   }
@@ -1420,6 +1427,10 @@ namespace rrr {
       });
       break;
     }
+    case 5:
+      //RemoveRedundancy();
+      Reduce();
+      break;
     default:
       assert(0);
     }
