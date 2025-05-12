@@ -27,6 +27,8 @@ namespace rrr {
     int nVerbose;
     int nWords;
     int nStimuli;
+    bool fUseCustomCondition = false;
+    std::function<word(std::vector<word> const &, std::vector<word> const &)> CustomCondition;
 
     // data
     bool fGenerated;
@@ -560,7 +562,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "computing careset of " << target << std::endl;
     }
-    if(pNtk->IsPoDriver(target)) {
+    if(!fUseCustomCondition && pNtk->IsPoDriver(target)) {
       Fill(nStimuli, care.begin());
       if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
@@ -573,9 +575,10 @@ namespace rrr {
     // alternative of vValues2 = vValues;
     vValues2.resize(nStimuli * pNtk->GetNumNodes());
     StartTraversal();
+    Copy(nStimuli, vValues2.begin() + target * nStimuli, vValues.begin() + target * nStimuli, true);
+    vTrav[target] = iTrav;
     pNtk->ForEachTfo(target, false, [&](int id) {
-      // alternative of SimulateNode(vValues2, id, target);
-      int to_negate = target;
+      // alternative of SimulateNode(vValues2, id);
       itr x = vValues2.end();
       itr y = vValues2.begin() + id * nStimuli;
       bool cx = false;
@@ -588,12 +591,12 @@ namespace rrr {
             } else {
               x = vValues2.begin() + fi * nStimuli;
             }
-            cx = c ^ (fi == to_negate);
+            cx = c;
           } else {
             if(vTrav[fi] != iTrav) {
-              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
             } else {
-              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c);
             }
             x = y;
             cx = false;
@@ -614,15 +617,36 @@ namespace rrr {
       }
     });
     Clear(nStimuli, care.begin());
-    pNtk->ForEachPoDriver([&](int fi) {
-      assert(fi != target);
+    if(fUseCustomCondition) {
+      std::vector<word> vPoValues(pNtk->GetNumPos()), vPoValues2(pNtk->GetNumPos());
       for(int i = 0; i < nStimuli; i++) {
-        // skip unaffected POs
-        if(vTrav[fi] == iTrav) {
-          care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
-        }
+        int index = 0;
+        pNtk->ForEachPoDriver([&](int fi, bool c) {
+          vPoValues[index] = vValues[fi * nStimuli + i];
+          if(vTrav[fi] == iTrav) {
+            vPoValues2[index] = vValues2[fi * nStimuli + i];
+          } else {
+            vPoValues2[index] = vValues[fi * nStimuli + i];
+          }
+          if(c) {
+            vPoValues[index] ^= ~0ull;
+            vPoValues2[index] ^= ~0ull;
+          }
+          index++;
+        });
+        care[i] = CustomCondition(vPoValues, vPoValues2);
       }
-    });
+    } else {
+      pNtk->ForEachPoDriver([&](int fi) {
+        assert(fi != target);
+        for(int i = 0; i < nStimuli; i++) {
+          // skip unaffected POs
+          if(vTrav[fi] == iTrav) {
+            care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+          }
+        }
+      });
+    }
     if(nVerbose) {
       std::cout << "care " << std::setw(3) << target << ": ";
       Print(nStimuli, care.begin());
@@ -730,6 +754,23 @@ namespace rrr {
     care.resize(nWords);
     tmp.resize(nWords);
     ResetSummary();
+    CustomCondition = [&](std::vector<word> const &v, std::vector<word> const &v2) {
+      int n = pNtk->GetNumPos() / 10;
+      word res = 0;
+      for(int k = 0; k < 64; k++) {
+        std::vector<int> vCounts(10), vCounts2(10);
+        for(int j = 0; j < 10; j++) {
+          for(int i = 0; i < n; i++) {
+            vCounts[j] += (v[i + n * j] >> k) & 1;
+            vCounts2[j] += (v2[i + n * j] >> k) & 1;
+          }
+        }
+        if(vCounts != vCounts2) {
+          res |= 1ull << k;
+        }
+      }
+      return res;
+    };
   }
 
   template <typename Ntk>
