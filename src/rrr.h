@@ -24,6 +24,14 @@ namespace rrr {
       pPat->Read(pPar->strPattern, pNtk->GetNumPis());
       pNtk->RegisterPattern(pPat);
     }
+    Ntk *pCond = NULL;
+    if(!pPar->strCond.empty()) {
+      char buf[100];
+      strcpy(buf, pPar->strCond.c_str());
+      Gia_Man_t *pGia = Gia_AigerRead(buf, 0, 0, 0);
+      pCond = new AndNetwork;
+      pCond->Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
+    }
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     switch(pPar->nPartitionType) {
     case 0:

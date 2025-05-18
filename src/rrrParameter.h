@@ -32,6 +32,7 @@ namespace rrr {
     bool fGreedy = true;
     std::string strTemporary;
     std::string strPattern;
+    std::string strCond;
   };
   
 }
