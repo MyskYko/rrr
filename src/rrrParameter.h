@@ -24,6 +24,7 @@ namespace rrr {
     int nThreads = 1;
     int nPartitionSize = 0;
     int nPartitionSizeMin = 0;
+    int nPartitionInputMax = 0;
     bool fDeterministic = true;
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;

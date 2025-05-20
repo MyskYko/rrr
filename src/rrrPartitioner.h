@@ -20,6 +20,7 @@ namespace rrr {
     int nVerbose;
     int nPartitionSize;
     int nPartitionSizeMin;
+    int nPartitionInputMax;
     std::string strVerbosePrefix;
 
     // data
@@ -128,6 +129,9 @@ namespace rrr {
     Print(3, "nodes:", sNodes);
     Print(3, "inputs:", sInputs);
     Print(3, "outputs:", sOutputs);
+    if(nPartitionInputMax && int_size(sInputs) > nPartitionInputMax) {
+      return std::set<int>();
+    }
     // include inner nodes
     std::set<int> sFanouts = GetFanouts(sNodes, sOutputs);
     std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
@@ -151,6 +155,9 @@ namespace rrr {
       Print(3, "nodes:", sNodes);
       Print(3, "inputs:", sInputs);
       Print(3, "outputs:", sOutputs);
+      if(nPartitionInputMax && int_size(sInputs) > nPartitionInputMax) {
+        return std::set<int>();
+      }
       // recompute fanouts
       sFanouts = GetFanouts(sNodes, sOutputs);
       vInners = pNtk->GetInners(sFanouts, sInputs);
@@ -264,7 +271,8 @@ namespace rrr {
   Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
     nVerbose(pPar->nPartitionerVerbose),
     nPartitionSize(pPar->nPartitionSize),
-    nPartitionSizeMin(pPar->nPartitionSizeMin) {
+    nPartitionSizeMin(pPar->nPartitionSizeMin),
+    nPartitionInputMax(pPar->nPartitionInputMax) {
   }
 
   template <typename Ntk>
