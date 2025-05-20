@@ -8,9 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, fDeterministic, nParallelPartitions, fOptOnInsert, fGreedy, nRelaxedPatterns, pTemporary, pPattern, pCond
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, fDeterministic = 1, nParallelPartitions = 1, fOptOnInsert = 0, fGreedy = 1, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, fDeterministic, nParallelPartitions, fOptOnInsert, fGreedy, nRelaxedPatterns, pTemporary, pPattern, pCond
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, fDeterministic = 1, nParallelPartitions = 1, fOptOnInsert = 0, fGreedy = 1, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLBDRWTCGVPOAQSMFUEabcdegvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLIBDRWTCGVPOAQSMFUEabcdegvh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -55,6 +55,10 @@ int main(int argc, char **argv) {
           break;
       case 'L':
           nPartitionSizeMin = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'I':
+          nPartitionInputMax = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
       case 'B':
