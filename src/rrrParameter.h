@@ -31,6 +31,7 @@ namespace rrr {
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;
     bool fGreedy = true;
+    bool fExSim = false;
     int nRelaxedPatterns = 0;
     std::string strTemporary;
     std::string strPattern;

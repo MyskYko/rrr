@@ -4,7 +4,7 @@
 #include "rrrAbc.h"
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -34,6 +34,7 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nParallelPartitions = nParallelPartitions;
   Par.fOptOnInsert = fOptOnInsert;
   Par.fGreedy = fGreedy;
+  Par.fExSim = fExSim;
   Par.nRelaxedPatterns = nRelaxedPatterns;
   if(pTemporary) {
     Par.strTemporary = std::string(pTemporary);
