@@ -20,6 +20,12 @@ namespace rrr {
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
 
+    static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
+                                        0xccccccccccccccccull,
+                                        0xf0f0f0f0f0f0f0f0ull,
+                                        0xff00ff00ff00ff00ull,
+                                        0xffff0000ffff0000ull,
+                                        0xffffffff00000000ull};
     // pointer to network
     Ntk *pNtk;
     
@@ -27,6 +33,7 @@ namespace rrr {
     int nVerbose;
     int nWords;
     int nStimuli;
+    bool fExSim;
 
     // data
     bool fGenerated;
@@ -87,6 +94,7 @@ namespace rrr {
     // generate stimuli
     void GenerateRandomStimuli();
     void ReadStimuli(Pattern *pPat);
+    void GenerateExhaustiveStimuli();
 
     // careset computation
     void ComputeCare(int id);
@@ -104,6 +112,9 @@ namespace rrr {
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
+
+    // sdc
+    std::vector<word> ComputeSdc(std::vector<int> const &ids);
 
     // cex
     void AddCex(std::vector<VarValue> const &vCex);
@@ -289,6 +300,9 @@ namespace rrr {
       fInitialized = false;
       break;
     case POP_BACK:
+      break;
+    case INSERT:
+      fInitialized = false;
       break;
     default:
       assert(0);
@@ -538,6 +552,44 @@ namespace rrr {
     fGenerated = true;
   }
 
+  template <typename Ntk>
+  void Simulator2<Ntk>::GenerateExhaustiveStimuli() {
+    if(nVerbose) {
+      std::cout << "generating exhaustive stimuli" << std::endl;
+    }
+    assert(pNtk->GetNumPis() < 30);
+    if(pNtk->GetNumPis() <= 6) {
+      nStimuli = 1;
+    } else {
+      nStimuli = 1 << (pNtk->GetNumPis() - 6);
+    }
+    vValues.resize(nStimuli * pNtk->GetNumNodes());
+    pNtk->ForEachPiIdx([&](int index, int id) {
+      if(index < 6) {
+        itr it = vValues.begin() + id * nStimuli;
+        for(int i = 0; i < nStimuli; i++, it++) {
+          *it = basepats[index];
+        }
+      } else {
+        itr it = vValues.begin() + id * nStimuli;
+        for(int i = 0; i < nStimuli;) {
+          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
+            *it = 0;
+          }
+          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
+            *it = 0xffffffffffffffffull;
+          }
+        }
+      }
+      if(nVerbose) {
+        std::cout << "node " << std::setw(3) << id << ": ";
+        Print(nStimuli, vValues.begin() + id * nStimuli);
+        std::cout << std::endl;
+      }
+    });
+    fGenerated = true;
+  }
+  
   /* }}} */
 
   /* {{{ Careset computation */
@@ -706,6 +758,7 @@ namespace rrr {
     nVerbose(0),
     nWords(0),
     nStimuli(0),
+    fExSim(false),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -721,6 +774,7 @@ namespace rrr {
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
     nStimuli(nWords),
+    fExSim(pPar->fExSim),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -748,6 +802,9 @@ namespace rrr {
       ReadStimuli(pPat);
       care.resize(nStimuli);
       tmp.resize(nStimuli);
+    }
+    if(fExSim) {
+      GenerateExhaustiveStimuli();
     }
   }
 
@@ -893,6 +950,40 @@ namespace rrr {
 
   /* }}} */
 
+  /* {{{ Sdc */
+  
+  template <typename Ntk>
+  std::vector<unsigned long long> Simulator2<Ntk>::ComputeSdc(std::vector<int> const &ids) {
+    if(!fInitialized) {
+      Initialize();
+    }
+    assert(int_size(ids) < 30);
+    int nPatterns = 1 << int_size(ids);
+    int nSdcWords = nPatterns >> 6;
+    if(nSdcWords == 0) {
+      nSdcWords = 1;
+    }
+    std::vector<word> sdc(nSdcWords);
+    for(int i = 0; i < nStimuli; i++) {
+      for(int j = 0; j < 64; j++) {
+        int pattern = 0;
+        for(int k = 0; k < int_size(ids); k++) {
+          int id = ids[k];
+          itr it = vValues.begin() + id * nStimuli + i;
+          if(*it & (1ull << j)) {
+            pattern |= 1ull << k;
+          }
+        }
+        int pattern_top = pattern >> 6;
+        int pattern_bottom = pattern & 63;
+        sdc[pattern_top] |= 1ull << pattern_bottom;
+      }
+    }
+    return sdc;
+  }
+
+  /* }}} */
+  
   /* {{{ Cex */
 
   template <typename Ntk>

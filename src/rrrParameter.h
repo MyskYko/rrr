@@ -29,6 +29,7 @@ namespace rrr {
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;
     bool fGreedy = true;
+    bool fExSim = false;
   };
   
 }
