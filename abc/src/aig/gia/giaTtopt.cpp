@@ -1220,5 +1220,69 @@ Gia_Man_t * Gia_ManTtoptCare( Gia_Man_t * p, int nIns, int nOuts, int nRounds, c
     return pNew;
 }
 
+Gia_Man_t * Gia_ManTtoptCare2( Gia_Man_t * p, int nIns, int nOuts, int nRounds, word * pCare )
+{
+    int fVerbose = 0;
+    Gia_Man_t * pNew;
+    Gia_Obj_t * pObj;
+    Vec_Int_t * vSupp;
+    word v;
+    word * pTruth;
+    int i, g, k, nInputs;
+    Gia_ManLevelNum( p );
+    pNew = Gia_ManStart( Gia_ManObjNum(p) );
+    pNew->pName = Abc_UtilStrsav( p->pName );
+    pNew->pSpec = Abc_UtilStrsav( p->pSpec );
+    Gia_ManForEachCi( p, pObj, k )
+        Gia_ManAppendCi( pNew );
+    Gia_ObjComputeTruthTableStart( p, nIns );
+    Gia_ManHashStart( pNew );
+    for ( g = 0; g < Gia_ManCoNum(p); g += nOuts )
+    {
+        vSupp = Gia_ManCollectSuppNew( p, g, nOuts );
+        Vec_IntSort( vSupp, 0 );
+        nInputs = Vec_IntSize( vSupp );
+        assert(nInputs == nIns);
+        if ( nInputs == 0 )
+        {
+            for ( k = 0; k < nOuts; k++ )
+            {
+                pObj = Gia_ManCo( p, g+k );
+                pTruth = Gia_ObjComputeTruthTableCut( p, Gia_ObjFanin0(pObj), vSupp );
+                Gia_ManAppendCo( pNew, pTruth[0] & 1 );
+            }
+            Vec_IntFree( vSupp );
+            continue;
+        }
+        Ttopt::TruthTableLevelTSM tt( nInputs, nOuts );
+        for ( k = 0; k < nOuts; k++ )
+        {
+            pObj = Gia_ManCo( p, g+k );
+            pTruth = Gia_ObjComputeTruthTableCut( p, Gia_ObjFanin0(pObj), vSupp );
+            if ( nInputs >= 6 )
+                for ( i = 0; i < tt.nSize; i++ )
+                    tt.t[i + tt.nSize * k] = Gia_ObjFaninC0(pObj)? ~pTruth[i]: pTruth[i];
+            else
+            {
+                i = k * (1 << nInputs);
+                v = (Gia_ObjFaninC0(pObj)? ~pTruth[0]: pTruth[0]) & tt.ones[nInputs];
+                tt.t[i / tt.ww] |= v << (i % tt.ww);
+            }
+        }
+        i = 1 << Vec_IntSize( vSupp );
+        tt.care[0] = pCare[0];
+        for ( i = 1; i < tt.nSize; i++ )
+            tt.care[i] = pCare[i];
+        tt.RandomSiftReo( nRounds );
+        tt.Optimize();
+        tt.BDDGenerateAig( pNew, vSupp );
+        Vec_IntFree( vSupp );
+    }
+    Gia_ObjComputeTruthTableStop( p );
+    Gia_ManHashStop( pNew );
+    Gia_ManSetRegNum( pNew, Gia_ManRegNum(p) );
+    return pNew;
+}
+
 ABC_NAMESPACE_IMPL_END
 

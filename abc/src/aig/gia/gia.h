@@ -1796,6 +1796,7 @@ extern Vec_Int_t *         Gia_ManComputeDistance( Gia_Man_t * p, int iObj, Vec_
 /*=== giaTtopt.cpp ===========================================================*/
 extern Gia_Man_t *         Gia_ManTtopt( Gia_Man_t * p, int nIns, int nOuts, int nRounds );
 extern Gia_Man_t *         Gia_ManTtoptCare( Gia_Man_t * p, int nIns, int nOuts, int nRounds, char * pFileName, int nRarity );
+extern Gia_Man_t *         Gia_ManTtoptCare2( Gia_Man_t * p, int nIns, int nOuts, int nRounds, word * pCare );
 
 /*=== giaTransduction.cpp ===========================================================*/
 extern Gia_Man_t *         Gia_ManTransductionBdd( Gia_Man_t * pGia, int nType, int fMspf, int nRandom, int nSortType, int nPiShuffle, int nParameter, int fLevel, Gia_Man_t * pExdc, int fNewLine, int nVerbose );
