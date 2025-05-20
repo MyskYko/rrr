@@ -41,11 +41,12 @@ namespace rrr {
   public:
     // constructors
     Partitioner(Parameter const *pPar);
-    void AssignNetwork(Ntk *pNtk);
+    void AssignNetwork(Ntk *pNtk_);
 
     // APIs
     Ntk *Extract(int iSeed);
     void Insert(Ntk *pSubNtk);
+    std::vector<int> GetInputs(Ntk *pSubNtk);
   };
 
   /* {{{ Print */
@@ -341,6 +342,11 @@ namespace rrr {
     delete pSubNtk;
     mSubNtk2Io.erase(pSubNtk);
     vFailed.clear(); // clear, there isn't really a way to track
+  }
+
+  template <typename Ntk>
+  std::vector<int> Partitioner<Ntk>::GetInputs(Ntk *pSubNtk) {
+    return std::get<1>(mSubNtk2Io[pSubNtk]);
   }
 
   /* }}} */
