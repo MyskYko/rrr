@@ -29,7 +29,7 @@
 //#include "sat/cnf/cnf.h"
 //#include "misc/extra/extra.h"
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 using namespace Gluco;
 
@@ -593,4 +593,4 @@ void glucose_print_stats(SimpSolver& s, abctime clk)
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END

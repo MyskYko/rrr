@@ -34,7 +34,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "abc/Constants.h"
 #include "abc/system.h"
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 using namespace Gluco;
 
@@ -1496,4 +1496,4 @@ void Solver::reset()
     initialPositions.clear(false);
 }
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END

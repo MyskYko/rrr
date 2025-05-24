@@ -27,7 +27,7 @@
 
 #include "abc_global.h"
 
-ABC_NAMESPACE_HEADER_START
+PABC_NAMESPACE_HEADER_START
 
 ////////////////////////////////////////////////////////////////////////
 ///                         PARAMETERS                               ///
@@ -466,7 +466,7 @@ static inline int Sat_MemCompactLearned( Sat_Mem_t * p, int fDoMove )
 }
 
 
-ABC_NAMESPACE_HEADER_END
+PABC_NAMESPACE_HEADER_END
 
 #endif
 

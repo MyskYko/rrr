@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 ////////////////////////////////////////////////////////////////////////
 ///                        DECLARATIONS                              ///
@@ -450,7 +450,7 @@ inline Sto_Man_t* Sto_ManLoadClauses(char* pFileName)
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 
 /*** satSolver.cpp ***/
 
@@ -482,7 +482,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdio.h>
 #include <string.h>
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 #define SAT_USE_ANALYZE_FINAL
 
@@ -2957,7 +2957,7 @@ inline void* sat_solver_store_release(sat_solver* s)
 	return pTemp;
 }
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 
 /*** SimpSolver.cpp */
 
@@ -2985,7 +2985,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "abc/Sort.h"
 #include "abc/system.h"
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 namespace Gluco {
 
@@ -3729,7 +3729,7 @@ inline void SimpSolver::reset()
 
 } /* namespace Gluco */
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 
 /*** Glucose.cpp ***/
 
@@ -3769,7 +3769,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include <math.h>
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 //=================================================================================================
 // Options:
@@ -5317,7 +5317,7 @@ inline void Solver::reset()
 
 } /* namespace Gluco */
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 
 /*** AbcGlucose.cpp */
 
@@ -5347,7 +5347,7 @@ ABC_NAMESPACE_IMPL_END
 #include "abc/abc_global.h"
 #include "abc/system.h"
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 ////////////////////////////////////////////////////////////////////////
 ///                        DECLARATIONS                              ///
@@ -5917,7 +5917,7 @@ inline void glucose_print_stats(Gluco::SimpSolver& s, abctime clk)
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 
 #undef SAT_USE_ANALYZE_FINAL
 #undef L_IND

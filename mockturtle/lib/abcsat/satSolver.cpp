@@ -27,7 +27,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <abc/satSolver.h>
 #include <abc/satStore.h>
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 #define SAT_USE_ANALYZE_FINAL
 
@@ -2494,5 +2494,5 @@ void * sat_solver_store_release( sat_solver * s )
 }
 
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
 

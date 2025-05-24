@@ -25,7 +25,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Solver.h"
 #include "abc_global.h"
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 namespace Gluco {
 
@@ -203,6 +203,6 @@ inline void SimpSolver::addVar(Var v) { while (v >= nVars()) newVar(); }
 //=================================================================================================
 }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 #endif

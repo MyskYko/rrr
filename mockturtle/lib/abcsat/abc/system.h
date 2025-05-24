@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "IntTypes.h"
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 //-------------------------------------------------------------------------------------------------
 
@@ -34,7 +34,7 @@ static inline double cpuTime(void); // CPU-time in seconds.
 
 }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 //-------------------------------------------------------------------------------------------------
 // Implementation of inline functions:
@@ -42,11 +42,11 @@ ABC_NAMESPACE_CXX_HEADER_END
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #include <time.h>
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 static inline double Gluco::cpuTime(void) { return (double)clock() / CLOCKS_PER_SEC; }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 
 #else
@@ -54,14 +54,14 @@ ABC_NAMESPACE_CXX_HEADER_END
 #include <sys/resource.h>
 #include <unistd.h>
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 static inline double Gluco::cpuTime(void) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     return (double)ru.ru_utime.tv_sec + (double)ru.ru_utime.tv_usec / 1000000; }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 #endif
 

@@ -23,7 +23,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "Vec.h"
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 namespace Gluco {
 
@@ -149,6 +149,6 @@ class Heap {
 //=================================================================================================
 }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 #endif

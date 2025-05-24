@@ -26,7 +26,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 //=================================================================================================
 // Some sorting algorithms for vec's
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 namespace Gluco {
 
@@ -96,6 +96,6 @@ template <class T> void sort(vec<T>& v) {
 //=================================================================================================
 }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 #endif

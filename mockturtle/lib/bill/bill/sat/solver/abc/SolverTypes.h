@@ -38,7 +38,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "Map.h"
 #include "Alloc.h"
 
-ABC_NAMESPACE_CXX_HEADER_START
+PABC_NAMESPACE_CXX_HEADER_START
 
 namespace Gluco {
 
@@ -437,6 +437,6 @@ inline void Clause::strengthen(Lit p)
 //=================================================================================================
 }
 
-ABC_NAMESPACE_CXX_HEADER_END
+PABC_NAMESPACE_CXX_HEADER_END
 
 #endif

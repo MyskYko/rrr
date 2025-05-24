@@ -39,7 +39,7 @@
 ///                         PARAMETERS                               ///
 ////////////////////////////////////////////////////////////////////////
 
-ABC_NAMESPACE_HEADER_START
+PABC_NAMESPACE_HEADER_START
 
 #ifdef _WIN32
 #define inline __inline // compatible with MS VS 6.0
@@ -146,7 +146,7 @@ extern void *       Intp_ManUnsatCore( Intp_Man_t * p, Sto_Man_t * pCnf, int fLe
 extern void         Intp_ManUnsatCorePrintForBmc( FILE * pFile, Sto_Man_t * pCnf, void * vCore, void * vVarMap );
 
 
-ABC_NAMESPACE_HEADER_END
+PABC_NAMESPACE_HEADER_END
 
 
 

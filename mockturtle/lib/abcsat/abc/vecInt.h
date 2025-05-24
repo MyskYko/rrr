@@ -33,7 +33,7 @@
 
 #include <stdio.h>
 
-ABC_NAMESPACE_HEADER_START
+PABC_NAMESPACE_HEADER_START
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -2073,7 +2073,7 @@ static inline void Vec_IntRemapArray( Vec_Int_t * vOld2New, Vec_Int_t * vOld, Ve
             Vec_IntWriteEntry( vNew, iNew, Vec_IntEntry(vOld, iOld) );
 }
 
-ABC_NAMESPACE_HEADER_END
+PABC_NAMESPACE_HEADER_END
 
 #ifdef _MSC_VER
 #pragma warning(pop)
