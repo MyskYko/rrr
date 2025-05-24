@@ -13,7 +13,7 @@
 #include "../solver/ghack.hpp"
 #include "../solver/glucose.hpp"
 #define ABC_USE_NAMESPACE pabc
-#define ABC_NAMESPACE pabc
+#define PABC_NAMESPACE pabc
 #define ABC_USE_NO_READLINE
 #include "../solver/abc.hpp"
 #pragma warning(pop)
@@ -35,7 +35,7 @@
 #define LIN64
 #endif
 #define ABC_USE_NAMESPACE pabc
-#define ABC_NAMESPACE pabc
+#define PABC_NAMESPACE pabc
 #define ABC_USE_NO_READLINE
 #include "../solver/abc.hpp"
 #pragma GCC diagnostic pop

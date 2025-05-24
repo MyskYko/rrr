@@ -37,7 +37,7 @@
 #define GLUCOSE_UNDEC  0
 
 
-ABC_NAMESPACE_HEADER_START
+PABC_NAMESPACE_HEADER_START
 
 ////////////////////////////////////////////////////////////////////////
 ///                         BASIC TYPES                              ///
@@ -97,7 +97,7 @@ extern int               bmcg_sat_solver_add_and( bmcg_sat_solver * s, int iVar,
 
 extern void              Glucose_SolveCnf( char * pFilename, Glucose_Pars * pPars );
 
-ABC_NAMESPACE_HEADER_END
+PABC_NAMESPACE_HEADER_END
 
 #endif
 

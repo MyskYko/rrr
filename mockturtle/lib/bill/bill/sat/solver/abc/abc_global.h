@@ -95,7 +95,7 @@
 ///                         PARAMETERS                               ///
 ////////////////////////////////////////////////////////////////////////
 
-ABC_NAMESPACE_HEADER_START
+PABC_NAMESPACE_HEADER_START
 
 ////////////////////////////////////////////////////////////////////////
 ///                         BASIC TYPES                              ///
@@ -407,7 +407,7 @@ extern void   Abc_QuickSortCostData( int * pCosts, int nSize, int fDecrease, wor
 extern int *  Abc_QuickSortCost( int * pCosts, int nSize, int fDecrease );
 
 
-ABC_NAMESPACE_HEADER_END
+PABC_NAMESPACE_HEADER_END
 
 #endif
 
