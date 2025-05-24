@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "dauInt.h"
 #include "misc/util/utilTruth.h"
 
@@ -55,7 +56,7 @@ ABC_NAMESPACE_IMPL_START
 ***********************************************************************/
 static inline word ** Dau_DsdTtElems()
 {
-    static word TtElems[DAU_MAX_VAR+1][DAU_MAX_WORD], * pTtElems[DAU_MAX_VAR+1] = {NULL};
+    thread_local static word TtElems[DAU_MAX_VAR+1][DAU_MAX_WORD], * pTtElems[DAU_MAX_VAR+1] = {NULL};
     if ( pTtElems[0] == NULL )
     {
         int v;
@@ -79,7 +80,7 @@ static inline word ** Dau_DsdTtElems()
 ***********************************************************************/
 int * Dau_DsdComputeMatches( char * p )
 {
-    static int pMatches[DAU_MAX_STR];
+    thread_local static int pMatches[DAU_MAX_STR];
     int pNested[DAU_MAX_VAR];
     int v, nNested = 0;
     for ( v = 0; p[v]; v++ )
@@ -188,7 +189,7 @@ int Dau_DsdNormalizeCompare( char * pStr, int * pMarks, int i, int j )
 }
 int * Dau_DsdNormalizePerm( char * pStr, int * pMarks, int nMarks )
 {
-    static int pPerm[DAU_MAX_VAR];
+    thread_local static int pPerm[DAU_MAX_VAR];
     int i, k;
     for ( i = 0; i < nMarks; i++ )
         pPerm[i] = i;
@@ -204,7 +205,7 @@ int * Dau_DsdNormalizePerm( char * pStr, int * pMarks, int nMarks )
 }
 void Dau_DsdNormalize_rec( char * pStr, char ** p, int * pMatches )
 {
-    static char pBuffer[DAU_MAX_STR];
+    thread_local static char pBuffer[DAU_MAX_STR];
     if ( **p == '!' )
         (*p)++;
     while ( (**p >= 'A' && **p <= 'F') || (**p >= '0' && **p <= '9') )
@@ -656,7 +657,7 @@ void Dau_DsdTest2()
 ***********************************************************************/
 static inline int Dau_DsdPerformReplace( char * pBuffer, int PosStart, int Pos, int Symb, char * pNext )
 {
-    static char pTemp[DAU_MAX_STR];
+    thread_local static char pTemp[DAU_MAX_STR];
     char * pCur = pTemp;
     int i, k, RetValue;
     for ( i = PosStart; i < Pos; i++ )
@@ -827,7 +828,7 @@ int Dau_DsdPerform_rec( word t, char * pBuffer, int Pos, int * pVars, int nVars 
 }
 char * Dau_DsdPerform( word t )
 {
-    static char pBuffer[DAU_MAX_STR];
+    thread_local static char pBuffer[DAU_MAX_STR];
     int pVarsNew[6] = {0, 1, 2, 3, 4, 5};
     int Pos = 0;
     if ( t == 0 )
@@ -969,7 +970,7 @@ struct Dau_Dsd_t_
     char     pOutput[DAU_MAX_STR]; // output stream
 };
 
-static abctime s_Times[3] = {0};
+thread_local static abctime s_Times[3] = {0};
 
 /**Function*************************************************************
 

@@ -234,7 +234,7 @@ char * If_DsdManGetCellStr( If_DsdMan_t * p )
 ***********************************************************************/
 static inline word ** If_ManDsdTtElems()
 {
-    static word TtElems[DAU_MAX_VAR+1][DAU_MAX_WORD], * pTtElems[DAU_MAX_VAR+1] = {NULL};
+    thread_local static word TtElems[DAU_MAX_VAR+1][DAU_MAX_WORD], * pTtElems[DAU_MAX_VAR+1] = {NULL};
     if ( pTtElems[0] == NULL )
     {
         int v;

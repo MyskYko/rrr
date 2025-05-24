@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "base/abc/abc.h"
 #include "opt/rwr/rwr.h"
 #include "bool/dec/dec.h"
@@ -209,7 +210,8 @@ Rwr_ManAddTimeTotal( pManRwr, Abc_Clock() - clkStart );
 ***********************************************************************/
 Cut_Man_t * Abc_NtkStartCutManForRewrite( Abc_Ntk_t * pNtk )
 {
-    static Cut_Params_t Params, * pParams = &Params;
+    thread_local static Cut_Params_t Params;
+    Cut_Params_t * pParams = &Params;
     Cut_Man_t * pManCut;
     Abc_Obj_t * pObj;
     int i;

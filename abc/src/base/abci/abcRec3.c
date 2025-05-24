@@ -93,7 +93,7 @@ struct Lms_Man_t_
     abctime           timeTotal;
 };
 
-static Lms_Man_t * s_pMan3 = NULL;
+thread_local static Lms_Man_t * s_pMan3 = NULL;
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
