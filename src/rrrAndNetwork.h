@@ -66,7 +66,7 @@ namespace rrr {
     AndNetwork(AndNetwork const &x);
 
     // initialization APIs (should not be called after optimization has started)
-    void Clear(bool fClearCallbacks = true, bool fClearBackups = true);
+    void Clear(bool fClearNetwork = true, bool fClearCallbacks = true, bool fClearBackups = true);
     void Reserve(int nReserve);
     int  AddPi();
     int  AddAnd(int id0, int id1, bool c0, bool c1);
@@ -281,29 +281,31 @@ namespace rrr {
 
   /* {{{ Initialization APIs */
 
-  void AndNetwork::Clear(bool fClearCallbacks, bool fClearBackups) {
-    nNodes = 0;
-    vPis.clear();
-    lInts.clear();
-    sInts.clear();
-    vPos.clear();
-    vvFaninEdges.clear();
-    vRefs.clear();
-    pPat = NULL;
-    fLockTrav = false;
-    iTrav = 0;
-    vTrav.clear();
-    fPropagating = false;
+  void AndNetwork::Clear(bool fClearNetwork, bool fClearCallbacks, bool fClearBackups) {
+    if(fClearNetwork) {
+      nNodes = 0;
+      vPis.clear();
+      lInts.clear();
+      sInts.clear();
+      vPos.clear();
+      vvFaninEdges.clear();
+      vRefs.clear();
+      pPat = NULL;
+      fLockTrav = false;
+      iTrav = 0;
+      vTrav.clear();
+      fPropagating = false;
+      // add constant node
+      vvFaninEdges.emplace_back();
+      vRefs.push_back(0);
+      nNodes++;
+    }
     if(fClearCallbacks) {
       vCallbacks.clear();
     }
     if(fClearBackups) {
       vBackups.clear();
     }
-    // add constant node
-    vvFaninEdges.emplace_back();
-    vRefs.push_back(0);
-    nNodes++;
   }
 
   void AndNetwork::Reserve(int nReserve) {
@@ -369,7 +371,7 @@ namespace rrr {
   }
 
   inline void AndNetwork::Read(AndNetwork const &from) {
-    Clear(false, false);
+    Clear(true, false, false);
     Copy(from);
     Action action;
     action.type = READ;
@@ -378,7 +380,7 @@ namespace rrr {
 
   template <typename Ntk, typename Reader>
   void AndNetwork::Read(Ntk const &from, Reader const &reader) {
-    Clear(false, false);
+    Clear(true, false, false);
     reader(from, this);
     Action action;
     action.type = READ;

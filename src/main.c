@@ -8,9 +8,9 @@
 #include <proof/cec/cec.h>
 
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, fDeterministic, nParallelPartitions, fOptOnInsert, fGreedy, fExSim
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, fDeterministic = 1, nParallelPartitions = 1, fOptOnInsert = 0, fGreedy = 1, fExSim = 0
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int fExSim
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim
 
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
@@ -24,8 +24,9 @@ int main(int argc, char **argv) {
   int c;
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
+  char *ofname = NULL;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLIBDRWTCGVPOAQSabcdefgvh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLIEFBDRWTCGVPOAQSUHMabcdefgvoh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -59,6 +60,14 @@ int main(int argc, char **argv) {
           break;
       case 'I':
           nPartitionInputMax = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'E':
+          nResynSize = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'F':
+          nResynInputMax = atoi(argv[globalUtilOptind]);
           globalUtilOptind++;
           break;
       case 'B':
@@ -111,6 +120,22 @@ int main(int argc, char **argv) {
           break;
       case 'S':
           nSatSolverVerbose = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'U':
+          nResynVerbose = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'H':
+          nHops = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'M':
+          nJumps = atoi(argv[globalUtilOptind]);
+          globalUtilOptind++;
+          break;
+      case 'o':
+          ofname = argv[globalUtilOptind];
           globalUtilOptind++;
           break;
       case 'a':
@@ -210,6 +235,9 @@ int main(int argc, char **argv) {
   }
 
   //Gia_AigerWrite(pNew, "out.aig", 0, 0, 0);
+  if(ofname != NULL) {
+    Gia_AigerWrite(pNew, ofname, 0, 0, 0);
+  }
   
   Gia_ManStop(pGia);
   Gia_ManStop(pNew);
@@ -218,7 +246,7 @@ int main(int argc, char **argv) {
   return 0;
 
 usage:
-      Abc_Print( -2, "usage: rrr [-XYZNJKLBDRWTCGVPOAQS num] [-abdegh]\n" );
+      Abc_Print( -2, "usage: rrr [-XYZNJKLIEFBDRWTCGVPOAQSUHM num] [-abdegoh]\n" );
       Abc_Print( -2, "\t        perform optimization\n" );
       Abc_Print( -2, "\t-X num : method [default = %d]\n", nOptimizerFlow );
       Abc_Print( -2, "\t                0: single-add resub\n" );
@@ -236,6 +264,9 @@ usage:
       Abc_Print( -2, "\t-J num : number of threads [default = %d]\n", nThreads );
       Abc_Print( -2, "\t-K num : maximum partition size (0 = no partitioning) [default = %d]\n", nPartitionSize );
       Abc_Print( -2, "\t-L num : minimum partition size [default = %d]\n", nPartitionSizeMin );
+      Abc_Print( -2, "\t-I num : maximum partition input size [default = %d]\n", nPartitionInputMax );
+      Abc_Print( -2, "\t-E num : maximum partition size for resynthesis [default = %d]\n", nResynSize );
+      Abc_Print( -2, "\t-F num : maximum partition input size for resynthesis [default = %d]\n", nResynInputMax );
       Abc_Print( -2, "\t-B num : maximum number of partitions to optimize in parallel [default = %d]\n", nParallelPartitions );
       Abc_Print( -2, "\t-D num : maximum distance between node and new fanin (0 = no limit) [default = %d]\n", nDistance );
       Abc_Print( -2, "\t-R num : random number generator seed [default = %d]\n", iSeed );
@@ -249,11 +280,15 @@ usage:
       Abc_Print( -2, "\t-A num : analyzer verbosity level [default = %d]\n", nAnalyzerVerbose );
       Abc_Print( -2, "\t-Q num : simulator verbosity level [default = %d]\n", nSimulatorVerbose );
       Abc_Print( -2, "\t-S num : SAT solver verbosity level [default = %d]\n", nSatSolverVerbose );
+      Abc_Print( -2, "\t-U num : resynthesis verbosity level [default = %d]\n", nResynVerbose );
+      Abc_Print( -2, "\t-H num : number of no improvement iterations before each hop [default = %d]\n", nHops );
+      Abc_Print( -2, "\t-M num : number of no improvement iterations before each jump [default = %d]\n", nJumps );
       Abc_Print( -2, "\t-a     : use BDD-based analyzer (CSPF) [default = %s]\n", fUseBddCspf? "yes": "no" );
       Abc_Print( -2, "\t-b     : use BDD-based analyzer (MSPF) [default = %s]\n", fUseBddMspf? "yes": "no" );
       Abc_Print( -2, "\t-d     : ensure deterministic execution [default = %s]\n", fDeterministic? "yes": "no" );
       Abc_Print( -2, "\t-e     : apply \"c2rs; dc2\" after importing changes of partitions [default = %s]\n", fOptOnInsert? "yes": "no" );
       Abc_Print( -2, "\t-g     : discard changes that increased the cost [default = %s]\n", fGreedy? "yes": "no" );
+      Abc_Print( -2, "\t-o     : output file name [default = %s]\n", ofname? ofname : "" );
       Abc_Print( -2, "\t-h     : print the command usage\n");
 
     Abc_Stop();
