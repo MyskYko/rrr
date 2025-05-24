@@ -41,12 +41,14 @@ namespace rrr {
   public:
     // constructors
     Partitioner(Parameter const *pPar);
+    Partitioner(int nVerbose, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax);
     void AssignNetwork(Ntk *pNtk_);
 
     // APIs
     Ntk *Extract(int iSeed);
     void Insert(Ntk *pSubNtk);
     std::vector<int> GetInputs(Ntk *pSubNtk);
+    bool IsTooSmall(Ntk *pNtk_);
   };
 
   /* {{{ Print */
@@ -277,6 +279,14 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  Partitioner<Ntk>::Partitioner(int nVerbose, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax) :
+    nVerbose(nVerbose),
+    nPartitionSize(nPartitionSize),
+    nPartitionSizeMin(nPartitionSizeMin),
+    nPartitionInputMax(nPartitionInputMax) {
+  }
+
+  template <typename Ntk>
   void Partitioner<Ntk>::AssignNetwork(Ntk *pNtk_) {
     pNtk = pNtk_;
     assert(mSubNtk2Io.empty());
@@ -304,6 +314,7 @@ namespace rrr {
         Print(0, "try partitioning with node", id, "(", i, "/", int_size(vInts), ")");
         Ntk *pSubNtk = ExtractDisjoint(id);
         if(pSubNtk) {
+          Print(0, "got partitioning with node", id, "(", i, "/", int_size(vInts), ")", "with size", pSubNtk->GetNumInts());
           return pSubNtk;
         }
       }
@@ -347,6 +358,11 @@ namespace rrr {
   template <typename Ntk>
   std::vector<int> Partitioner<Ntk>::GetInputs(Ntk *pSubNtk) {
     return std::get<1>(mSubNtk2Io[pSubNtk]);
+  }
+
+  template <typename Ntk>
+  bool Partitioner<Ntk>::IsTooSmall(Ntk *pNtk_) {
+    return pNtk_->GetNumInts() <= nPartitionSizeMin;
   }
 
   /* }}} */

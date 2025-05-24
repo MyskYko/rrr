@@ -90,4 +90,18 @@ namespace rrr {
     pNtk->Read(pGia, GiaReader<Ntk>);
   }
 
+  void AbcLmsStart(std::string lib_name) {
+    std::string Command = "rec_start3 " + lib_name;
+    Abc_Frame_t *pAbc = Abc_FrameGetGlobalFrame();
+    if(Abc_FrameIsBatchMode()) {
+      int r = Cmd_CommandExecute(pAbc, Command.c_str());
+      assert(r == 0);
+    } else {
+      Abc_FrameSetBatchMode(1);
+      int r = Cmd_CommandExecute(pAbc, Command.c_str());
+      assert(r == 0);
+      Abc_FrameSetBatchMode(0);
+    }
+  }
+  
 }

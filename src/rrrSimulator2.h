@@ -982,7 +982,7 @@ namespace rrr {
     nVerbose(0),
     nWords(0),
     nStimuli(0),
-    fExSim(false),
+    fExSim(true), // for sdc
     nRelaxedPatterns(0),
     fGenerated(false),
     fInitialized(false),
@@ -1041,13 +1041,15 @@ namespace rrr {
     pNtk = pNtk_;
     pNtk->AddCallback(std::bind(&Simulator2<Ntk>::ActionCallback, this, std::placeholders::_1));
     Pattern *pPat = pNtk->GetPattern();
-    if(pPat) {
+    if(!fGenerated && pPat) {
       ReadStimuli(pPat);
       care.resize(nStimuli);
       tmp.resize(nStimuli);
     }
-    if(fExSim) {
+    if(!fGenerated && fExSim) {
       GenerateExhaustiveStimuli();
+      care.resize(nStimuli);
+      tmp.resize(nStimuli);
     }
   }
 

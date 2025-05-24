@@ -14,6 +14,7 @@ namespace rrr {
     int nAnalyzerVerbose = 0;
     int nSimulatorVerbose = 0;
     int nSatSolverVerbose = 0;
+    int nResynVerbose = 0;
     bool fUseBddCspf = false;
     bool fUseBddMspf = false;
     int nConflictLimit = 0;
@@ -27,6 +28,10 @@ namespace rrr {
     int nPartitionSize = 0;
     int nPartitionSizeMin = 0;
     int nPartitionInputMax = 0;
+    int nResynSize = 30;
+    int nResynInputMax = 16;
+    int nHops = 10;
+    int nJumps = 100;
     bool fDeterministic = true;
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;
