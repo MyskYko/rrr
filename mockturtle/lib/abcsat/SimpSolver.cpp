@@ -22,7 +22,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "abc/SimpSolver.h"
 #include "abc/system.h"
 
-ABC_NAMESPACE_IMPL_START
+PABC_NAMESPACE_IMPL_START
 
 using namespace Gluco;
 
@@ -758,4 +758,4 @@ void SimpSolver::reset()
     remove_satisfied      = false;
 }
 
-ABC_NAMESPACE_IMPL_END
+PABC_NAMESPACE_IMPL_END
