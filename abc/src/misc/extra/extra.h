@@ -38,6 +38,7 @@
 /* Nested includes                                                           */
 /*---------------------------------------------------------------------------*/
 
+#include <threads.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -404,10 +405,10 @@ extern char *        Extra_UtilPrintTime( long t );
 extern char *        Extra_UtilStrsav( const char *s );
 extern char *        Extra_UtilTildeExpand( char *fname );
 extern char *        Extra_UtilFileSearch( char *file, char *path, char *mode );
-extern void          (*Extra_UtilMMoutOfMemory)( long size );
+extern void (*Extra_UtilMMoutOfMemory)( long size );
 
-extern const char *  globalUtilOptarg;
-extern int           globalUtilOptind;
+extern thread_local const char *  globalUtilOptarg;
+extern thread_local int           globalUtilOptind;
 
 /**AutomaticEnd***************************************************************/
 

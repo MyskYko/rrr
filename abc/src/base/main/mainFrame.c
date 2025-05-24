@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "base/abc/abc.h"
 #include "mainInt.h"
 #include "bool/dec/dec.h"
@@ -35,7 +36,7 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-static Abc_Frame_t * s_GlobalFrame = NULL;
+thread_local static Abc_Frame_t * s_GlobalFrame = NULL;
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///

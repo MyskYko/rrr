@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "darInt.h"
 #include "aig/gia/gia.h"
 #include "dar.h"
@@ -105,7 +106,7 @@ struct Dar_Lib_t_ // library
     unsigned char *  pMap;
 };
 
-static Dar_Lib_t * s_DarLib = NULL;
+thread_local static Dar_Lib_t * s_DarLib = NULL;
 
 static inline Dar_LibObj_t * Dar_LibObj( Dar_Lib_t * p, int Id )    { return p->pObjs + Id; }
 static inline int            Dar_LibObjTruth( Dar_LibObj_t * pObj ) { return pObj->Num < (0xFFFF & ~pObj->Num) ? pObj->Num : (0xFFFF & ~pObj->Num); }
