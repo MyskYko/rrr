@@ -330,7 +330,7 @@ public:
                       if ( ps.filter_cyclic_substitutions &&
                            call_with_stopwatch( st.time_window, [&]() { return is_contained_in_tfi( ntk, ntk.get_node( _new ), ntk.get_node( _old ) ); } ) )
                       {
-                        std::cout << "undo resubstitution " << ntk.get_node( _old ) << std::endl;
+                        //std::cout << "undo resubstitution " << ntk.get_node( _old ) << std::endl;
                         substitutions.emplace_back( std::make_pair( ntk.get_node( _old ), ntk.is_complemented( _old ) ? !_new : _new ) );
                         for ( auto it = std::rbegin( substitutions ); it != std::rend( substitutions ); ++it )
                         {
