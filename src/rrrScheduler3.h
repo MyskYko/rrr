@@ -42,6 +42,7 @@ namespace rrr {
     int nHops;
     int nJumps;
     bool fOptOnInsert;
+    std::string strOutput;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
 
@@ -762,6 +763,7 @@ namespace rrr {
     nHops(pPar->nHops),
     nJumps(pPar->nJumps),
     fOptOnInsert(pPar->fOptOnInsert),
+    strOutput(pPar->strOutput),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -861,7 +863,9 @@ namespace rrr {
           if(cost < costBest) {
             pNtk->Read(*(pJob->pNtk));
             costBest = cost;
-            DumpAig("best.aig", pNtk, true);
+	    if(!strOutput.empty()) {
+	      DumpAig(strOutput, pNtk, true);
+	    }
           }
           // next job
           int column = pJob->column;
