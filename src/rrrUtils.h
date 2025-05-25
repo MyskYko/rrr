@@ -80,7 +80,7 @@ namespace rrr {
     return os;
   }
 
-  void PrintComplementedEdges(std::function<void(std::function<void(int, bool)> const &)> const &ForEachEdge) {
+  static inline void PrintComplementedEdges(std::function<void(std::function<void(int, bool)> const &)> const &ForEachEdge) {
     std::string delim;
     std::cout << "[";
     ForEachEdge([&] (int id, bool c) {
@@ -235,7 +235,7 @@ namespace rrr {
   
   /* {{{ Combination */
 
-  bool ForEachCombinationStopRec(std::vector<int> &v, int n, int k, std::function<bool(std::vector<int> const &)> const &func) {
+  inline bool ForEachCombinationStopRec(std::vector<int> &v, int n, int k, std::function<bool(std::vector<int> const &)> const &func) {
     if(k == 0) {
       return func(v);
     }

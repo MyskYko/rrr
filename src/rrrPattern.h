@@ -19,7 +19,7 @@ namespace rrr {
     int GetNumWords() const;
   };
 
-  void Pattern::Read(std::string filename, int nInputs) {
+  inline void Pattern::Read(std::string filename, int nInputs) {
     std::ifstream f(filename, std::ios::binary);
     auto start = f.tellg();
     f.seekg(0, std::ios::end);
@@ -58,11 +58,11 @@ namespace rrr {
     }
   }
 
-  std::vector<unsigned long long>::const_iterator Pattern::GetIterator(int index) const {
+  inline std::vector<unsigned long long>::const_iterator Pattern::GetIterator(int index) const {
     return data[index].cbegin();
   }
 
-  int Pattern::GetNumWords() const {
+  inline int Pattern::GetNumWords() const {
     return nWords;
   }
 }
