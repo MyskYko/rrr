@@ -12,6 +12,7 @@
 #include "rrrParameter.h"
 #include "rrrUtils.h"
 #include "rrrAbc.h"
+#include "rrrMockturtle.h"
 
 #include "rrrSimulator2.h"
 
@@ -134,6 +135,7 @@ namespace rrr {
     int last_impr;
     double costInitial;
     std::string prefix;
+    std::string log;
     double duration;
     summary<int> stats;
     summary<double> times;
@@ -387,8 +389,24 @@ namespace rrr {
     switch(pJob->stage) {
     case 0: {
       // run ABC/mockturtle
-      std::string cmd = AbcLocal(rng, false);
-      Abc9Execute(pJob->pNtk, cmd);
+      switch(rng() % 2) {
+      case 0: {
+        std::string cmd = AbcLocal(rng, false);
+	pJob->log = cmd;
+	Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        Abc9Execute(pJob->pNtk, cmd);
+	//std::cout << pJob->column << " " << cmd << std::endl;
+        break;
+      }
+      case 1: {
+	std::cout << "colmn " << pJob->column;
+        std::string cmd = MockturtlePerformLocal(pJob->pNtk, rng);
+	pJob->log = cmd;
+        break;
+      }
+      default:
+        assert(0);
+      }
       break;
     }
     case 1: {

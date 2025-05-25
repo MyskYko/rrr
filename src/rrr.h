@@ -2,6 +2,7 @@
 
 #include "rrrAndNetwork.h"
 #include "rrrScheduler.h"
+#include "rrrScheduler3.h"
 #include "rrrOptimizer.h"
 #include "rrrBddAnalyzer.h"
 #include "rrrBddMspfAnalyzer.h"
@@ -25,7 +26,8 @@ namespace rrr {
         Scheduler<Ntk, Optimizer<Ntk, BddMspfAnalyzer<Ntk>>, Partitioner<Ntk>> sch(pNtk, pPar);
         sch.Run();
       } else {
-        Scheduler<Ntk, Optimizer<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+        //Scheduler<Ntk, Optimizer<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+        Scheduler3<Ntk, Optimizer<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
         sch.Run();
       }
       break;
