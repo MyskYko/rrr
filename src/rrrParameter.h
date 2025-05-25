@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace rrr {
 
   struct Parameter {
@@ -35,6 +37,7 @@ namespace rrr {
     bool fOptOnInsert = false;
     bool fGreedy = true;
     bool fExSim = false;
+    std::string strOutput;
   };
   
 }
