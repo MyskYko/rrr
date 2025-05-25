@@ -6,6 +6,8 @@
 
 #include "rrrUtils.h"
 
+using namespace aabbcc;
+
 namespace rrr {
 
   template <typename Ntk>
