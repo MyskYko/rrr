@@ -34,7 +34,8 @@ using namespace mockturtle;
 namespace rrr {
 
   static inline void DebugPrint(std::string log) {
-    std::cout << log << std::endl;
+    (void)log;
+    //std::cout << log << std::endl;
   }
 
   template <typename Rng>

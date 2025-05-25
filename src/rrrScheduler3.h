@@ -323,7 +323,8 @@ namespace rrr {
     Command += std::to_string(KLut);
     Command += "; ";
     Command += "&mfs -e -W 20 -L 20; ";
-    Command += fFx ? "&fx; &st" : "";
+    Command += fFx ? "&fx; " : "";
+    Command += "&st";
     return Command;
   }
   
@@ -372,8 +373,9 @@ namespace rrr {
     }
     Command += "; ";
     if(rng() & 1) {
-      Command += "&fx; &st;";
+      Command += "&fx; ";
     }
+    Command += "&st";
     return Command;
   }
   
@@ -393,13 +395,12 @@ namespace rrr {
       case 0: {
         std::string cmd = AbcLocal(rng, false);
 	pJob->log = cmd;
-	Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         Abc9Execute(pJob->pNtk, cmd);
-	//std::cout << pJob->column << " " << cmd << std::endl;
         break;
       }
       case 1: {
-	std::cout << "colmn " << pJob->column;
+	//std::cout << "colmn " << pJob->column;
         std::string cmd = MockturtlePerformLocal(pJob->pNtk, rng);
 	pJob->log = cmd;
         break;
@@ -417,6 +418,8 @@ namespace rrr {
           parOpt.AssignNetwork(pJob->pNtk);
           Ntk *pSubNtk = parOpt.Extract(seed);
           if(pSubNtk) {
+	    pJob->log = "transduction part";
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             opt.AssignNetwork(pSubNtk);
             opt.SetPrintLine([&](std::string str) {
               Print(-1, pJob->prefix, str);
@@ -428,6 +431,8 @@ namespace rrr {
             opt.ResetSummary();
           }
         } else {
+	  pJob->log = "transduction";
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
           opt.AssignNetwork(pJob->pNtk);
           opt.SetPrintLine([&](std::string str) {
             Print(-1, pJob->prefix, str);
@@ -440,6 +445,8 @@ namespace rrr {
         break;
       case 1: {
         std::string cmd = AbcLocal(rng, true);
+	pJob->log = cmd;
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         Abc9Execute(pJob->pNtk, cmd);
         break;
       }
@@ -456,8 +463,10 @@ namespace rrr {
         parResyn.AssignNetwork(pJob->pNtk);
         Ntk *pSubNtk = parResyn.Extract(seed);
         if(pSubNtk) {
-          switch(rng() % 5) {
+          switch(rng() % /*5*/2) {
           case 0: {
+	    pJob->log = "ttopt";
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             std::vector<ABC_UINT64_T> vSdc;
             {
               sim.AssignNetwork(pJob->pNtk, true);
@@ -476,6 +485,8 @@ namespace rrr {
           }
           case 1: {
             std::string cmd = "&transduction -V 0 -T 3";
+	    pJob->log = cmd;
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             if(rng() & 1) {
               cmd += " -m";
             }
@@ -486,6 +497,8 @@ namespace rrr {
             break;
           }
           case 2:
+	    pJob->log = "collapse; sop; fx";
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             if(fMultiThreading) {
               std::unique_lock<std::mutex> l(mutexAbc);
               Abc9Execute(pSubNtk, "&put; collapse; sop; fx; strash; &get");
@@ -494,6 +507,8 @@ namespace rrr {
             }
             break;
           case 3:
+	    pJob->log = "collapse; dsd";
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             if(fMultiThreading) {
               std::unique_lock<std::mutex> l(mutexAbc);
               Abc9Execute(pSubNtk, "&put; collapse; dsd; strash; &get");
@@ -502,6 +517,8 @@ namespace rrr {
             }
             break;
           case 4:
+	    pJob->log = "collapse; aig; bidec";
+	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             if(fMultiThreading) {
               std::unique_lock<std::mutex> l(mutexAbc);
               Abc9Execute(pSubNtk, "&put; collapse; aig; bidec; strash; &get");
@@ -520,22 +537,32 @@ namespace rrr {
         case 0: {
           int fCom; // unused
           std::string cmd = DeepSynOne(rng(), rng, fCom);
+	  pJob->log = cmd;
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
           Abc9Execute(pJob->pNtk, cmd);
           break;
         }
         case 1: {
           std::string cmd = DeepSynExtra(rng);
+	  pJob->log = cmd;
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
           Abc9Execute(pJob->pNtk, cmd);
           break;
         }
         case 2:
-          Abc9Execute(pJob->pNtk, "&if -y -K 6");
+	  pJob->log = "&if -y -K 6";
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+          Abc9Execute(pJob->pNtk, "&if -y -K 6; &st");
           break;
         case 3:
-          Abc9Execute(pJob->pNtk, "&if -g");
+	  pJob->log = "&if -g";
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+          Abc9Execute(pJob->pNtk, "&if -g; &st");
           break; 
         case 4:
-          Abc9Execute(pJob->pNtk, "&if -x");
+	  pJob->log = "&if -x";
+	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+          Abc9Execute(pJob->pNtk, "&if -x; &st");
           break; 
         default:
           assert(0);
@@ -808,6 +835,7 @@ namespace rrr {
     }
 #endif
     assert(!fMultiThreading);
+    AbcLmsStart("lib6.aig");
     pOpt = new Opt(pPar, CostFunction);
     pParOpt = new Par(pPar);
     pParResyn = new Par(pPar->nResynVerbose, pPar->nResynSize, 0, pPar->nResynInputMax);
@@ -877,7 +905,7 @@ namespace rrr {
           double cost = CostFunction(pJob->pNtk);          
           Print(1, pJob->prefix, "finished", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost);
           //Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", "duration", "=", pJob->duration, "s", ",", "elapsed", "=", GetElapsedTime(), "s");
-          Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", pJob->pNtk->GetNumInts(), ",", pJob->pNtk->GetNumLevels(), ",", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", pJob->column, ",", pJob->stage, ",", pJob->iteration, ",", pJob->last_impr, ",", pJob->duration, "s", ",", GetElapsedTime(), "s");
+	  Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", pJob->pNtk->GetNumInts(), ",", pJob->pNtk->GetNumLevels(), ",", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", pJob->column, ",", pJob->stage, ",", pJob->iteration, ",", pJob->last_impr, ",", pJob->duration, "s", ",", GetElapsedTime(), "s", ",", pJob->log);
           if(cost < costBest) {
             pNtk->Read(*(pJob->pNtk));
             costBest = cost;
@@ -909,7 +937,7 @@ namespace rrr {
           costs.push_back(CostFunction(pNtk_));
         }
         std::sort(costs.begin(), costs.end());
-        Print(-1, "", "optimized", "(", nFinishedJobs, " / ", nJobs, ")", ":", costs);
+        Print(-1, "", "optimized", "(", nFinishedJobs, " / ", nJobs, ")", ":", costs, ",", GetElapsedTime(), "s");
       }
       // sync
       double costMin = CostFunction(vPopulation[0]);
