@@ -3,8 +3,8 @@
 #include "rrr.h"
 #include "rrrAbc.h"
 
-extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int ResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond) {
+//extern "C"
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int ResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -49,6 +49,8 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   }
   if(pCond) {
     Par.strCond = std::string(pCond);
+  if(pOutput) {
+    Par.strOutput = pOutput;
   }
   rrr::Perform(&ntk, &Par);
   Gia_Man_t *pNew = rrr::CreateGia(&ntk, false);

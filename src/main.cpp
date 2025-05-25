@@ -7,11 +7,11 @@
 // #include <map/amap/amap.h>
 #include <proof/cec/cec.h>
 
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, nRelaxedPatterns, pTemporary, pPattern, pCond, pOutput
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL, pOutput = NULL
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, nRelaxedPatterns, pTemporary, pPattern, pCond
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond
-
+using namespace aabbcc;
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
 Gia_Man_t *MinimizeTest(Gia_Man_t *pGia, PARAMS_DECL);
@@ -24,7 +24,6 @@ int main(int argc, char **argv) {
   int c;
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
-  char *ofname = NULL;
   Extra_UtilGetoptReset();
   while ( ( c = Extra_UtilGetopt( argc, argv, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgijklvoh" ) ) != EOF )
   {
@@ -172,7 +171,7 @@ int main(int argc, char **argv) {
           globalUtilOptind++;
           break;
       case 'o':
-          ofname = argv[globalUtilOptind];
+          pOutput = argv[globalUtilOptind];
           globalUtilOptind++;
           break;
       case 'v':
@@ -188,6 +187,8 @@ int main(int argc, char **argv) {
   if(argc != globalUtilOptind + 1) {
     goto usage;
   }
+
+  {
   
   char * fname = argv[globalUtilOptind];
   Gia_Man_t *pGia = Gia_AigerRead(fname, 0, 0, 0);
@@ -250,8 +251,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  if(ofname != NULL) {
-    Gia_AigerWrite(pNew, ofname, 0, 0, 0);
+  if(pOutput != NULL) {
+    Gia_AigerWrite(pNew, pOutput, 0, 0, 0);
   }
   
   Gia_ManStop(pGia);
@@ -259,6 +260,7 @@ int main(int argc, char **argv) {
   
   Abc_Stop();
   return 0;
+  }
 
 usage:
       Abc_Print( -2, "usage: rrr [-XYZNJKLIEFBDRWTCGVPOAQSUHMl num] [-ijko str] [-abdegh]\n" );
@@ -302,7 +304,7 @@ usage:
       Abc_Print( -2, "\t-i str : temporary file prefix [default = \"%s\"]\n", pTemporary? pTemporary: "" );
       Abc_Print( -2, "\t-j str : simulation pattern file [default = \"%s\"]\n", pPattern? pPattern: "" );
       Abc_Print( -2, "\t-k str : custom condition AIG [default = \"%s\"]\n", pCond? pCond: "" );
-      Abc_Print( -2, "\t-o str : output file name [default = %s]\n", ofname? ofname : "" );
+      Abc_Print( -2, "\t-o str : output file name [default = %s]\n", pOutput? pOutput : "" );
       Abc_Print( -2, "\t-a     : use BDD-based analyzer (CSPF) [default = %s]\n", fUseBddCspf? "yes": "no" );
       Abc_Print( -2, "\t-b     : use BDD-based analyzer (MSPF) [default = %s]\n", fUseBddMspf? "yes": "no" );
       Abc_Print( -2, "\t-d     : ensure deterministic execution [default = %s]\n", fDeterministic? "yes": "no" );
