@@ -19,6 +19,7 @@ namespace rrr {
     using citr = std::vector<int>::const_iterator;
     using ritr = std::vector<int>::reverse_iterator;
     using critr = std::vector<int>::const_reverse_iterator;
+    static constexpr bool fFastRr = true;
     
     // pointer to network
     Ntk *pNtk;
@@ -669,6 +670,28 @@ namespace rrr {
       while(Reduce(true)) {
         fReduced = true;
         SortFanins();
+      }
+    } else if(fFastRr) {
+      bool fReduced_ = true;
+      std::vector<int> vInts;
+      while(fReduced_) {
+        fReduced_ = false;
+        vInts = pNtk->GetInts();
+        for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+          if(!pNtk->IsInt(*it)) {
+            continue;
+          }
+          if(pNtk->GetNumFanouts(*it) == 0) {
+            pNtk->RemoveUnused(*it);
+            continue;
+          }
+          SortFanins(*it);
+          fReduced_ |= ReduceFanins(*it);
+          if(pNtk->GetNumFanins(*it) <= 1) {
+            pNtk->Propagate(*it);
+          }
+        }
+        fReduced |= fReduced_;
       }
     } else {
       std::vector<int> vInts = pNtk->GetInts();
@@ -1430,6 +1453,41 @@ namespace rrr {
     case 5:
       //RemoveRedundancy();
       Reduce();
+      break;
+    case 6:
+      RemoveRedundancy();
+      for(int i = 0; i < 1; i++) {
+        if(!strTemporary.empty()) {
+          std::string str = strTemporary + std::to_string(i) + ".aig";
+          DumpAig(str, pNtk, false);
+        }
+        std::vector<int> vCands;
+        if(!nDistance) {
+          vCands = pNtk->GetPisInts();
+          std::shuffle(vCands.begin(), vCands.end(), rng);
+        }
+        Stats statsSingle, statsMulti;
+        ApplyRandomlyStop([&](int id) {
+          statsLocal.Reset();
+          if(nDistance) {
+            vCands = pNtk->GetNeighbors(id, true, nDistance);
+            std::shuffle(vCands.begin(), vCands.end(), rng);
+          }
+          bool fChanged;
+          if(/*rng() & 1*/true) {
+            fChanged = SingleResubStop(id, vCands);
+            statsSingle += statsLocal;
+          } else {
+            fChanged = MultiResubStop(id, vCands);
+            statsMulti += statsLocal;
+          }
+          return fChanged;
+        });
+        stats["single"] += statsSingle;
+        stats["multi"] += statsMulti;
+        Print(0, "single", ":", statsSingle.GetString());
+        Print(0, "multi ", ":", statsMulti.GetString());
+      }
       break;
     default:
       assert(0);
