@@ -31,6 +31,8 @@ namespace rrr {
       Gia_Man_t *pGia = Gia_AigerRead(buf, 0, 0, 0);
       pCond = new AndNetwork;
       pCond->Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
+      Gia_ManStop(pGia);
+      pNtk->RegisterCond(pCond);
     }
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     switch(pPar->nPartitionType) {
@@ -63,6 +65,9 @@ namespace rrr {
     }
     if(pPat) {
       delete pPat;
+    }
+    if(pCond) {
+      delete pCond;
     }
   }
   
