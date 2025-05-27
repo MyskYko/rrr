@@ -13,24 +13,37 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  static inline void ExternalAbcExecute(Ntk *pNtk, std::string Command) {
+  static inline void ExternalAbcExecute(Ntk *pNtk, std::string Command, bool fCheck = false) {
     static constexpr char *pAbc = "~/abc/abc";
     // create file
-    char filename[] = "/tmp/rrr_XXXXXX";
-    int fd = mkstemp(filename);
+    char filenamet[] = "/tmp/rrr_XXXXXX";
+    int fd = mkstemp(filenamet);
     assert(fd != -1);
     close(fd);
     // write aig
+    char filename[30];
+    sprintf(filename, "%s.aig", filenamet);
     Gia_Man_t *pGia = CreateGia(pNtk, true);
     Gia_AigerWrite(pGia, filename, 0, 0, 0);
     Gia_ManStop(pGia);
     // call external abc
     std::string cmd = pAbc;
-    cmd += " -q \"read_aiger ";
+    if(fCheck) {
+      cmd += " -c ";
+    } else {
+      cmd += " -q ";
+    }
+    cmd += "\"read_aiger ";
     cmd += filename;
     cmd += "; ";
     cmd += Command;
-    cmd += "; strash; write_aiger ";
+    cmd += "; strash; ";
+    if(fCheck) {
+      cmd += "cec -n ";
+      cmd += filename;
+      cmd += "; ";
+    }
+    cmd += "write_aiger ";
     cmd += filename;
     cmd += "\"";
     SystemCall(cmd);
@@ -39,6 +52,7 @@ namespace rrr {
     pNtk->Read(pGia, GiaReader<Ntk>);
     Gia_ManStop(pGia);
     unlink(filename);
+    unlink(filenamet);
   }
   
 }
