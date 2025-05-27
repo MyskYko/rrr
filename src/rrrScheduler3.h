@@ -104,7 +104,7 @@ namespace rrr {
     void RunJob(Opt &opt, Par &parOpt, Par &parResyn, Simulator2<Ntk> &sim, Job *pJob);
 
     // manage jobs
-    Job *CreateJob(Ntk *pNtk_, int column, int stage, int iteration, int last_impr, double cost);
+    Job *CreateJob(Ntk *pNtk_, int column, int stage, int iteration, int last_impr, double costImproved, double costInitial);
     void OnJobEnd(std::function<void(Job *pJob)> const &func);
 
     // thread
@@ -136,6 +136,7 @@ namespace rrr {
     int stage;
     int iteration;
     int last_impr;
+    double costImproved;
     double costInitial;
     std::string prefix;
     std::string log;
@@ -144,14 +145,15 @@ namespace rrr {
     summary<double> times;
     
     // constructor
-    Job(int id, Ntk *pNtk, int column, int stage, int iteration, int last_impr, double cost) :
+    Job(int id, Ntk *pNtk, int column, int stage, int iteration, int last_impr, double costImproved, double costInitial) :
       id(id),
       pNtk(pNtk),
       column(column),
       stage(stage),
       iteration(iteration),
       last_impr(last_impr),
-      costInitial(cost) {
+      costImproved(costImproved),
+      costInitial(costInitial) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
       prefix = ss.str() + " ";
@@ -439,7 +441,8 @@ namespace rrr {
       Command += " -m";
     }
     Command += "; ";
-    Command += "&mfs -W 100000 -F 100000 -D 100000 -L 100000 -C 100000";
+    Command += "&mfs";
+    //Command += " -W 100000 -F 100000 -D 100000 -L 100000 -C 100000"; // too much
     if(rng() & 1) {
       Command += " -a";
     }
@@ -744,8 +747,8 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename Scheduler3<Ntk, Opt, Par>::Job *Scheduler3<Ntk, Opt, Par>::CreateJob(Ntk *pNtk_, int column, int stage, int iteration, int last_impr, double cost) {
-    Job *pJob = new Job(nCreatedJobs++, pNtk_, column, stage, iteration, last_impr, cost);
+  typename Scheduler3<Ntk, Opt, Par>::Job *Scheduler3<Ntk, Opt, Par>::CreateJob(Ntk *pNtk_, int column, int stage, int iteration, int last_impr, double costImproved, double costInitial) {
+    Job *pJob = new Job(nCreatedJobs++, pNtk_, column, stage, iteration, last_impr, costImproved, costInitial);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -969,9 +972,9 @@ namespace rrr {
       for(int i = 0; i < nPopulation; i++) {
         Job *pJob;
         if(fFirst) {
-          pJob = CreateJob(vPopulation[i], i, 0, 0, 0, CostFunction(vPopulation[i]));
+          pJob = CreateJob(vPopulation[i], i, 0, 0, 0, CostFunction(vPopulation[i]), CostFunction(vPopulation[i]));
         } else {
-          pJob = CreateJob(vPopulation[i], i, 2, vIterations[i], vIterations[i], CostFunction(vPopulation[i]));
+          pJob = CreateJob(vPopulation[i], i, 2, vIterations[i], vIterations[i], CostFunction(vPopulation[i]), CostFunction(vPopulation[i]));
         }
         Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
       }
@@ -993,14 +996,22 @@ namespace rrr {
           // next job
           int column = pJob->column;
           int iteration = pJob->iteration + 1;
-          int last_impr = (cost < pJob->costInitial)? pJob->iteration: pJob->last_impr;
+          int last_impr;
+          double costImproved;
+          if(cost < pJob->costImproved) {
+            last_impr = pJob->iteration;
+            costImproved = cost;
+          } else {
+            last_impr = pJob->last_impr;
+            costImproved = pJob->costImproved;
+          }
           if(GetRemainingTime() < 0 || nCreatedJobs >= nJobs || (nJumps && iteration - last_impr == nJumps)) {
             vIterations[pJob->column] = pJob->iteration + 1;
             pJob = NULL; // end or wait for jump
-          } else if(nHops && (iteration - last_impr  + 1) % nHops == 0) {
-            pJob = CreateJob(pJob->pNtk, column, 1, iteration, last_impr, cost);
+          } else if(nHops && iteration - last_impr % nHops == 0) {
+            pJob = CreateJob(pJob->pNtk, column, 1, iteration, last_impr, costImproved, cost);
           } else {
-            pJob = CreateJob(pJob->pNtk, column, 0, iteration, last_impr, cost);
+            pJob = CreateJob(pJob->pNtk, column, 0, iteration, last_impr, costImproved, cost);
           }
           if(pJob) {
             Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
