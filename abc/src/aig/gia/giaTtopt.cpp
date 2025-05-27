@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <cassert>
 #include <bitset>
+#include <random>
 
 #include "gia.h"
 #include "misc/vec/vecHash.h"
@@ -57,11 +58,13 @@ public:
   std::vector<std::vector<std::vector<int> > > vvRedundantIndicesSaved;
   std::vector<std::vector<int> > vLevelsSaved;
 
+  std::mt19937 rng;
+
   static const word ones[];
   static const word swapmask[];
 
   TruthTable(int nInputs, int nOutputs): nInputs(nInputs), nOutputs(nOutputs) {
-    srand(0xABC);
+    rng.seed(0xABC);
     if(nInputs >= lww) {
       nSize = 1 << (nInputs - lww);
       nTotalSize = nSize * nOutputs;
@@ -403,7 +406,7 @@ public:
         vLevelsNew[j] = j;
       }
       for(j = nInputs - 1; j > 0; j--) {
-        int d = rand() % j;
+        int d = rng() % j;
         std::swap(vLevelsNew[j], vLevelsNew[d]);
       }
       Reo(vLevelsNew);
