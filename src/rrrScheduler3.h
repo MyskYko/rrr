@@ -13,6 +13,7 @@
 #include "rrrUtils.h"
 #include "rrrAbc.h"
 #include "rrrMockturtle.h"
+#include "rrrSystemCall.h"
 
 #include "rrrSimulator2.h"
 
@@ -463,7 +464,7 @@ namespace rrr {
         parResyn.AssignNetwork(pJob->pNtk);
         Ntk *pSubNtk = parResyn.Extract(seed);
         if(pSubNtk) {
-          switch(rng() % /*5*/2) {
+          switch(rng() % 5) {
           case 0: {
 	    pJob->log = "ttopt";
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
@@ -496,36 +497,29 @@ namespace rrr {
             Abc9Execute(pSubNtk, cmd);
             break;
           }
-          case 2:
-	    pJob->log = "collapse; sop; fx";
+          case 2: {
+            std::string cmd = "collapse; sop; fx";
+	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            if(fMultiThreading) {
-              std::unique_lock<std::mutex> l(mutexAbc);
-              Abc9Execute(pSubNtk, "&put; collapse; sop; fx; strash; &get");
-            } else {
-              Abc9Execute(pSubNtk, "&put; collapse; sop; fx; strash; &get");
-            }
+            ExternalAbcExecute(pSubNtk, cmd);
             break;
-          case 3:
-	    pJob->log = "collapse; dsd";
+          }
+          case 3: {
+            std::string cmd = "collapse; dsd";
+	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            if(fMultiThreading) {
-              std::unique_lock<std::mutex> l(mutexAbc);
-              Abc9Execute(pSubNtk, "&put; collapse; dsd; strash; &get");
-            } else {
-              Abc9Execute(pSubNtk, "&put; collapse; dsd; strash; &get");
-            }
+            ExternalAbcExecute(pSubNtk, cmd);
             break;
-          case 4:
-	    pJob->log = "collapse; aig; bidec";
+          }
+          case 4: {
+            std::string cmd = "collapse; aig; bidec";
+	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            if(fMultiThreading) {
-              std::unique_lock<std::mutex> l(mutexAbc);
-              Abc9Execute(pSubNtk, "&put; collapse; aig; bidec; strash; &get");
-            } else {
-              Abc9Execute(pSubNtk, "&put; collapse; aig; bidec; strash; &get");
-            }
+            ExternalAbcExecute(pSubNtk, cmd);
             break;
+          }
+          default:
+            assert(0);
           }
           parResyn.Insert(pSubNtk);
           break;
