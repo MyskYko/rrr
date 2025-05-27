@@ -170,8 +170,12 @@ Odc_Man_t * Abc_NtkDontCareAlloc( int nVarsMax, int nLevels, int fVerbose, int f
     assert( nVarsMax > 4 && nVarsMax < 16 );
     assert( nLevels > 0 && nLevels < 10 );
 
-    srand( 0xABC );
+    Abc_Random( 1 );
+    for( i = 0; i < 10; i++ ) {
+      Abc_Random( 0 );
+    }
 
+    
     // dont'-care parameters
     p->nVarsMax     = nVarsMax;
     p->nLevels      = nLevels;
@@ -878,7 +882,7 @@ void Abc_NtkDontCareSimulateSetRand( Odc_Man_t * p )
     int w, k, Number;
     for ( w = 0; w < p->nWords; w++ )
     {
-        Number = rand();
+        Number = Abc_Random(0);
         for ( k = 0; k < p->nVarsMax; k++ )
         {
             pData = Odc_ObjTruth( p, Odc_Var(p, k) );
