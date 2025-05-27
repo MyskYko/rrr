@@ -94,6 +94,8 @@ namespace rrr {
     template <typename Rng>
     std::string AbcLocal(Rng &rng, bool fOdc);
     template <typename Rng>
+    std::string AbcLocalMap(Rng &rng);
+    template <typename Rng>
     std::string DeepSynOne(unsigned i, Rng &rng, int &fCom);
     template <typename Rng>
     std::string DeepSynExtra(Rng &rng);
@@ -257,7 +259,7 @@ namespace rrr {
       Command += " -K " + std::to_string(nCutSize);
       Command += " -N " + std::to_string(nAddition);
       if(fOdc) {
-        int nOdcLevel = rng() % 10; // 0-9
+        int nOdcLevel = 1 + (rng() % 9); // 1-9
         Command += " -F " + std::to_string(nOdcLevel);
       }
       if(rng() & 1) {
@@ -281,7 +283,7 @@ namespace rrr {
       int nCutSize = 5 + (rng() % 11); // 5-15
       int nAddition = rng() % 4; // 0-3
       if(fOdc) {
-        int nOdcLevel = rng() % 10; // 0-9
+        int nOdcLevel = 1 + (rng() % 9); // 1-9
         Command += " -F " + std::to_string(nOdcLevel);
       }
       Command += " -K " + std::to_string(nCutSize);
@@ -303,6 +305,78 @@ namespace rrr {
       assert(0);
     }
     Command += "&get";
+    return Command;
+  }
+  
+  template <typename Ntk, typename Opt, typename Par>
+  template <typename Rng>  
+  inline std::string Scheduler3<Ntk, Opt, Par>::AbcLocalMap(Rng &rng) {
+    std::string Command = "read_library ";
+    switch(rng() % /*6*/5) {
+    case 0:
+      Command += "and.genlib";
+      break;
+    case 1:
+      Command += "xag.genlib";
+      break;
+    case 2:
+      Command += "mig.genlib";
+      break;
+    case 3:
+      Command += "dot.genlib";
+      break;
+    case 4:
+      Command += "oh.genlib";
+      break;
+    case 5: // this causes bug
+      Command += "mux.genlib";
+      break;
+    default:
+      assert(0);
+    }
+    Command += "; ";
+    if(rng() & 1) {
+      Command += "dch";
+      if(rng() & 1) {
+        Command += " -f";
+      }
+      Command += "; ";
+    }
+    switch(rng() % 2) {
+    case 0:
+      Command += "map";
+      if(rng() & 1) {
+        Command += " -a";
+      }
+      break;
+    case 1:
+      Command += "amap";
+      if(rng() & 1) {
+        Command += " -m";
+      }
+      break;
+    default:
+      assert(0);
+    }
+    Command += "; ";
+    switch(rng() % 2) {
+    case 0:
+      Command += "mfs";
+      break;
+    case 1:
+      Command += "mfs2";
+      break;
+    default:
+      assert(0);
+    }
+    if(rng() & 1) {
+      Command += " -a";
+    }
+    if(rng() & 1) {
+      Command += " -e";
+    }
+    Command += "; ";
+    Command += "strash";
     return Command;
   }
   
@@ -412,7 +486,7 @@ namespace rrr {
       break;
     }
     case 1: {
-      switch(rng() % 2) {
+      switch(rng() % 3) {
       case 0:
         // run transduction
         if(fPartitioning && !parOpt.IsTooSmall(pJob->pNtk)) {
@@ -445,10 +519,19 @@ namespace rrr {
         }
         break;
       case 1: {
+        // abc resub with odc
         std::string cmd = AbcLocal(rng, true);
 	pJob->log = cmd;
 	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         Abc9Execute(pJob->pNtk, cmd);
+        break;
+      }
+      case 2: {
+        // mapping base optimization
+        std::string cmd = AbcLocalMap(rng);
+	pJob->log = cmd;
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        ExternalAbcExecute(pJob->pNtk, cmd);
         break;
       }
       default:
