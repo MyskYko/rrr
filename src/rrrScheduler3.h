@@ -974,7 +974,7 @@ namespace rrr {
         if(fFirst) {
           pJob = CreateJob(vPopulation[i], i, 0, 0, 0, CostFunction(vPopulation[i]), CostFunction(vPopulation[i]));
         } else {
-          pJob = CreateJob(vPopulation[i], i, 2, vIterations[i], vIterations[i], CostFunction(vPopulation[i]), CostFunction(vPopulation[i]));
+          pJob = CreateJob(vPopulation[i], i, 2, vIterations[i], vIterations[i], 1000000 /* big number */, CostFunction(vPopulation[i]));
         }
         Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
       }
