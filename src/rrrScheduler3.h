@@ -1008,7 +1008,7 @@ namespace rrr {
           if(GetRemainingTime() < 0 || nCreatedJobs >= nJobs || (nJumps && iteration - last_impr == nJumps)) {
             vIterations[pJob->column] = pJob->iteration + 1;
             pJob = NULL; // end or wait for jump
-          } else if(nHops && iteration - last_impr % nHops == 0) {
+          } else if(nHops && (iteration - last_impr) % nHops == 0) {
             pJob = CreateJob(pJob->pNtk, column, 1, iteration, last_impr, costImproved, cost);
           } else {
             pJob = CreateJob(pJob->pNtk, column, 0, iteration, last_impr, costImproved, cost);
