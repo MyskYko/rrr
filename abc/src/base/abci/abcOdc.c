@@ -27,7 +27,7 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-#define ABC_DC_MAX_NODES   (1<<15)
+#define ABC_DC_MAX_NODES   (1<<20)
 
 typedef unsigned short Odc_Lit_t;
 
