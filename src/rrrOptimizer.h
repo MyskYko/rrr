@@ -15,6 +15,7 @@ namespace rrr {
   class Optimizer {
   private:
     static constexpr int nReductionMethod = 1;
+    static constexpr int nSamples = 1000;
     
     // aliases
     using itr = std::vector<int>::iterator;
@@ -36,6 +37,8 @@ namespace rrr {
     bool fGreedy;
     seconds nTimeout; // assigned upon Run
     std::function<void(std::string)> PrintLine;
+
+    int nTargets = 3;
 
     // data
     Ana ana;
@@ -114,8 +117,8 @@ namespace rrr {
     void ApplyReverseTopologically(std::function<void(int)> const &func);
     void ApplyRandomlyStop(std::function<bool(int)> const &func);
     void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
-    void ApplyCombinationSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
-    void ApplyMultisetSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyMultisetSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
     
   public:
     // constructors
@@ -125,6 +128,7 @@ namespace rrr {
 
     // run
     void Run(int iSeed = 0, seconds nTimeout_ = 0);
+    void SetNumTargets(int nTargets_);
 
     // summary
     void ResetSummary();
@@ -1333,9 +1337,9 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::ApplyCombinationSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
+  void Optimizer<Ntk, Ana>::ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
-    for(int i = 0; i < nSamples; i++) {
+    for(int i = 0; i < n; i++) {
       if(Timeout()) {
         break;
       }
@@ -1346,7 +1350,7 @@ namespace rrr {
       }
       std::vector<int> vIdxs(sIdxs.begin(), sIdxs.end());
       std::shuffle(vIdxs.begin(), vIdxs.end(), rng);
-      Print(1, "comb", vIdxs, "(", i + 1, "/", nSamples, ")");
+      Print(1, "comb", vIdxs, "(", i + 1, "/", n, ")");
       std::vector<int> vTargets(k);
       for(int i = 0; i < k; i++) {
         vTargets[i] = vInts[vIdxs[i]];
@@ -1358,9 +1362,9 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::ApplyMultisetSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
+  void Optimizer<Ntk, Ana>::ApplyMultisetSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
-    for(int i = 0; i < nSamples; i++) {
+    for(int i = 0; i < n; i++) {
       if(Timeout()) {
         break;
       }
@@ -1369,7 +1373,7 @@ namespace rrr {
         int idx = rng() % pNtk->GetNumInts();
         vIdxs.push_back(idx);
       }
-      Print(1, "comb", vIdxs, "(", i + 1, "/", nSamples, ")");
+      Print(1, "comb", vIdxs, "(", i + 1, "/", n, ")");
       std::vector<int> vTargets(k);
       for(int i = 0; i < k; i++) {
         vTargets[i] = vInts[vIdxs[i]];
@@ -1529,7 +1533,7 @@ namespace rrr {
     case 4: {
       Reduce();
       statsLocal.Reset();
-      ApplyMultisetSampledStop(3, 100, [&](std::vector<int> const &vTargets) {
+      ApplyMultisetSampledStop(nTargets, nSamples, [&](std::vector<int> const &vTargets) {
         return MultiTargetResub(vTargets, 1);
       });
       stats["mt"] += statsLocal;
@@ -1539,6 +1543,11 @@ namespace rrr {
     default:
       assert(0);
     }
+  }
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::SetNumTargets(int nTargets_) {
+    nTargets = nTargets_;
   }
   
   /* }}} */
