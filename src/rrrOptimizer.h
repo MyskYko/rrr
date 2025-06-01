@@ -116,7 +116,8 @@ namespace rrr {
     void ApplyReverseTopologically(std::function<void(int)> const &func);
     void ApplyRandomlyStop(std::function<bool(int)> const &func);
     void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
-    void ApplyCombinationSampledRandomlyStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyCombinationSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyMultisetSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func);
     
   public:
     // constructors
@@ -1221,9 +1222,17 @@ namespace rrr {
         it++;
       }
     }
-    // add while remembering extended fanins
+    // remember extended fanins
     Print(2, "targets", ":", vTargets);
-    std::vector<std::set<int>> vsFanins;
+    std::set<int> sTargets(vTargets.begin(), vTargets.end());
+    std::map<int, std::set<int>> msFanins;
+    for(int id: sTargets) {
+      // remember fanins
+      std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+      Print(3, "extended fanins", id, ":", sFanins);
+      msFanins[id] = std::move(sFanins);
+    }    
+    // add
     for(int id: vTargets) {
       // get candidates
       std::vector<int> vCands;
@@ -1233,10 +1242,6 @@ namespace rrr {
         vCands = pNtk->GetPisInts();
       }
       std::shuffle(vCands.begin(), vCands.end(), rng);
-      // remember fanins
-      std::set<int> sFanins = pNtk->GetExtendedFanins(id);
-      Print(3, "extended fanins", ":", sFanins);
-      vsFanins.push_back(std::move(sFanins));
       // add
       MultiAdd(id, vCands, nMax);
     }
@@ -1252,22 +1257,25 @@ namespace rrr {
       if(dNewCost < dCost) {
         fChanged = true;
       } else {
-        for(int id: vTargets) {
+        for(int id: sTargets) {
           if(!pNtk->IsInt(id)) {
             fChanged = true;
             break;
           }
         }
-        for(int i = 0; !fChanged && i < int_size(vTargets); i++) {
-          std::set<int> sNewFanins = pNtk->GetExtendedFanins(vTargets[i]);
-          Print(3, "new extended fanins", ":", sNewFanins);
-          if(vsFanins[i] != sNewFanins) {
-            fChanged = true;
+        if(!fChanged) {
+          for(int id: sTargets) {
+            std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+            Print(3, "new extended fanins", id, ":", sNewFanins);
+            if(msFanins[id] != sNewFanins) {
+              fChanged = true;
+              break;
+            }
           }
         }
       }
       if(fChanged) {
-        for(int id: vTargets) {
+        for(int id: sTargets) {
           if(pNtk->IsInt(id)) {
             pNtk->TrivialDecompose(id);
           }
@@ -1280,7 +1288,7 @@ namespace rrr {
     pNtk->PopBack();
     return false;
   }
-  
+    
   /* }}} */
   
   /* {{{ Apply */
@@ -1339,7 +1347,7 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::ApplyCombinationSampledRandomlyStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
+  void Optimizer<Ntk, Ana>::ApplyCombinationSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
     for(int i = 0; i < nSamples; i++) {
       if(Timeout()) {
@@ -1362,7 +1370,30 @@ namespace rrr {
       }
     }
   }
-  
+
+  template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ApplyMultisetSampledStop(int k, int nSamples, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(int i = 0; i < nSamples; i++) {
+      if(Timeout()) {
+        break;
+      }
+      std::vector<int> vIdxs;
+      for(int j = 0; j < k; j++) {
+        int idx = rng() % pNtk->GetNumInts();
+        vIdxs.push_back(idx);
+      }
+      Print(1, "comb", vIdxs, "(", i + 1, "/", nSamples, ")");
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      if(func(vTargets)) {
+        break;
+      }
+    }
+  }
+
   /* }}} */
   
   /* {{{ Constructors */
@@ -1512,8 +1543,8 @@ namespace rrr {
     }
     case 4: {
       Reduce();
-      ApplyCombinationSampledRandomlyStop(3, 100, [&](std::vector<int> const &vTargets) {
-        return MultiTargetResub(vTargets);
+      ApplyMultisetSampledStop(3, 100, [&](std::vector<int> const &vTargets) {
+        return MultiTargetResub(vTargets, 1);
       });
       break;
     }
