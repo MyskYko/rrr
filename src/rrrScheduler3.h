@@ -492,7 +492,7 @@ namespace rrr {
       switch(rng() % 3) {
       case 0:
         // run transduction
-        opt.SetNumTargets(1 + (rng() % 10));
+        opt.SetNumTargets(1 + (rng() % 3));
         if(fPartitioning && !parOpt.IsTooSmall(pJob->pNtk)) {
           parOpt.AssignNetwork(pJob->pNtk);
           Ntk *pSubNtk = parOpt.Extract(seed);
@@ -977,7 +977,7 @@ namespace rrr {
         } else {
           pJob = CreateJob(vPopulation[i], i, 2, vIterations[i], vIterations[i], 1000000 /* big number */, CostFunction(vPopulation[i]));
         }
-        Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
+        //Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);// this causes bug when multithreaded because pJob->pNtk may be being modified
       }
       // loop until next jump
       while(nFinishedJobs < nCreatedJobs) {
@@ -1015,7 +1015,7 @@ namespace rrr {
             pJob = CreateJob(pJob->pNtk, column, 0, iteration, last_impr, costImproved, cost);
           }
           if(pJob) {
-            Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
+            //Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);// same reason as above
           }
         });
       }
