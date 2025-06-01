@@ -14,6 +14,8 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   class Optimizer {
   private:
+    static constexpr int nReductionMethod = 1;
+    
     // aliases
     using itr = std::vector<int>::iterator;
     using citr = std::vector<int>::const_iterator;
@@ -74,17 +76,22 @@ namespace rrr {
     void SortFanins(int id);
     void SortFanins();
 
-    // reduce fanins
-    bool ReduceFanins(int id, bool fRemoveUnused = false);
-    bool ReduceFaninsOneRandom(int id, bool fRemoveUnused = false);
+    // remove fanins
+    bool RemoveRedundantFanins(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsRandom(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsOne(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsOneRandom(int id, bool fRemoveUnused = false);
 
-    // reduce
-    bool Reduce(bool fSubRoutine = false);
+    // remove traversal
+    bool RemoveRedundancyOneTraversal(bool fSubRoutine = false);
     void ReduceRandom();
 
     // remove redundancy
     bool RemoveRedundancy();
-    void RemoveRedundancyRandom();
+    bool RemoveRedundancyRandom();
+
+    // reduce
+    bool Reduce();
 
     // addition
     template <typename T>
@@ -540,10 +547,10 @@ namespace rrr {
   
   /* }}} */
   
-  /* {{{ Reduce fanins */
+  /* {{{ Remove fanins */
   
   template <typename Ntk, typename Ana>
-  inline bool Optimizer<Ntk, Ana>::ReduceFanins(int id, bool fRemoveUnused) {
+  inline bool Optimizer<Ntk, Ana>::RemoveRedundantFanins(int id, bool fRemoveUnused) {
     assert(pNtk->GetNumFanouts(id) > 0);
     bool fReduced = false;
     for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
@@ -568,9 +575,44 @@ namespace rrr {
     return fReduced;
   }
 
+  template <typename Ntk, typename Ana>
+  inline bool Optimizer<Ntk, Ana>::RemoveRedundantFaninsRandom(int id, bool fRemoveUnused) {
+    assert(pNtk->GetNumFanouts(id) > 0);
+    bool fReduced = false;
+    // generate random order
+    vTmp.resize(pNtk->GetNumFanins(id));
+    std::iota(vTmp.begin(), vTmp.end(), 0);
+    std::shuffle(vTmp.begin(), vTmp.end(), rng);
+    for(int i = 0; i < int_size(vTmp); i++) {
+      int idx = vTmp[i];
+      // skip fanins that were just added
+      if(mapNewFanins.count(id)) {
+        int fi = pNtk->GetFanin(id, idx);
+        if(mapNewFanins[id].count(fi)) {
+          continue;
+        }
+      }
+      // reduce
+      if(ana.CheckRedundancy(id, idx)) {
+        int fi = pNtk->GetFanin(id, idx);
+        pNtk->RemoveFanin(id, idx);
+        fReduced = true;
+        for(int j = i + 1; j < int_size(vTmp); j++) {
+          if(vTmp[j] > idx) {
+            vTmp[j]--;
+          }
+        }
+        if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
+          pNtk->RemoveUnused(fi, true);
+        }
+      }
+    }
+    return fReduced;
+  }
+  
   /*
   template <typename Ntk, typename Ana>
-  inline bool Optimizer<Ntk, Ana>::ReduceFaninsOneRandom(int id, bool fRemoveUnused) {
+  inline bool Optimizer<Ntk, Ana>::RemoveRedundantFaninsOneRandom(int id, bool fRemoveUnused) {
     assert(pNtk->GetNumFanouts(id) > 0);
     // generate random order
     vTmp.resize(pNtk->GetNumFanins(id));
@@ -602,10 +644,10 @@ namespace rrr {
   
   /* }}} */
   
-  /* {{{ Reduce */
+  /* {{{ Remove traversal */
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::Reduce(bool fSubRoutine) {
+  bool Optimizer<Ntk, Ana>::RemoveRedundancyOneTraversal(bool fSubRoutine) {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
@@ -617,7 +659,7 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
-      fReduced |= ReduceFanins(*it);
+      fReduced |= RemoveRedundantFanins(*it);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
@@ -643,7 +685,7 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
-      ReduceFanins(*it, true);
+      RemoveRedundantFanins(*it, true);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
@@ -660,7 +702,7 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     if(fCompatible) {
-      while(Reduce(true)) {
+      while(RemoveRedundancyOneTraversal(true)) {
         fReduced = true;
         SortFanins();
       }
@@ -677,7 +719,8 @@ namespace rrr {
           continue;
         }
         SortFanins(*it);
-        bool fReduced_ = ReduceFanins(*it);
+        bool fReduced_ = RemoveRedundantFanins(*it);
+        // design choice: we could stop at one removal and start over
         fReduced |= fReduced_;
         if(pNtk->GetNumFanins(*it) <= 1) {
           pNtk->Propagate(*it);
@@ -694,10 +737,12 @@ namespace rrr {
     return fReduced;
   }
 
-  /*
   template <typename Ntk, typename Ana>
-  void Optimizer<Ntk, Ana>::RemoveRedundancyRandom() {
-    pNtk->Sweep(false);
+  bool Optimizer<Ntk, Ana>::RemoveRedundancyRandom() {
+    // TODO: compatible dc?
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    //pNtk->Sweep(false);
     std::vector<int> vInts = pNtk->GetInts();
     std::shuffle(vInts.begin(), vInts.end(), rng);
     for(citr it = vInts.begin(); it != vInts.end();) {
@@ -710,19 +755,41 @@ namespace rrr {
         it++;
         continue;
       }
-      bool fReduced = ReduceFaninsOneRandom(*it, true);
+      bool fReduced_ = RemoveRedundantFaninsRandom(*it, true);
+      // design choice: we could stop at one removal and start over
+      fReduced |= fReduced_;
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
-      if(fReduced) {
+      if(fReduced_) {
         std::shuffle(vInts.begin(), vInts.end(), rng);
         it = vInts.begin();
       } else {
         it++;
       }
     }
+    return fReduced;
   }
-  */
+
+  /* }}} */
+
+  /* {{{ Reduce */
+
+  template <typename Ntk, typename Ana>
+  bool Optimizer<Ntk, Ana>::Reduce() {
+    int r;
+    switch(nReductionMethod) {
+    case 0:
+      r = RemoveRedundancy();
+      break;
+    case 1:
+      r = RemoveRedundancyRandom();
+      break;
+    default:
+      assert(0);
+    }
+    return r;
+  }
 
   /* }}} */
 
@@ -849,7 +916,7 @@ namespace rrr {
       }
       fAdded = true;
       Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
-      if(RemoveRedundancy()) {
+      if(Reduce()) {
         double costNew = CostFunction(pNtk);
         // stats
         statsLocal.nChanged++;
@@ -885,7 +952,7 @@ namespace rrr {
       pNtk->TrivialDecompose(id);
       SortFanins();
       if(fCompatible) {
-        RemoveRedundancy();
+        Reduce();
       }
     }
     if(fGreedy || fCompatible) {
@@ -917,9 +984,9 @@ namespace rrr {
     double cost = CostFunction(pNtk);
     if(MultiAdd(id, vCands, nMax)) {
       statsLocal.nAdded++;
-      if(RemoveRedundancy()) {
+      if(Reduce()) {
         mapNewFanins.clear();
-        RemoveRedundancy();
+        Reduce();
         double costNew = CostFunction(pNtk);
         // stats
         statsLocal.nChanged++;
@@ -947,7 +1014,7 @@ namespace rrr {
       pNtk->TrivialDecompose(id);
       SortFanins();
       if(fCompatible) {
-        RemoveRedundancy();
+        Reduce();
       }
     }
     if(fGreedy || fCompatible) {
@@ -991,7 +1058,7 @@ namespace rrr {
       }
       fAdded = true;
       Print(3, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
-      if(RemoveRedundancy()) {
+      if(Reduce()) {
         mapNewFanins.clear();
         double costNew = CostFunction(pNtk);
         if(costNew <= cost) {
@@ -1062,9 +1129,9 @@ namespace rrr {
     double cost = CostFunction(pNtk);
     if(MultiAdd(id, vCands, nMax)) {
       statsLocal.nAdded++;
-      if(RemoveRedundancy()) {
+      if(Reduce()) {
         mapNewFanins.clear();
-        RemoveRedundancy();
+        Reduce();
         double costNew = CostFunction(pNtk);
         if(!fGreedy || costNew <= cost) {
           fChanged = false;
@@ -1145,10 +1212,10 @@ namespace rrr {
       MultiAdd(id, vCands, nMax);
     }
     // reduce
-    RemoveRedundancy();
+    Reduce();
     mapNewFanins.clear();
     // TODO: we could quit here if nothing has been removed
-    RemoveRedundancy();
+    Reduce();
     double dNewCost = CostFunction(pNtk);
     Print(2, "cost =", dCost, "->", dNewCost);
     if(!fGreedy || dNewCost <= dCost) {
@@ -1316,7 +1383,7 @@ namespace rrr {
     start = GetCurrentTime();
     switch(nFlow) {
     case 0:
-      RemoveRedundancy();
+      Reduce();
       statsLocal.Reset();
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
@@ -1331,7 +1398,7 @@ namespace rrr {
       Print(0, statsLocal.GetString());
       break;
     case 1:
-      RemoveRedundancy();
+      Reduce();
       statsLocal.Reset();
       ApplyReverseTopologically([&](int id) {
         std::vector<int> vCands;
@@ -1346,7 +1413,7 @@ namespace rrr {
       Print(0, statsLocal.GetString());
       break;
     case 2: {
-      RemoveRedundancy();
+      Reduce();
       double dCost = CostFunction(pNtk);
       while(true) {
         statsLocal.Reset();
@@ -1384,7 +1451,7 @@ namespace rrr {
       break;
     }
     case 3: {
-      RemoveRedundancy();
+      Reduce();
       std::vector<int> vCands;
       if(!nDistance) {
         vCands = pNtk->GetPisInts();
@@ -1414,7 +1481,7 @@ namespace rrr {
       break;
     }
     case 4: {
-      RemoveRedundancy();
+      Reduce();
       ApplyCombinationSampledRandomlyStop(3, 100, [&](std::vector<int> const &vTargets) {
         return MultiTargetResub(vTargets);
       });
