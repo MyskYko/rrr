@@ -261,7 +261,7 @@ namespace rrr {
       Command += " -K " + std::to_string(nCutSize);
       Command += " -N " + std::to_string(nAddition);
       if(fOdc) {
-        int nOdcLevel = 1 + (rng() % 9); // 1-9
+        int nOdcLevel = 1 + (rng() % 3); // 1-3
         Command += " -F " + std::to_string(nOdcLevel);
       }
       if(rng() & 1) {
@@ -285,7 +285,7 @@ namespace rrr {
       int nCutSize = 5 + (rng() % 11); // 5-15
       int nAddition = rng() % 4; // 0-3
       if(fOdc) {
-        int nOdcLevel = 1 + (rng() % 9); // 1-9
+        int nOdcLevel = 1 + (rng() % 3); // 1-3
         Command += " -F " + std::to_string(nOdcLevel);
       }
       Command += " -K " + std::to_string(nCutSize);
