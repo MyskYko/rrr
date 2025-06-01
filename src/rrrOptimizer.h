@@ -1206,9 +1206,10 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   bool Optimizer<Ntk, Ana>::MultiTargetResub(std::vector<int> vTargets, int nMax) {
+    statsLocal.nTried++;
     // save
     int slot = pNtk->Save();
-    double dCost = CostFunction(pNtk);
+    double cost = CostFunction(pNtk);
     // remove targets that are trivially collapsed together
     for(int id: vTargets) {
       if(pNtk->IsInt(id)) {
@@ -1233,6 +1234,7 @@ namespace rrr {
       msFanins[id] = std::move(sFanins);
     }    
     // add
+    bool fAdded = false;
     for(int id: vTargets) {
       // get candidates
       std::vector<int> vCands;
@@ -1243,50 +1245,63 @@ namespace rrr {
       }
       std::shuffle(vCands.begin(), vCands.end(), rng);
       // add
-      MultiAdd(id, vCands, nMax);
+      fAdded |= MultiAdd(id, vCands, nMax);
     }
     // reduce
-    Reduce();
-    mapNewFanins.clear();
-    // TODO: we could quit here if nothing has been removed
-    Reduce();
-    double dNewCost = CostFunction(pNtk);
-    Print(2, "cost =", dCost, "->", dNewCost);
-    if(!fGreedy || dNewCost <= dCost) {
-      bool fChanged = false;
-      if(dNewCost < dCost) {
-        fChanged = true;
-      } else {
-        for(int id: sTargets) {
-          if(!pNtk->IsInt(id)) {
+    bool fChanged = false;
+    if(fAdded) {
+      statsLocal.nAdded++;
+      if(Reduce()) {
+        mapNewFanins.clear();
+        Reduce();
+        double costNew = CostFunction(pNtk);
+        if(!fGreedy || costNew <= cost) {
+          if(costNew < cost) {
             fChanged = true;
-            break;
+          } else {
+            for(int id: sTargets) {
+              if(!pNtk->IsInt(id)) {
+                fChanged = true;
+                break;
+              }
+            }
+            if(!fChanged) {
+              for(int id: sTargets) {
+                std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+                Print(3, "new extended fanins", id, ":", sNewFanins);
+                if(msFanins[id] != sNewFanins) {
+                  fChanged = true;
+                  break;
+                }
+              }
+            }
           }
-        }
-        if(!fChanged) {
-          for(int id: sTargets) {
-            std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
-            Print(3, "new extended fanins", id, ":", sNewFanins);
-            if(msFanins[id] != sNewFanins) {
-              fChanged = true;
-              break;
+          if(fChanged) {
+            statsLocal.nChanged++;
+            if(costNew < cost) {
+              statsLocal.nDowns++;
+            } else if (costNew == cost) {
+              statsLocal.nEqs++;
+            } else {
+              statsLocal.nUps++;
             }
           }
         }
-      }
-      if(fChanged) {
-        for(int id: sTargets) {
-          if(pNtk->IsInt(id)) {
-            pNtk->TrivialDecompose(id);
-          }
-        }
-        pNtk->PopBack();
-        return true;
+      } else {
+        mapNewFanins.clear();
       }
     }
-    pNtk->Load(slot);
+    if(fChanged) {
+      for(int id: sTargets) {
+        if(pNtk->IsInt(id)) {
+          pNtk->TrivialDecompose(id);
+        }
+      }
+    } else {
+      pNtk->Load(slot);
+    }
     pNtk->PopBack();
-    return false;
+    return fChanged;
   }
     
   /* }}} */
@@ -1543,9 +1558,12 @@ namespace rrr {
     }
     case 4: {
       Reduce();
+      statsLocal.Reset();
       ApplyMultisetSampledStop(3, 100, [&](std::vector<int> const &vTargets) {
         return MultiTargetResub(vTargets, 1);
       });
+      stats["mt"] += statsLocal;
+      Print(0, statsLocal.GetString());
       break;
     }
     case 5:
