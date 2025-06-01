@@ -418,17 +418,18 @@ namespace rrr {
   inline int AndNetwork::GetNumLevels() const {
     int nMaxLevel = 0;
     std::vector<int> vLevels(nNodes);
-    ForEachInt([&](int id) {
-      ForEachFanin(id, [&](int fi) {
+    for(int id: lInts) {
+      for(int fi_edge: vvFaninEdges[id]) {
+        int fi = Edge2Node(fi_edge);
         if(vLevels[id] < vLevels[fi]) {
           vLevels[id] = vLevels[fi];
         }
-      });
+      }
       vLevels[id] += 1;
       if(nMaxLevel < vLevels[id]) {
         nMaxLevel = vLevels[id];
       }
-    });
+    }
     return nMaxLevel;
   }
 
