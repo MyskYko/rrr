@@ -360,7 +360,7 @@ namespace rrr {
     default:
       assert(0);
     }
-    Command += "; ";
+    Command += "; sweep; ";
     switch(rng() % 2) {
     case 0:
       Command += "mfs";
