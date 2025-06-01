@@ -1274,6 +1274,7 @@ namespace rrr {
       }
     } else {
       pNtk->Load(slot);
+      target = -1;
     }
     pNtk->PopBack();
     return fChanged;
