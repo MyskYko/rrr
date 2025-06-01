@@ -492,6 +492,7 @@ namespace rrr {
       switch(rng() % 3) {
       case 0:
         // run transduction
+        opt.SetNumTargets(1 + (rng() % 10));
         if(fPartitioning && !parOpt.IsTooSmall(pJob->pNtk)) {
           parOpt.AssignNetwork(pJob->pNtk);
           Ntk *pSubNtk = parOpt.Extract(seed);
