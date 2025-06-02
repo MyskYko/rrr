@@ -574,7 +574,7 @@ namespace rrr {
         pNtk->RemoveFanin(id, idx);
         fReduced = true;
         idx--;
-        if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
+        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
       }
@@ -609,7 +609,7 @@ namespace rrr {
             vTmp[j]--;
           }
         }
-        if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
+        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
       }
@@ -637,7 +637,7 @@ namespace rrr {
       if(ana.CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
-        if(fRemoveUnused && pNtk->GetNumFanouts(fi) == 0) {
+        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
         return true;
