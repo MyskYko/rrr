@@ -624,7 +624,7 @@ namespace rrr {
           break;
         }
       }
-      if(!fNoGlobalJump) {
+      if(fNoGlobalJump) {
 	// no fall back on global resynthesis
 	break;
       }
