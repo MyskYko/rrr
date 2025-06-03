@@ -7,9 +7,10 @@
 // #include <map/amap/amap.h>
 #include <proof/cec/cec.h>
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, nRelaxedPatterns, pTemporary, pPattern, pCond, pOutput
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL, pOutput = NULL
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput
+<<<<<<< HEAD
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, fNoGlobalJump, nRelaxedPatterns, pTemporary, pPattern, pCond, pOutput
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, fNoGlobalJump = 0, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL, pOutput = NULL
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int fNoGlobalJump, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput
 
 using namespace aabbcc;
 
@@ -25,7 +26,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgijklvoh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgijklmvoh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -154,6 +155,9 @@ int main(int argc, char **argv) {
       case 'g':
           fGreedy ^= 1;
           break;
+      case 'm':
+	  fNoGlobalJump ^= 1;
+	  break;
       case 'i':
           pCond = argv[globalUtilOptind];
           globalUtilOptind++;
@@ -263,7 +267,7 @@ int main(int argc, char **argv) {
   }
 
 usage:
-      Abc_Print( -2, "usage: rrr [-XYZNJKLIEFBDRWTCGVPOAQSUHMl num] [-ijko str] [-abdegh]\n" );
+      Abc_Print( -2, "usage: rrr [-XYZNJKLIEFBDRWTCGVPOAQSUHMl num] [-ijko str] [-abdegmh]\n" );
       Abc_Print( -2, "\t        perform optimization\n" );
       Abc_Print( -2, "\t-X num : method [default = %d]\n", nOptimizerFlow );
       Abc_Print( -2, "\t                0: single-add resub\n" );

@@ -44,6 +44,7 @@ namespace rrr {
     int nHops;
     int nJumps;
     bool fOptOnInsert;
+    bool fNoGlobalJump;
     std::string strOutput;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
@@ -548,8 +549,7 @@ namespace rrr {
     }
     case 2: {
       // jump
-      switch(rng() % 2) {
-      case 0: {
+      if(fNoGlobalJump || rng() & 1) {
         // partial resynthesis
         parResyn.AssignNetwork(pJob->pNtk);
         Ntk *pSubNtk = parResyn.Extract(seed);
@@ -623,47 +623,45 @@ namespace rrr {
           parResyn.Insert(pSubNtk);
           break;
         }
-      } // fall back on global resynthesis
-      case 1: {
-        // global resynthesis
-        switch(rng() % 5) {
-        case 0: {
-          int fCom; // unused
-          std::string cmd = DeepSynOne(rng(), rng, fCom);
-	  pJob->log = cmd;
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-          Abc9Execute(pJob->pNtk, cmd);
-          break;
-        }
-        case 1: {
-          std::string cmd = DeepSynExtra(rng);
-	  pJob->log = cmd;
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-          Abc9Execute(pJob->pNtk, cmd);
-          break;
-        }
-        case 2:
-	  pJob->log = "&if -y -K 6";
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-          Abc9Execute(pJob->pNtk, "&if -y -K 6; &st");
-          break;
-        case 3:
-	  pJob->log = "&if -g";
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-          Abc9Execute(pJob->pNtk, "&if -g; &st");
-          break; 
-        case 4:
-	  pJob->log = "&if -x";
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-          Abc9Execute(pJob->pNtk, "&if -x; &st");
-          break; 
-        default:
-          assert(0);
-        }
-        break;
       }
+      if(!fNoGlobalJump) {
+	// no fall back on global resynthesis
+	break;
+      }
+      // global resynthesis
+      switch(rng() % 5) {
+      case 0: {
+	int fCom; // unused
+	std::string cmd = DeepSynOne(rng(), rng, fCom);
+	pJob->log = cmd;
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	Abc9Execute(pJob->pNtk, cmd);
+	break;
+      }
+      case 1: {
+	std::string cmd = DeepSynExtra(rng);
+	pJob->log = cmd;
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	Abc9Execute(pJob->pNtk, cmd);
+	break;
+      }
+      case 2:
+	pJob->log = "&if -y -K 6";
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	Abc9Execute(pJob->pNtk, "&if -y -K 6; &st");
+	break;
+      case 3:
+	pJob->log = "&if -g";
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	Abc9Execute(pJob->pNtk, "&if -g; &st");
+	break; 
+      case 4:
+	pJob->log = "&if -x";
+	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	Abc9Execute(pJob->pNtk, "&if -x; &st");
+	break; 
       default:
-        assert(0);
+	assert(0);
       }
       break;
     }
@@ -901,6 +899,7 @@ namespace rrr {
     nHops(pPar->nHops),
     nJumps(pPar->nJumps),
     fOptOnInsert(pPar->fOptOnInsert),
+    fNoGlobalJump(pPar->fNoGlobalJump),
     strOutput(pPar->strOutput),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),

@@ -37,6 +37,7 @@ namespace rrr {
     bool fOptOnInsert = false;
     bool fGreedy = true;
     bool fExSim = false;
+    bool fNoGlobalJump = false;
     int nRelaxedPatterns = 0;
     std::string strTemporary;
     std::string strPattern;
