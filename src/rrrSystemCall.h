@@ -7,13 +7,13 @@
 
 namespace rrr {
 
-  static inline void SystemCall(std::string Command) {
-    int r = system(Command.c_str()); // Executes the 'ls -l' command (lists files in detail on Unix-like systems)
-    assert(r == 0);
+  static inline bool SystemCall(std::string Command) {
+    int r = system(Command.c_str());
+    return r == 0;
   }
 
   template <typename Ntk>
-  static inline void ExternalAbcExecute(Ntk *pNtk, std::string Command, bool fCheck = false) {
+  static inline bool ExternalAbcExecute(Ntk *pNtk, std::string Command, bool fCheck = false) {
     static constexpr char *pAbc = "~/abc/abc";
     // create file
     char filenamet[] = "/tmp/rrr_XXXXXX";
@@ -46,13 +46,16 @@ namespace rrr {
     cmd += "write_aiger ";
     cmd += filename;
     cmd += "\"";
-    SystemCall(cmd);
-    // read aig
-    pGia = Gia_AigerRead(filename, 0, 0, 0);
-    pNtk->Read(pGia, GiaReader<Ntk>);
-    Gia_ManStop(pGia);
+    bool r = SystemCall(cmd);
+    if(r) {
+      // read aig
+      pGia = Gia_AigerRead(filename, 0, 0, 0);
+      pNtk->Read(pGia, GiaReader<Ntk>);
+      Gia_ManStop(pGia);
+    }
     unlink(filename);
     unlink(filenamet);
+    return r;
   }
   
 }
