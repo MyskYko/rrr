@@ -535,7 +535,10 @@ namespace rrr {
         std::string cmd = AbcLocalMap(rng);
 	pJob->log = cmd;
 	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-        ExternalAbcExecute(pJob->pNtk, cmd);
+        bool r = ExternalAbcExecute(pJob->pNtk, cmd);
+	if(!r) {
+	  Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
+	}
         break;
       }
       default:
@@ -588,21 +591,30 @@ namespace rrr {
             std::string cmd = "collapse; sop; fx";
 	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            ExternalAbcExecute(pSubNtk, cmd);
+            bool r = ExternalAbcExecute(pSubNtk, cmd);
+	    if(!r) {
+	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
+	    }
             break;
           }
           case 3: {
             std::string cmd = "collapse; dsd";
 	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            ExternalAbcExecute(pSubNtk, cmd);
+            bool r = ExternalAbcExecute(pSubNtk, cmd);
+	    if(!r) {
+	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
+	    }
             break;
           }
           case 4: {
             std::string cmd = "collapse; aig; bidec";
 	    pJob->log = cmd;
 	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-            ExternalAbcExecute(pSubNtk, cmd);
+            bool r = ExternalAbcExecute(pSubNtk, cmd);
+	    if(!r) {
+	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
+	    }
             break;
           }
           default:
