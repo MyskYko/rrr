@@ -7,9 +7,9 @@
 // #include <map/amap/amap.h>
 #include <proof/cec/cec.h>
 
-#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, pOutput
-#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0; char *pOutput = NULL
-#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, char *pOutput
+#define PARAMS iSeed, nWords, nTimeout, nSchedulerVerbose, nPartitionerVerbose, nOptimizerVerbose, nAnalyzerVerbose, nSimulatorVerbose, nSatSolverVerbose, nResynVerbose, fUseBddCspf, fUseBddMspf, nConflictLimit, nSortType, nOptimizerFlow, nSchedulerFlow, nPartitionType, nDistance, nJobs, nThreads, nPartitionSize, nPartitionSizeMin, nPartitionInputMax, nResynSize, nResynInputMax, fDeterministic, nParallelPartitions, nHops, nJumps, fOptOnInsert, fGreedy, fExSim, fNoGlobalJump, pOutput
+#define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, fNoGlobalJump = 0; char *pOutput = NULL
+#define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int fNoGlobalJump, char *pOutput
 
 using namespace aabbcc;
 
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   PARAMS_DEF;
   int fCore = 0, fVerify = 0;
   Extra_UtilGetoptReset();
-  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLIEFBDRWTCGVPOAQSUHMabcdefgvoh" ) ) != EOF )
+  while ( ( c = Extra_UtilGetopt( argc, argv, "XYZNJKLIEFBDRWTCGVPOAQSUHMabcdefgivoh" ) ) != EOF )
   {
       switch ( c )
       {
@@ -158,6 +158,9 @@ int main(int argc, char **argv) {
       case 'g':
           fGreedy ^= 1;
           break;
+      case 'i':
+	  fNoGlobalJump ^= 1;
+	  break;
       case 'v':
           fVerify ^= 1;
           break;
