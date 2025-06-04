@@ -464,6 +464,7 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler3<Ntk, Opt, Par>::RunJob(Opt &opt, Par &parOpt, Par &parResyn, Simulator2<Ntk> &sim, Job *pJob) {
+    constexpr bool fPrint = false;
     time_point timeStartLocal = GetCurrentTime();
     int seed = iSeed + (pJob->column + 1) * (pJob->iteration + 1);
     std::mt19937 rng(seed);
@@ -474,12 +475,12 @@ namespace rrr {
       case 0: {
         std::string cmd = AbcLocal(rng, false);
 	pJob->log = cmd;
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         Abc9Execute(pJob->pNtk, cmd);
         break;
       }
       case 1: {
-	//std::cout << "colmn " << pJob->column;
+	if(fPrint) std::cout << "colmn " << pJob->column;
         std::string cmd = MockturtlePerformLocal(pJob->pNtk, rng);
 	pJob->log = cmd;
         break;
@@ -499,7 +500,7 @@ namespace rrr {
           Ntk *pSubNtk = parOpt.Extract(seed);
           if(pSubNtk) {
 	    pJob->log = "transduction part";
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             opt.AssignNetwork(pSubNtk);
             opt.SetPrintLine([&](std::string str) {
               Print(-1, pJob->prefix, str);
@@ -512,7 +513,7 @@ namespace rrr {
           }
         } else {
 	  pJob->log = "transduction";
-	  //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	  if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
           opt.AssignNetwork(pJob->pNtk);
           opt.SetPrintLine([&](std::string str) {
             Print(-1, pJob->prefix, str);
@@ -527,7 +528,7 @@ namespace rrr {
         // abc resub with odc
         std::string cmd = AbcLocal(rng, true);
 	pJob->log = cmd;
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         Abc9Execute(pJob->pNtk, cmd);
         break;
       }
@@ -535,7 +536,7 @@ namespace rrr {
         // mapping base optimization
         std::string cmd = AbcLocalMap(rng);
 	pJob->log = cmd;
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
         bool r = ExternalAbcExecute(pJob->pNtk, cmd);
 	if(!r) {
 	  Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
@@ -557,7 +558,7 @@ namespace rrr {
           switch(rng() % 5) {
           case 0: {
 	    pJob->log = "ttopt";
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             std::vector<ABC_UINT64_T> vSdc;
             {
               sim.AssignNetwork(pJob->pNtk, true);
@@ -577,7 +578,7 @@ namespace rrr {
           case 1: {
             std::string cmd = "&transduction -V 0 -T 3";
 	    pJob->log = cmd;
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             if(rng() & 1) {
               cmd += " -m";
             }
@@ -590,7 +591,7 @@ namespace rrr {
           case 2: {
             std::string cmd = "collapse; sop; fx";
 	    pJob->log = cmd;
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             bool r = ExternalAbcExecute(pSubNtk, cmd);
 	    if(!r) {
 	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
@@ -600,7 +601,7 @@ namespace rrr {
           case 3: {
             std::string cmd = "collapse; dsd";
 	    pJob->log = cmd;
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             bool r = ExternalAbcExecute(pSubNtk, cmd);
 	    if(!r) {
 	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
@@ -610,7 +611,7 @@ namespace rrr {
           case 4: {
             std::string cmd = "collapse; aig; bidec";
 	    pJob->log = cmd;
-	    //Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+	    if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
             bool r = ExternalAbcExecute(pSubNtk, cmd);
 	    if(!r) {
 	      Print(-1, pJob->prefix, "column", pJob->column, "failed", pJob->log);
@@ -634,30 +635,30 @@ namespace rrr {
 	int fCom; // unused
 	std::string cmd = DeepSynOne(rng(), rng, fCom);
 	pJob->log = cmd;
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
-	Abc9Execute(pJob->pNtk, cmd);
-	break;
+        if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        Abc9Execute(pJob->pNtk, cmd);
+        break;
       }
       case 1: {
 	std::string cmd = DeepSynExtra(rng);
 	pJob->log = cmd;
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
 	Abc9Execute(pJob->pNtk, cmd);
 	break;
       }
       case 2:
 	pJob->log = "&if -y -K 6";
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
 	Abc9Execute(pJob->pNtk, "&if -y -K 6; &st");
 	break;
       case 3:
 	pJob->log = "&if -g";
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
 	Abc9Execute(pJob->pNtk, "&if -g; &st");
 	break; 
       case 4:
 	pJob->log = "&if -x";
-	//Print(0, pJob->prefix, "column", pJob->column, pJob->log);
+        if(fPrint) Print(0, pJob->prefix, "column", pJob->column, pJob->log);
 	Abc9Execute(pJob->pNtk, "&if -x; &st");
 	break; 
       default:
