@@ -962,6 +962,9 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler3<Ntk, Opt, Par>::Run() {
+    constexpr bool fLog = false;
+    constexpr bool fVerify = false;
+    constexpr bool fPrint = false;
     timeStart = GetCurrentTime();
     double costStart = CostFunction(pNtk);
     pNtk->Sweep();
@@ -980,6 +983,13 @@ namespace rrr {
     bool fFirst = true;
     std::mt19937 rng(iSeed);
     std::vector<int> vIterations(nPopulation);
+    std::vector<std::vector<std::pair<std::string, int>>> logs(nPopulation);
+    std::vector<Ntk *> backups;
+    if(fVerify) {
+      for(int i = 0; i < nPopulation; i++) {
+        backups.push_back(new Ntk(*vPopulation[i]));
+      }
+    }
     while(GetRemainingTime() >= 0 && nCreatedJobs < nJobs) {
       // create jobs (jump if not first)
       for(int i = 0; i < nPopulation; i++) {
@@ -999,6 +1009,17 @@ namespace rrr {
           Print(1, pJob->prefix, "finished", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost);
           //Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", "duration", "=", pJob->duration, "s", ",", "elapsed", "=", GetElapsedTime(), "s");
 	  Print(0, "", "job", pJob->id, "(", nFinishedJobs + 1, "/", nJobs, ")", ":", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", pJob->pNtk->GetNumInts(), ",", pJob->pNtk->GetNumLevels(), ",", cost, "(", 100 * (cost - pJob->costInitial) / pJob->costInitial, "%", ")", ",", pJob->column, ",", pJob->stage, ",", pJob->iteration, ",", pJob->last_impr, ",", pJob->duration, "s", ",", GetElapsedTime(), "s", ",", pJob->log);
+          if(fLog) {
+            logs[pJob->column].push_back(std::make_pair(pJob->log, (int)cost));
+          }
+          if(fVerify) {
+            if(!AbcVerify(pNtk, pJob->pNtk)) {
+              std::cout << "column" << pJob->column << " UNSAT" << std::endl;
+              std::cout << pJob->log << std::endl;
+              DumpAig("before.aig", backups[pJob->column], false);
+              assert(0);
+            }
+          }
           if(cost < costBest) {
             pNtk->Read(*(pJob->pNtk));
             costBest = cost;
@@ -1018,6 +1039,10 @@ namespace rrr {
             last_impr = pJob->last_impr;
             costImproved = pJob->costImproved;
           }
+          if(fVerify) {
+            delete backups[column];
+            backups[column] = new Ntk(*vPopulation[column]);
+          }
           if(GetRemainingTime() < 0 || nCreatedJobs >= nJobs || (nJumps && iteration - last_impr == nJumps)) {
             vIterations[pJob->column] = pJob->iteration + 1;
             pJob = NULL; // end or wait for jump
@@ -1032,10 +1057,22 @@ namespace rrr {
         });
       }
       // print
-      {
+      if(fLog) {
+        for(int i = 0; i < nPopulation; i++) {
+          std::cout << "column " << i << std::endl;
+          for(auto p : logs[i]) {
+            std::cout << "\t" << p.first << " " << p.second << std::endl;
+          }
+          logs[i].clear();
+        }
+      }
+      if(fPrint) {
         std::vector<double> costs;
         for(Ntk *pNtk_: vPopulation) {
           costs.push_back(CostFunction(pNtk_));
+        }
+        for(int i = 0; i < nPopulation; i++) {
+          std::cout << "column " << i << " " << costs[i] << std::endl;
         }
         std::sort(costs.begin(), costs.end());
         Print(-1, "", "optimized", "(", nFinishedJobs, " / ", nJobs, ")", ":", costs, ",", GetElapsedTime(), "s");
@@ -1060,9 +1097,21 @@ namespace rrr {
           vPopulation[i] = new Ntk(*(vBests[rng() % vBests.size()]));
         }
       }
+      if(fVerify) {
+        for(int i = 0; i < nPopulation; i++) {
+          delete backups[i];
+          backups[i] = new Ntk(*vPopulation[i]);
+        }
+      }
       fFirst = false;
     }
     // delete
+    if(fVerify) {
+      for(Ntk *pNtk_: backups) {
+        delete pNtk_;
+      }
+      backups.clear();
+    }
     for(Ntk *pNtk_: vPopulation) {
       delete pNtk_;
     }

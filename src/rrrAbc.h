@@ -3,6 +3,7 @@
 #include "aig/gia/gia.h"
 #include "base/main/main.h"
 #include "base/cmd/cmd.h"
+#include "proof/cec/cec.h"
 
 #include "rrrUtils.h"
 
@@ -104,6 +105,16 @@ namespace rrr {
       assert(r == 0);
       Abc_FrameSetBatchMode(0);
     }
+  }
+
+  template <typename Ntk>
+  bool AbcVerify(Ntk *pNtk, Ntk *pAnother) {
+    Gia_Man_t *pGia = CreateGia(pNtk);
+    Gia_Man_t *pNew = CreateGia(pAnother);
+    bool r = Cec_ManVerifyTwo(pGia, pNew, 0);
+    Gia_ManStop(pGia);
+    Gia_ManStop(pNew);
+    return r;
   }
   
 }
