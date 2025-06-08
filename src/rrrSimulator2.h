@@ -19,6 +19,7 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
+    static constexpr bool fRelax = true;
 
     // pointer to network
     Ntk *pNtk;
@@ -27,8 +28,10 @@ namespace rrr {
     int nVerbose;
     int nWords;
     int nStimuli;
+    int nRelaxedPatterns;
     bool fUseCustomCondition = false;
     std::function<word(std::vector<word> const &, std::vector<word> const &)> CustomCondition;
+    bool fUseOriginalPoValues = true;
 
     // data
     bool fGenerated;
@@ -41,6 +44,7 @@ namespace rrr {
     //std::vector<std::vector<word>> vPoValues;
     std::vector<word> vValuesCond;
     std::vector<word> vValuesCond2;
+    std::vector<word> vOriginalPoValues;
 
     // marks
     unsigned iTrav;
@@ -69,9 +73,11 @@ namespace rrr {
     void Fill(int n, itr x) const;
     void Copy(int n, itr dst, citr src, bool c) const;
     void And(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
+    void Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
     bool IsZero(int n, citr x) const;
     bool IsEq(int n, citr x, citr y, bool c) const;
+    bool AtMostK(int n, citr x, int k) const;
     void Print(int n, citr x) const;
 
     // callback
@@ -171,6 +177,31 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline void Simulator2<Ntk>::Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const {
+    if(!c0) {
+      if(!c1) {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = *src0 | *src1;
+        }
+      } else {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = *src0 | ~*src1;
+        }
+      }
+    } else {
+      if(!c1) {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = ~*src0 | *src1;
+        }
+      } else {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = ~*src0 | ~*src1;
+        }
+      }
+    }
+  }
+
+  template <typename Ntk>
   inline void Simulator2<Ntk>::Xor(int n, itr dst, citr src0, citr src1, bool c) const {
     if(!c) {
       for(int i = 0; i < n; i++, dst++, src0++, src1++) {
@@ -212,6 +243,18 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline bool Simulator2<Ntk>::AtMostK(int n, citr x, int k) const {
+    int count = 0;
+    for(int i = 0; i < n; i++, x++) {
+      count += __builtin_popcountll(*x);
+      if(count > k) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  template <typename Ntk>
   inline void Simulator2<Ntk>::Print(int n, citr x) const {
     std::cout << std::bitset<64>(*x);
     x++;
@@ -230,7 +273,7 @@ namespace rrr {
     case REMOVE_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(action.id == target) {
+        if(!fRelax && action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -243,7 +286,7 @@ namespace rrr {
     case REMOVE_CONST:
       if(fInitialized) {
         if(target != -1) {
-          if(action.id == target) {
+          if(!fRelax && action.id == target) {
             if(fUpdate) {
               for(int fo: action.vFanouts) {
                 sUpdates.insert(fo);
@@ -265,7 +308,7 @@ namespace rrr {
     case ADD_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(action.id == target) {
+        if(!fRelax && action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -626,7 +669,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "computing careset of " << target << std::endl;
     }
-    if(!pNtk->GetCond() && !fUseCustomCondition && pNtk->IsPoDriver(target)) {
+    if(!pNtk->GetCond() && !fUseCustomCondition && !fUseOriginalPoValues && pNtk->IsPoDriver(target)) {
       Fill(nStimuli, care.begin());
       if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
@@ -764,6 +807,19 @@ namespace rrr {
         });
         care[i] = CustomCondition(vPoValues, vPoValues2);
       }
+    } else if(fUseOriginalPoValues) {
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        itr x;
+        if(vTrav[fi] == iTrav) {
+          x = vValues2.begin() + fi * nStimuli;
+        } else {
+          x = vValues.begin() + fi * nStimuli;
+        }
+        Xor(nStimuli, tmp.begin(), vOriginalPoValues.begin() + index * nStimuli, x, c);
+        Or(nStimuli, care.begin(), care.begin(), tmp.begin(), false, false);
+        index++;
+      });
     } else {
       pNtk->ForEachPoDriver([&](int fi) {
         assert(fi != target);
@@ -853,6 +909,14 @@ namespace rrr {
       }
     }
     Simulate();
+    if(fUseOriginalPoValues) {
+      vOriginalPoValues.resize(nStimuli * pNtk->GetNumPos());
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        Copy(nStimuli, vOriginalPoValues.begin() + index * nStimuli, vValues.begin() + fi * nStimuli, c);
+        index++;
+      });
+    }
     fInitialized = true;
   }
 
@@ -866,6 +930,7 @@ namespace rrr {
     nVerbose(0),
     nWords(0),
     nStimuli(0),
+    nRelaxedPatterns(0),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -881,6 +946,7 @@ namespace rrr {
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
     nStimuli(nWords),
+    nRelaxedPatterns(pPar->nRelaxedPatterns),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -964,6 +1030,9 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
+      if(fRelax) {
+        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
+      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:
@@ -1060,6 +1129,9 @@ namespace rrr {
         x = tmp.begin();
       }
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
+      if(fRelax) {
+        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
+      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:
