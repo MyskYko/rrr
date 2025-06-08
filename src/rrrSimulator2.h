@@ -351,6 +351,8 @@ namespace rrr {
       });
       if(x == v.end()) {
         Fill(nStimuli, y);
+      } else if(x != y) {
+        Copy(nStimuli, y, x, cx);
       }
       break;
     default:
@@ -376,6 +378,8 @@ namespace rrr {
       });
       if(x == v.end()) {
         Fill(nStimuli, tmp.begin());
+      } else if(x != tmp.begin()) {
+        Copy(nStimuli, tmp.begin(), x, cx);
       }
       break;
     default:

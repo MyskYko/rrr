@@ -306,6 +306,8 @@ namespace rrr {
       });
       if(x == v.end()) {
         Fill(nWords, y);
+      } else if(x != y) {
+        Copy(nWords, y, x, cx);
       }
       break;
     default:
@@ -331,6 +333,8 @@ namespace rrr {
       });
       if(x == v.end()) {
         Fill(nWords, tmp.begin());
+      } else if(x != tmp.begin()) {
+        Copy(nWords, tmp.begin(), x, cx);
       }
       break;
     default:
