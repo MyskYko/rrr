@@ -315,7 +315,7 @@ namespace rrr {
   template <typename Rng>  
   inline std::string Scheduler3<Ntk, Opt, Par>::AbcLocalMap(Rng &rng) {
     std::string Command = "read_library ";
-    switch(rng() % /*6*/5) {
+    switch(rng() % 6) {
     case 0:
       Command += "and.genlib";
       break;
