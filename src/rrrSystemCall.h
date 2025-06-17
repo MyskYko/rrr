@@ -22,6 +22,7 @@ namespace rrr {
     close(fd);
     // write aig
     char filename[30];
+    char filename2[35];
     sprintf(filename, "%s.aig", filenamet);
     Gia_Man_t *pGia = CreateGia(pNtk, true);
     Gia_AigerWrite(pGia, filename, 0, 0, 0);
@@ -42,11 +43,26 @@ namespace rrr {
       cmd += "cec -n ";
       cmd += filename;
       cmd += "; ";
+      sprintf(filename2, "%s2.aig", filename);
+      cmd += "write_aiger ";
+      cmd += filename2;
+    } else {
+      cmd += "write_aiger ";
+      cmd += filename;
     }
-    cmd += "write_aiger ";
-    cmd += filename;
     cmd += "\"";
     bool r = SystemCall(cmd);
+    if(fCheck) {
+      pGia = Gia_AigerRead(filename, 0, 0, 0);
+      Gia_Man_t * pNew = Gia_AigerRead(filename2, 0, 0, 0);
+      if(Cec_ManVerifyTwo(pGia, pNew, 0)) {
+        Gia_ManStop(pGia);
+        pGia = pNew;
+      } else {
+        abort();
+      }
+      unlink(filename2);
+    }
     if(r) {
       // read aig
       pGia = Gia_AigerRead(filename, 0, 0, 0);
