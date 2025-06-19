@@ -69,7 +69,7 @@ namespace rrr {
     AndNetwork(AndNetwork const &x);
 
     // initialization APIs (should not be called after optimization has started)
-    void Clear(bool fClearCallbacks = true, bool fClearBackups = true);
+    void Clear(bool fClearNetwork = true, bool fClearCallbacks = true, bool fClearBackups = true);
     void Reserve(int nReserve);
     int  AddPi();
     int  AddAnd(int id0, int id1, bool c0, bool c1);
@@ -198,7 +198,7 @@ namespace rrr {
     return nNodes++;
   }
 
-  void AndNetwork::SortInts(itr it) {
+  inline void AndNetwork::SortInts(itr it) {
     ForEachFanin(*it, [&](int fi) {
       itr it2 = std::find(it, lInts.end(), fi);
       if(it2 != lInts.end()) {
@@ -230,7 +230,7 @@ namespace rrr {
     fLockTrav = false;
   }
 
-  void AndNetwork::ForEachTfiRec(int id, std::function<void(int)> const &func) {
+  inline void AndNetwork::ForEachTfiRec(int id, std::function<void(int)> const &func) {
     for(int fi_edge: vvFaninEdges[id]) {
       int fi = Edge2Node(fi_edge);
       if(vTrav[fi] == iTrav) {
@@ -264,7 +264,7 @@ namespace rrr {
 
   /* {{{ Constructors */
 
-  AndNetwork::AndNetwork() :
+  inline AndNetwork::AndNetwork() :
     nNodes(0),
     pPat(NULL),
     pCond(NULL),
@@ -277,7 +277,7 @@ namespace rrr {
     nNodes++;
   }
 
-  AndNetwork::AndNetwork(AndNetwork const &x) :
+  inline AndNetwork::AndNetwork(AndNetwork const &x) :
     fLockTrav(false),
     iTrav(0),
     fPropagating(false) {
@@ -288,33 +288,35 @@ namespace rrr {
 
   /* {{{ Initialization APIs */
 
-  void AndNetwork::Clear(bool fClearCallbacks, bool fClearBackups) {
-    nNodes = 0;
-    vPis.clear();
-    lInts.clear();
-    sInts.clear();
-    vPos.clear();
-    vvFaninEdges.clear();
-    vRefs.clear();
-    pPat = NULL;
-    pCond = NULL;
-    fLockTrav = false;
-    iTrav = 0;
-    vTrav.clear();
-    fPropagating = false;
+  inline void AndNetwork::Clear(bool fClearNetwork, bool fClearCallbacks, bool fClearBackups) {
+    if(fClearNetwork) {
+      nNodes = 0;
+      vPis.clear();
+      lInts.clear();
+      sInts.clear();
+      vPos.clear();
+      vvFaninEdges.clear();
+      vRefs.clear();
+      pPat = NULL;
+      pCond = NULL;
+      fLockTrav = false;
+      iTrav = 0;
+      vTrav.clear();
+      fPropagating = false;
+      // add constant node
+      vvFaninEdges.emplace_back();
+      vRefs.push_back(0);
+      nNodes++;
+    }
     if(fClearCallbacks) {
       vCallbacks.clear();
     }
     if(fClearBackups) {
       vBackups.clear();
     }
-    // add constant node
-    vvFaninEdges.emplace_back();
-    vRefs.push_back(0);
-    nNodes++;
   }
 
-  void AndNetwork::Reserve(int nReserve) {
+  inline void AndNetwork::Reserve(int nReserve) {
     vvFaninEdges.reserve(nReserve);
     vRefs.reserve(nReserve);
   }
@@ -377,7 +379,7 @@ namespace rrr {
   }
 
   inline void AndNetwork::Read(AndNetwork const &from) {
-    Clear(false, false);
+    Clear(true, false, false);
     Copy(from);
     Action action;
     action.type = READ;
@@ -386,7 +388,7 @@ namespace rrr {
 
   template <typename Ntk, typename Reader>
   void AndNetwork::Read(Ntk const &from, Reader const &reader) {
-    Clear(false, false);
+    Clear(true, false, false);
     reader(from, this);
     Action action;
     action.type = READ;
@@ -421,20 +423,21 @@ namespace rrr {
     return int_size(vPos);
   }
 
-  int AndNetwork::GetNumLevels() const {
+  inline int AndNetwork::GetNumLevels() const {
     int nMaxLevel = 0;
     std::vector<int> vLevels(nNodes);
-    ForEachInt([&](int id) {
-      ForEachFanin(id, [&](int fi) {
+    for(int id: lInts) {
+      for(int fi_edge: vvFaninEdges[id]) {
+        int fi = Edge2Node(fi_edge);
         if(vLevels[id] < vLevels[fi]) {
           vLevels[id] = vLevels[fi];
         }
-      });
+      }
       vLevels[id] += 1;
       if(nMaxLevel < vLevels[id]) {
         nMaxLevel = vLevels[id];
       }
-    });
+    }
     return nMaxLevel;
   }
 
@@ -1241,7 +1244,7 @@ namespace rrr {
   /* {{{ Extraction */
 
   template <template <typename...> typename Container, typename... Ts>
-  AndNetwork *AndNetwork::Extract(Container<Ts...> const &ids, std::vector<int> const &vInputs, std::vector<int> const &vOutputs) {
+  inline AndNetwork *AndNetwork::Extract(Container<Ts...> const &ids, std::vector<int> const &vInputs, std::vector<int> const &vOutputs) {
     AndNetwork *pNtk = new AndNetwork;
     pNtk->Reserve(int_size(vInputs) + int_size(ids) + int_size(vOutputs));
     std::map<int, int> m;
@@ -1278,7 +1281,7 @@ namespace rrr {
   
   /* {{{ Actions */
   
-  void AndNetwork::RemoveFanin(int id, int idx) {
+  inline void AndNetwork::RemoveFanin(int id, int idx) {
     Action action;
     action.type = REMOVE_FANIN;
     action.id = id;
@@ -1292,7 +1295,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::RemoveUnused(int id, bool fRecursive, bool fSweeping) {
+  inline void AndNetwork::RemoveUnused(int id, bool fRecursive, bool fSweeping) {
     assert(vRefs[id] == 0);
     Action action;
     action.type = REMOVE_UNUSED;
@@ -1317,7 +1320,7 @@ namespace rrr {
     }
   }
 
-  void AndNetwork::RemoveBuffer(int id) {
+  inline void AndNetwork::RemoveBuffer(int id) {
     assert(GetNumFanins(id) == 1);
     assert(!fPropagating || fLockTrav);
     int fi = GetFanin(id, 0);
@@ -1370,7 +1373,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::RemoveConst(int id) {
+  inline void AndNetwork::RemoveConst(int id) {
     assert(GetNumFanins(id) == 0 || FindFanin(id, GetConst0()) != -1);
     assert(!fPropagating || fLockTrav);
     bool c = (GetNumFanins(id) == 0);
@@ -1411,7 +1414,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::AddFanin(int id, int fi, bool c) {
+  inline void AndNetwork::AddFanin(int id, int fi, bool c) {
     assert(FindFanin(id, fi) == -1); // no duplication
     assert(fi != GetConst0() || !c); // no const-1
     Action action;
@@ -1432,7 +1435,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::TrivialCollapse(int id) {
+  inline void AndNetwork::TrivialCollapse(int id) {
     for(int idx = 0; idx < GetNumFanins(id);) {
       int fi_edge = vvFaninEdges[id][idx];
       int fi = Edge2Node(fi_edge);
@@ -1462,7 +1465,7 @@ namespace rrr {
     }
   }
   
-  void AndNetwork::TrivialCollapse() {
+  inline void AndNetwork::TrivialCollapse() {
     std::list<int> lInts_ = lInts;
     for(critr it = lInts_.rbegin(); it != lInts_.rend(); it++) {
       if(IsInt(*it)) {
@@ -1471,7 +1474,7 @@ namespace rrr {
     }
   }
 
-  void AndNetwork::TrivialDecompose(int id) {
+  inline void AndNetwork::TrivialDecompose(int id) {
     while(GetNumFanins(id) > 2) {
       Action action;
       action.type = TRIVIAL_DECOMPOSE;
@@ -1497,7 +1500,7 @@ namespace rrr {
   }
 
   template <typename Func>
-  void AndNetwork::SortFanins(int id, Func const &comp) {
+  inline void AndNetwork::SortFanins(int id, Func const &comp) {
     static_assert(is_invokable<Func, int, int>::value || is_invokable<Func, int, bool, int, bool>::value, "fanin cost function format error");
     std::vector<int> vFaninEdges = vvFaninEdges[id];
     std::sort(vvFaninEdges[id].begin(), vvFaninEdges[id].end(), [&](int i, int j) {
@@ -1521,7 +1524,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  std::pair<std::vector<int>, std::vector<bool>> AndNetwork::Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs) {
+  inline std::pair<std::vector<int>, std::vector<bool>> AndNetwork::Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs) {
     Reserve(nNodes + pNtk->GetNumInts());
     std::map<int, std::pair<int, bool>> m;
     m[pNtk->GetConst0()] = std::make_pair(GetConst0(), false);
@@ -1598,7 +1601,7 @@ namespace rrr {
 
   /* {{{ Network cleanup */
   
-  void AndNetwork::Propagate(int id) {
+  inline void AndNetwork::Propagate(int id) {
     StartTraversal();
     itr it;
     if(id == -1) {
@@ -1632,7 +1635,7 @@ namespace rrr {
     EndTraversal();
   }
 
-  void AndNetwork::Sweep(bool fPropagate) {
+  inline void AndNetwork::Sweep(bool fPropagate) {
     if(fPropagate) {
       Propagate();
     }
@@ -1650,7 +1653,7 @@ namespace rrr {
 
   /* {{{ Save & load */
 
-  int AndNetwork::Save(int slot) {
+  inline int AndNetwork::Save(int slot) {
     Action action;
     action.type = SAVE;
     if(slot < 0) {
@@ -1666,7 +1669,7 @@ namespace rrr {
     return slot;
   }
 
-  void AndNetwork::Load(int slot) {
+  inline void AndNetwork::Load(int slot) {
     assert(slot >= 0);
     assert(slot < int_size(vBackups));
     Action action;
@@ -1676,7 +1679,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  void AndNetwork::PopBack() {
+  inline void AndNetwork::PopBack() {
     assert(!vBackups.empty());
     Action action;
     action.type = POP_BACK;
@@ -1689,34 +1692,34 @@ namespace rrr {
   
   /* {{{ Misc */
 
-  int AndNetwork::AddCallback(Callback const &callback) {
+  inline int AndNetwork::AddCallback(Callback const &callback) {
     vCallbacks.push_back(callback);
     return int_size(vCallbacks) - 1;
   }
 
-  void AndNetwork::DeleteCallback(int index) {
+  inline void AndNetwork::DeleteCallback(int index) {
     vCallbacks[index] = [&](Action const &action) {
       (void)action;
     };
   }
 
-  void AndNetwork::RegisterPattern(Pattern *pPat_) {
+  inline void AndNetwork::RegisterPattern(Pattern *pPat_) {
     pPat = pPat_;
   }
 
-  Pattern *AndNetwork::GetPattern() {
+  inline Pattern *AndNetwork::GetPattern() {
     return pPat;
   }
 
-  void AndNetwork::RegisterCond(AndNetwork *pCond_) {
+  inline void AndNetwork::RegisterCond(AndNetwork *pCond_) {
     pCond = pCond_;
   }
 
-  AndNetwork *AndNetwork::GetCond() {
+  inline AndNetwork *AndNetwork::GetCond() {
     return pCond;
   }
   
-  void AndNetwork::Print() const {
+  inline void AndNetwork::Print() const {
     std::cout << "inputs: " << vPis << std::endl;
     ForEachInt([&](int id) {
       std::cout << "node " << id << ": ";

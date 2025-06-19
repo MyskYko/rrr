@@ -20,6 +20,7 @@ namespace rrr {
     int nVerbose;
     int nPartitionSize;
     int nPartitionSizeMin;
+    int nPartitionInputMax;
     std::string strVerbosePrefix;
 
     // data
@@ -40,11 +41,14 @@ namespace rrr {
   public:
     // constructors
     Partitioner(Parameter const *pPar);
-    void AssignNetwork(Ntk *pNtk);
+    Partitioner(int nVerbose, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax);
+    void AssignNetwork(Ntk *pNtk_);
 
     // APIs
     Ntk *Extract(int iSeed);
     void Insert(Ntk *pSubNtk);
+    std::vector<int> GetInputs(Ntk *pSubNtk);
+    bool IsTooSmall(Ntk *pNtk_);
   };
 
   /* {{{ Print */
@@ -128,6 +132,9 @@ namespace rrr {
     Print(3, "nodes:", sNodes);
     Print(3, "inputs:", sInputs);
     Print(3, "outputs:", sOutputs);
+    if(nPartitionInputMax && int_size(sInputs) > nPartitionInputMax) {
+      return std::set<int>();
+    }
     // include inner nodes
     std::set<int> sFanouts = GetFanouts(sNodes, sOutputs);
     std::vector<int> vInners = pNtk->GetInners(sFanouts, sInputs);
@@ -151,6 +158,9 @@ namespace rrr {
       Print(3, "nodes:", sNodes);
       Print(3, "inputs:", sInputs);
       Print(3, "outputs:", sOutputs);
+      if(nPartitionInputMax && int_size(sInputs) > nPartitionInputMax) {
+        return std::set<int>();
+      }
       // recompute fanouts
       sFanouts = GetFanouts(sNodes, sOutputs);
       vInners = pNtk->GetInners(sFanouts, sInputs);
@@ -264,7 +274,16 @@ namespace rrr {
   Partitioner<Ntk>::Partitioner(Parameter const *pPar) :
     nVerbose(pPar->nPartitionerVerbose),
     nPartitionSize(pPar->nPartitionSize),
-    nPartitionSizeMin(pPar->nPartitionSizeMin) {
+    nPartitionSizeMin(pPar->nPartitionSizeMin),
+    nPartitionInputMax(pPar->nPartitionInputMax) {
+  }
+
+  template <typename Ntk>
+  Partitioner<Ntk>::Partitioner(int nVerbose, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax) :
+    nVerbose(nVerbose),
+    nPartitionSize(nPartitionSize),
+    nPartitionSizeMin(nPartitionSizeMin),
+    nPartitionInputMax(nPartitionInputMax) {
   }
 
   template <typename Ntk>
@@ -295,6 +314,7 @@ namespace rrr {
         Print(0, "try partitioning with node", id, "(", i, "/", int_size(vInts), ")");
         Ntk *pSubNtk = ExtractDisjoint(id);
         if(pSubNtk) {
+          Print(0, "got partitioning with node", id, "(", i, "/", int_size(vInts), ")", "with size", pSubNtk->GetNumInts());
           return pSubNtk;
         }
       }
@@ -333,6 +353,16 @@ namespace rrr {
     delete pSubNtk;
     mSubNtk2Io.erase(pSubNtk);
     vFailed.clear(); // clear, there isn't really a way to track
+  }
+
+  template <typename Ntk>
+  std::vector<int> Partitioner<Ntk>::GetInputs(Ntk *pSubNtk) {
+    return std::get<1>(mSubNtk2Io[pSubNtk]);
+  }
+
+  template <typename Ntk>
+  bool Partitioner<Ntk>::IsTooSmall(Ntk *pNtk_) {
+    return pNtk_->GetNumInts() <= nPartitionSizeMin;
   }
 
   /* }}} */

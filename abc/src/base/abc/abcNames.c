@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "abc.h"
 #include "misc/util/utilNam.h"
 
@@ -85,7 +86,7 @@ char * Abc_ObjAssignName( Abc_Obj_t * pObj, char * pName, char * pSuffix )
 ***********************************************************************/
 char * Abc_ObjNamePrefix( Abc_Obj_t * pObj, char * pPrefix )
 {
-    static char Buffer[2000];
+    thread_local static char Buffer[2000];
     sprintf( Buffer, "%s%s", pPrefix, Abc_ObjName(pObj) );
     return Buffer;
 }
@@ -103,7 +104,7 @@ char * Abc_ObjNamePrefix( Abc_Obj_t * pObj, char * pPrefix )
 ***********************************************************************/
 char * Abc_ObjNameSuffix( Abc_Obj_t * pObj, char * pSuffix )
 {
-    static char Buffer[2000];
+    thread_local static char Buffer[2000];
     sprintf( Buffer, "%s%s", Abc_ObjName(pObj), pSuffix );
     return Buffer;
 }
@@ -121,7 +122,7 @@ char * Abc_ObjNameSuffix( Abc_Obj_t * pObj, char * pSuffix )
 ***********************************************************************/
 char * Abc_ObjNameDummy( char * pPrefix, int Num, int nDigits )
 {
-    static char Buffer[2000];
+    thread_local static char Buffer[2000];
     sprintf( Buffer, "%s%0*d", pPrefix, nDigits, Num );
     return Buffer;
 }

@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include <stdio.h>
 #include <string.h>
 #include "extra.h"
@@ -41,10 +42,10 @@ ABC_NAMESPACE_IMPL_START
  *  Purpose: get option letter from argv.
  */
 
-const char * globalUtilOptarg;        // Global argument pointer (util_optarg)
-int    globalUtilOptind = 0;    // Global argv index (util_optind)
+thread_local const char * globalUtilOptarg;        // Global argument pointer (util_optarg)
+thread_local int    globalUtilOptind = 0;    // Global argv index (util_optind)
 
-static const char *pScanStr;
+thread_local static const char *pScanStr;
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
@@ -158,7 +159,7 @@ int Extra_UtilGetopt( int argc, char *argv[], const char *optstring )
 ***********************************************************************/
 char * Extra_UtilPrintTime( long t )
 {
-    static char s[40];
+    thread_local static char s[40];
 
     (void) sprintf(s, "%ld.%02ld sec", t/1000, (t%1000)/10);
     return s;

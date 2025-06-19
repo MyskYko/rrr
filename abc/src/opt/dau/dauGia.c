@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "dauInt.h"
 #include "aig/gia/gia.h"
 #include "misc/util/utilTruth.h"
@@ -32,9 +33,9 @@ extern int Kit_TruthToGia( Gia_Man_t * pMan, unsigned * pTruth, int nVars, Vec_I
 
 #define DAU_DSD_MAX_VAR 12
 
-static int m_Calls = 0;
-static int m_NonDsd = 0;
-static int m_Non1Step = 0;
+thread_local static int m_Calls = 0;
+thread_local static int m_NonDsd = 0;
+thread_local static int m_Non1Step = 0;
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///

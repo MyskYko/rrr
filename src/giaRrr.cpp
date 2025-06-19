@@ -3,8 +3,8 @@
 #include "rrr.h"
 #include "rrrAbc.h"
 
-extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond) {
+//extern "C"
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int fNoGlobalJump, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -17,6 +17,7 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nAnalyzerVerbose = nAnalyzerVerbose;
   Par.nSimulatorVerbose = nSimulatorVerbose;
   Par.nSatSolverVerbose = nSatSolverVerbose;
+  Par.nResynVerbose = nResynVerbose;
   Par.fUseBddCspf = fUseBddCspf;
   Par.fUseBddMspf = fUseBddMspf;
   Par.nConflictLimit = nConflictLimit;
@@ -29,10 +30,17 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nThreads = nThreads;
   Par.nPartitionSize = nPartitionSize;
   Par.nPartitionSizeMin = nPartitionSizeMin;
+  Par.nPartitionInputMax = nPartitionInputMax;
+  Par.nResynSize = nResynSize;
+  Par.nResynInputMax = nResynInputMax;
+  Par.nHops = nHops;
+  Par.nJumps = nJumps;
   Par.fDeterministic = fDeterministic;
   Par.nParallelPartitions = nParallelPartitions;
   Par.fOptOnInsert = fOptOnInsert;
   Par.fGreedy = fGreedy;
+  Par.fExSim = fExSim;
+  Par.fNoGlobalJump = fNoGlobalJump;
   Par.nRelaxedPatterns = nRelaxedPatterns;
   if(pTemporary) {
     Par.strTemporary = std::string(pTemporary);
@@ -42,6 +50,9 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   }
   if(pCond) {
     Par.strCond = std::string(pCond);
+  }
+  if(pOutput) {
+    Par.strOutput = pOutput;
   }
   rrr::Perform(&ntk, &Par);
   Gia_Man_t *pNew = rrr::CreateGia(&ntk, false);

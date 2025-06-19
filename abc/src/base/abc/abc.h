@@ -233,7 +233,7 @@ struct Abc_Des_t_
 ////////////////////////////////////////////////////////////////////////
 
 // transforming floats into ints and back
-static inline unsigned    Abc_InfoRandomWord()                       { return ((((unsigned)rand()) << 24) ^ (((unsigned)rand()) << 12) ^ ((unsigned)rand())); } // #define RAND_MAX 0x7fff
+static inline unsigned    Abc_InfoRandomWord()                       { return ((((unsigned)Abc_Random(0)) << 24) ^ (((unsigned)Abc_Random(0)) << 12) ^ ((unsigned)Abc_Random(0))); } // #define RAND_MAX 0x7fff
 static inline void        Abc_InfoRandom( unsigned * p, int nWords ) { int i; for ( i = nWords - 1; i >= 0; i-- ) p[i] = Abc_InfoRandomWord();   } 
 static inline void        Abc_InfoClear( unsigned * p, int nWords )  { memset( p, 0, sizeof(unsigned) * nWords );   } 
 static inline void        Abc_InfoFill( unsigned * p, int nWords )   { memset( p, 0xff, sizeof(unsigned) * nWords );} 

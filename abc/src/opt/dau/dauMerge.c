@@ -18,6 +18,7 @@
 
 ***********************************************************************/
 
+#include <threads.h>
 #include "dauInt.h"
 #include "misc/util/utilTruth.h"
 
@@ -588,8 +589,8 @@ char * Dau_DsdMerge( char * pDsd0i, int * pPerm0, char * pDsd1i, int * pPerm1, i
 {
     int fVerbose = 0;
     int fCheck = 0;
-    static int Counter = 0;
-    static char pRes[2*DAU_MAX_STR+10];
+    thread_local static int Counter = 0;
+    thread_local static char pRes[2*DAU_MAX_STR+10];
     char pDsd0[DAU_MAX_STR];
     char pDsd1[DAU_MAX_STR];
     int pMatches0[DAU_MAX_STR];
