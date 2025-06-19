@@ -19,6 +19,7 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
+    static constexpr bool fRelax = true;
 
     // pointer to network
     Ntk *pNtk;
@@ -27,6 +28,10 @@ namespace rrr {
     int nVerbose;
     int nWords;
     int nStimuli;
+    int nRelaxedPatterns;
+    bool fUseCustomCondition = false;
+    std::function<word(std::vector<word> const &, std::vector<word> const &)> CustomCondition;
+    bool fUseOriginalPoValues = true;
 
     // data
     bool fGenerated;
@@ -37,10 +42,14 @@ namespace rrr {
     std::vector<word> care; // careset
     std::vector<word> tmp;
     //std::vector<std::vector<word>> vPoValues;
+    std::vector<word> vValuesCond;
+    std::vector<word> vValuesCond2;
+    std::vector<word> vOriginalPoValues;
 
     // marks
     unsigned iTrav;
     std::vector<unsigned> vTrav;
+    std::vector<unsigned> vTravCond;
 
     // partial cex
     int iPivot;
@@ -64,9 +73,11 @@ namespace rrr {
     void Fill(int n, itr x) const;
     void Copy(int n, itr dst, citr src, bool c) const;
     void And(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
+    void Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
     bool IsZero(int n, citr x) const;
     bool IsEq(int n, citr x, citr y, bool c) const;
+    bool AtMostK(int n, citr x, int k) const;
     void Print(int n, citr x) const;
 
     // callback
@@ -76,13 +87,13 @@ namespace rrr {
     unsigned StartTraversal(int n = 1);
     
     // simulation
-    void SimulateNode(std::vector<word> &v, int id, int to_negate = -1);
-    bool ResimulateNode(std::vector<word> &v, int id, int to_negate = -1);
-    void SimulateOneWordNode(std::vector<word> &v, int id, int offset, int to_negate = -1);
-    void SimulatePartNode(std::vector<word> &v, int id, int n, int offset, int to_negate = -1);
+    void SimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) const;
+    bool ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id);
+    //void SimulateOneWordNode(std::vector<word> &v, int id, int offset, int to_negate = -1);
+    //void SimulatePartNode(std::vector<word> &v, int id, int n, int offset, int to_negate = -1);
     void Simulate();
     void Resimulate();
-    void SimulateOneWord(int offset);
+    //void SimulateOneWord(int offset);
 
     // generate stimuli
     void GenerateRandomStimuli();
@@ -90,7 +101,7 @@ namespace rrr {
 
     // careset computation
     void ComputeCare(int id);
-    void ComputeCarePart(int nWords_, int offset);
+    //void ComputeCarePart(int nWords_, int offset);
 
     // preparation
     void Initialize();
@@ -106,7 +117,7 @@ namespace rrr {
     bool CheckFeasibility(int id, int fi, bool c);
 
     // cex
-    void AddCex(std::vector<VarValue> const &vCex);
+    //void AddCex(std::vector<VarValue> const &vCex);
 
     // summary
     void ResetSummary();
@@ -166,6 +177,31 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline void Simulator2<Ntk>::Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const {
+    if(!c0) {
+      if(!c1) {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = *src0 | *src1;
+        }
+      } else {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = *src0 | ~*src1;
+        }
+      }
+    } else {
+      if(!c1) {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = ~*src0 | *src1;
+        }
+      } else {
+        for(int i = 0; i < n; i++, dst++, src0++, src1++) {
+          *dst = ~*src0 | ~*src1;
+        }
+      }
+    }
+  }
+
+  template <typename Ntk>
   inline void Simulator2<Ntk>::Xor(int n, itr dst, citr src0, citr src1, bool c) const {
     if(!c) {
       for(int i = 0; i < n; i++, dst++, src0++, src1++) {
@@ -207,6 +243,18 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline bool Simulator2<Ntk>::AtMostK(int n, citr x, int k) const {
+    int count = 0;
+    for(int i = 0; i < n; i++, x++) {
+      count += __builtin_popcountll(*x);
+      if(count > k) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  template <typename Ntk>
   inline void Simulator2<Ntk>::Print(int n, citr x) const {
     std::cout << std::bitset<64>(*x);
     x++;
@@ -225,7 +273,7 @@ namespace rrr {
     case REMOVE_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(action.id == target) {
+        if(!fRelax && action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -238,7 +286,7 @@ namespace rrr {
     case REMOVE_CONST:
       if(fInitialized) {
         if(target != -1) {
-          if(action.id == target) {
+          if(!fRelax && action.id == target) {
             if(fUpdate) {
               for(int fo: action.vFanouts) {
                 sUpdates.insert(fo);
@@ -260,7 +308,7 @@ namespace rrr {
     case ADD_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(action.id == target) {
+        if(!fRelax && action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -273,8 +321,11 @@ namespace rrr {
       if(fInitialized) {
         if(target != -1) {
           vValues.resize(nStimuli * pNtk->GetNumNodes());
-          SimulateNode(vValues, action.fi);
+          SimulateNode(pNtk, vValues, action.fi);
           // time of this simulation is not measured for simplicity sake
+          if(pNtk->GetCond()) {
+            vValuesCond.resize(nStimuli * pNtk->GetCond()->GetNumNodes());
+          }
         }
       }
       break;
@@ -306,11 +357,17 @@ namespace rrr {
         iTrav++;
         if(iTrav == 0) {
           vTrav.clear();
+          if(pNtk->GetCond()) {
+            vTravCond.clear();
+          }
           break;
         }
       }
     } while(iTrav == 0);
     vTrav.resize(pNtk->GetNumNodes());
+    if(pNtk->GetCond()) {
+      vTravCond.resize(pNtk->GetCond()->GetNumNodes());
+    }
     return iTrav - n + 1;
   }
 
@@ -319,24 +376,26 @@ namespace rrr {
   /* {{{ Simulation */
   
   template <typename Ntk>
-  void Simulator2<Ntk>::SimulateNode(std::vector<word> &v, int id, int to_negate) {
+  void Simulator2<Ntk>::SimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) const {
     itr x = v.end();
     itr y = v.begin() + id * nStimuli;
     bool cx = false;
-    switch(pNtk->GetNodeType(id)) {
+    switch(pNtk_->GetNodeType(id)) {
     case AND:
-      pNtk->ForEachFanin(id, [&](int fi, bool c) {
+      pNtk_->ForEachFanin(id, [&](int fi, bool c) {
         if(x == v.end()) {
           x = v.begin() + fi * nStimuli;
-          cx = c ^ (fi == to_negate);
+          cx = c;
         } else {
-          And(nStimuli, y, x, v.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+          And(nStimuli, y, x, v.begin() + fi * nStimuli, cx, c);
           x = y;
           cx = false;
         }
       });
       if(x == v.end()) {
         Fill(nStimuli, y);
+      } else if(x != y) {
+        Copy(nStimuli, y, x, cx);
       }
       break;
     default:
@@ -345,23 +404,25 @@ namespace rrr {
   }
       
   template <typename Ntk>
-  bool Simulator2<Ntk>::ResimulateNode(std::vector<word> &v, int id, int to_negate) {
+  bool Simulator2<Ntk>::ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) {
     itr x = v.end();
     bool cx = false;
-    switch(pNtk->GetNodeType(id)) {
+    switch(pNtk_->GetNodeType(id)) {
     case AND:
-      pNtk->ForEachFanin(id, [&](int fi, bool c) {
+      pNtk_->ForEachFanin(id, [&](int fi, bool c) {
         if(x == v.end()) {
           x = v.begin() + fi * nStimuli;
-          cx = c ^ (fi == to_negate);
+          cx = c;
         } else {
-          And(nStimuli, tmp.begin(), x, v.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+          And(nStimuli, tmp.begin(), x, v.begin() + fi * nStimuli, cx, c);
           x = tmp.begin();
           cx = false;
         }
       });
       if(x == v.end()) {
         Fill(nStimuli, tmp.begin());
+      } else if(x != tmp.begin()) {
+        Copy(nStimuli, tmp.begin(), x, cx);
       }
       break;
     default:
@@ -374,7 +435,8 @@ namespace rrr {
     Copy(nStimuli, y, tmp.begin(), false);
     return true;
   }
-  
+
+  /*
   template <typename Ntk>
   void Simulator2<Ntk>::SimulateOneWordNode(std::vector<word> &v, int id, int offset, int to_negate) {
     itr x = v.end();
@@ -400,7 +462,9 @@ namespace rrr {
       assert(0);
     }
   }
-  
+  */
+
+  /*
   template <typename Ntk>
   void Simulator2<Ntk>::SimulatePartNode(std::vector<word> &v, int id, int n, int offset, int to_negate) {
     itr x = v.end();
@@ -426,6 +490,7 @@ namespace rrr {
       assert(0);
     }
   }
+  */
   
   template <typename Ntk>
   void Simulator2<Ntk>::Simulate() {
@@ -434,17 +499,33 @@ namespace rrr {
       std::cout << "simulating" << std::endl;
     }
     pNtk->ForEachInt([&](int id) {
-      SimulateNode(vValues, id);
+      SimulateNode(pNtk, vValues, id);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
         Print(nStimuli, vValues.begin() + id * nStimuli);
         std::cout << std::endl;
       }
     });
+    if(pNtk->GetCond()) {
+      Ntk *pCond = pNtk->GetCond();
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        Copy(nStimuli, vValuesCond.begin() + pCond->GetPi(index) * nStimuli, vValues.begin() + fi * nStimuli, c);
+        index++;
+      });
+      pCond->ForEachInt([&](int id) {
+        SimulateNode(pCond, vValuesCond, id);
+        // if(nVerbose) {
+        //   std::cout << "node " << std::setw(3) << id << ": ";
+        //   Print(nStimuli, vValues.begin() + id * nStimuli);
+        //   std::cout << std::endl;
+        // }
+      });
+    }
     /*
     vPoValues.resize(pNtk->GetNumPos());
     int index = 0;
-    pNtk->ForEachPoDriver([&](int fi, bool c){
+    pNtk->ForEachPoDriver([&](int fi, bool c) {
       vPoValues[index].resize(nStimuli);
       Copy(nStimuli, vPoValues[index].begin(), vValues.begin() + fi * nStimuli, c);
       index++;
@@ -460,7 +541,7 @@ namespace rrr {
       std::cout << "resimulating" << std::endl;
     }
     pNtk->ForEachTfosUpdate(sUpdates, false, [&](int fo) {
-      bool fUpdated = ResimulateNode(vValues, fo);
+      bool fUpdated = ResimulateNode(pNtk, vValues, fo);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
         Print(nStimuli, vValues.begin() + fo * nStimuli);
@@ -468,6 +549,29 @@ namespace rrr {
       }
       return fUpdated;
     });
+    if(pNtk->GetCond()) {
+      Ntk *pCond = pNtk->GetCond();
+      std::set<int> sUpdatesCond;
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c){
+        if(!IsEq(nStimuli, vValuesCond.begin() + pCond->GetPi(index) * nStimuli, vValues.begin() + fi * nStimuli, c)) {
+          Copy(nStimuli, vValuesCond.begin() + pCond->GetPi(index) * nStimuli, vValues.begin() + fi * nStimuli, c);
+          pCond->ForEachFanout(pCond->GetPi(index), false, [&](int fo) {
+            sUpdatesCond.insert(fo);
+          });
+        }
+        index++;
+      });
+      pCond->ForEachTfosUpdate(sUpdatesCond, false, [&](int fo) {
+        bool fUpdated = ResimulateNode(pCond, vValuesCond, fo);
+        // if(nVerbose) {
+        //   std::cout << "node " << std::setw(3) << fo << ": ";
+        //   Print(nStimuli, vValues.begin() + fo * nStimuli);
+        //   std::cout << std::endl;
+        // }
+        return fUpdated;
+      });
+    }
     /* alternative version that updates entire TFO
     pNtk->ForEachTfos(sUpdates, false, [&](int fo) {
       SimulateNode(vValues, fo);
@@ -488,6 +592,7 @@ namespace rrr {
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
+  /*
   template <typename Ntk>
   void Simulator2<Ntk>::SimulateOneWord(int offset) {
     time_point timeStart = GetCurrentTime();
@@ -504,6 +609,7 @@ namespace rrr {
     });
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
+  */
 
   /* }}} */
 
@@ -535,6 +641,9 @@ namespace rrr {
     pNtk->ForEachPiIdx([&](int index, int id) {
       Copy(nStimuli, vValues.begin() + id * nStimuli, pPat->GetIterator(index), false);
     });
+    if(pNtk->GetCond()) {
+      vValuesCond.resize(nStimuli * pNtk->GetCond()->GetNumNodes());
+    }
     fGenerated = true;
   }
 
@@ -560,7 +669,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "computing careset of " << target << std::endl;
     }
-    if(pNtk->IsPoDriver(target)) {
+    if(!pNtk->GetCond() && !fUseCustomCondition && !fUseOriginalPoValues && pNtk->IsPoDriver(target)) {
       Fill(nStimuli, care.begin());
       if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
@@ -573,9 +682,10 @@ namespace rrr {
     // alternative of vValues2 = vValues;
     vValues2.resize(nStimuli * pNtk->GetNumNodes());
     StartTraversal();
+    Copy(nStimuli, vValues2.begin() + target * nStimuli, vValues.begin() + target * nStimuli, true);
+    vTrav[target] = iTrav;
     pNtk->ForEachTfo(target, false, [&](int id) {
-      // alternative of SimulateNode(vValues2, id, target);
-      int to_negate = target;
+      // alternative of SimulateNode(vValues2, id);
       itr x = vValues2.end();
       itr y = vValues2.begin() + id * nStimuli;
       bool cx = false;
@@ -588,12 +698,12 @@ namespace rrr {
             } else {
               x = vValues2.begin() + fi * nStimuli;
             }
-            cx = c ^ (fi == to_negate);
+            cx = c;
           } else {
             if(vTrav[fi] != iTrav) {
-              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
             } else {
-              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c ^ (fi == to_negate));
+              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c);
             }
             x = y;
             cx = false;
@@ -613,16 +723,114 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
-    Clear(nStimuli, care.begin());
-    pNtk->ForEachPoDriver([&](int fi) {
-      assert(fi != target);
-      for(int i = 0; i < nStimuli; i++) {
-        // skip unaffected POs
+    if(pNtk->GetCond()) {
+      Ntk *pCond = pNtk->GetCond();
+      std::set<int> sUpdatesCond;
+      vValuesCond2.resize(nStimuli * pCond->GetNumNodes());
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
         if(vTrav[fi] == iTrav) {
-          care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+          vTravCond[pCond->GetPi(index)] = iTrav;
+          Copy(nStimuli, vValuesCond2.begin() + pCond->GetPi(index) * nStimuli, vValues2.begin() + fi * nStimuli, c);
+          pCond->ForEachFanout(pCond->GetPi(index), false, [&](int fo) {
+            sUpdatesCond.insert(fo);
+          });
         }
+        index++;
+      });
+      pCond->ForEachTfos(sUpdatesCond, false, [&](int id) {
+        itr x = vValuesCond2.end();
+        itr y = vValuesCond2.begin() + id * nStimuli;
+        bool cx = false;
+        switch(pCond->GetNodeType(id)) {
+        case AND:
+          pCond->ForEachFanin(id, [&](int fi, bool c) {
+            if(x == vValuesCond2.end()) {
+              if(vTravCond[fi] != iTrav) {
+                x = vValuesCond.begin() + fi * nStimuli;
+              } else {
+                x = vValuesCond2.begin() + fi * nStimuli;
+              }
+              cx = c;
+            } else {
+              if(vTravCond[fi] != iTrav) {
+                And(nStimuli, y, x, vValuesCond.begin() + fi * nStimuli, cx, c);
+              } else {
+                And(nStimuli, y, x, vValuesCond2.begin() + fi * nStimuli, cx, c);
+              }
+              x = y;
+              cx = false;
+            }
+          });
+          if(x == vValuesCond2.end()) {
+            Fill(nStimuli, y);
+          }
+          break;
+        default:
+          assert(0);
+        }
+        vTravCond[id] = iTrav;
+        // if(nVerbose) {
+        //   std::cout << "node " << std::setw(3) << id << ": ";
+        //   Print(nStimuli, vValues2.begin() + id * nStimuli);
+        //   std::cout << std::endl;
+        // }
+      });
+    }
+    Clear(nStimuli, care.begin());
+    if(pNtk->GetCond()) {
+      Ntk *pCond = pNtk->GetCond();
+      pCond->ForEachPoDriver([&](int fi) {
+        for(int i = 0; i < nStimuli; i++) {
+          // skip unaffected POs
+          if(vTravCond[fi] == iTrav) {
+            care[i] = care[i] | (vValuesCond[fi * nStimuli + i] ^ vValuesCond2[fi * nStimuli + i]);
+          }
+        }
+      });
+    } else if(fUseCustomCondition) {
+      std::vector<word> vPoValues(pNtk->GetNumPos()), vPoValues2(pNtk->GetNumPos());
+      for(int i = 0; i < nStimuli; i++) {
+        int index = 0;
+        pNtk->ForEachPoDriver([&](int fi, bool c) {
+          vPoValues[index] = vValues[fi * nStimuli + i];
+          if(vTrav[fi] == iTrav) {
+            vPoValues2[index] = vValues2[fi * nStimuli + i];
+          } else {
+            vPoValues2[index] = vValues[fi * nStimuli + i];
+          }
+          if(c) {
+            vPoValues[index] ^= ~0ull;
+            vPoValues2[index] ^= ~0ull;
+          }
+          index++;
+        });
+        care[i] = CustomCondition(vPoValues, vPoValues2);
       }
-    });
+    } else if(fUseOriginalPoValues) {
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        itr x;
+        if(vTrav[fi] == iTrav) {
+          x = vValues2.begin() + fi * nStimuli;
+        } else {
+          x = vValues.begin() + fi * nStimuli;
+        }
+        Xor(nStimuli, tmp.begin(), vOriginalPoValues.begin() + index * nStimuli, x, c);
+        Or(nStimuli, care.begin(), care.begin(), tmp.begin(), false, false);
+        index++;
+      });
+    } else {
+      pNtk->ForEachPoDriver([&](int fi) {
+        assert(fi != target);
+        for(int i = 0; i < nStimuli; i++) {
+          // skip unaffected POs
+          if(vTrav[fi] == iTrav) {
+            care[i] = care[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+          }
+        }
+      });
+    }
     if(nVerbose) {
       std::cout << "care " << std::setw(3) << target << ": ";
       Print(nStimuli, care.begin());
@@ -631,6 +839,7 @@ namespace rrr {
     durationCare += Duration(timeStart, GetCurrentTime());
   }
 
+  /*
   template <typename Ntk>
   void Simulator2<Ntk>::ComputeCarePart(int nWords_, int offset) {
     if(nVerbose) {
@@ -666,6 +875,7 @@ namespace rrr {
       std::cout << std::endl;
     }
   }
+  */
 
   /* }}} */
 
@@ -676,6 +886,9 @@ namespace rrr {
     if(!fGenerated) {
       // TODO: reset nStimuli to default here maybe, if such a mechanism that changes nStimuli has been implemneted
       vValues.resize(nStimuli * pNtk->GetNumNodes());
+      if(pNtk->GetCond()) {
+        vValuesCond.resize(nStimuli * pNtk->GetCond()->GetNumNodes());
+      }
       iPivot = 0;
       vAssignedStimuli.clear();
       vAssignedStimuli.resize(nStimuli * pNtk->GetNumPis());
@@ -691,8 +904,19 @@ namespace rrr {
     } else {
       // use same nStimuli as we are reusing patterns even if nStimuli has changed
       vValues.resize(nStimuli * pNtk->GetNumNodes());
+      if(pNtk->GetCond()) {
+        vValuesCond.resize(nStimuli * pNtk->GetCond()->GetNumNodes());
+      }
     }
     Simulate();
+    if(fUseOriginalPoValues) {
+      vOriginalPoValues.resize(nStimuli * pNtk->GetNumPos());
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        Copy(nStimuli, vOriginalPoValues.begin() + index * nStimuli, vValues.begin() + fi * nStimuli, c);
+        index++;
+      });
+    }
     fInitialized = true;
   }
 
@@ -706,6 +930,7 @@ namespace rrr {
     nVerbose(0),
     nWords(0),
     nStimuli(0),
+    nRelaxedPatterns(0),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -721,6 +946,7 @@ namespace rrr {
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
     nStimuli(nWords),
+    nRelaxedPatterns(pPar->nRelaxedPatterns),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -730,6 +956,23 @@ namespace rrr {
     care.resize(nWords);
     tmp.resize(nWords);
     ResetSummary();
+    CustomCondition = [&](std::vector<word> const &v, std::vector<word> const &v2) {
+      int n = pNtk->GetNumPos() / 10;
+      word res = 0;
+      for(int k = 0; k < 64; k++) {
+        std::vector<int> vCounts(10), vCounts2(10);
+        for(int j = 0; j < 10; j++) {
+          for(int i = 0; i < n; i++) {
+            vCounts[j] += (v[i + n * j] >> k) & 1;
+            vCounts2[j] += (v2[i + n * j] >> k) & 1;
+          }
+        }
+        if(vCounts != vCounts2) {
+          res |= 1ull << k;
+        }
+      }
+      return res;
+    };
   }
 
   template <typename Ntk>
@@ -787,6 +1030,9 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
+      if(fRelax) {
+        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
+      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:
@@ -883,6 +1129,9 @@ namespace rrr {
         x = tmp.begin();
       }
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
+      if(fRelax) {
+        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
+      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:
@@ -895,6 +1144,7 @@ namespace rrr {
 
   /* {{{ Cex */
 
+  /*
   template <typename Ntk>
   void Simulator2<Ntk>::AddCex(std::vector<VarValue> const &vCex) {
     if(nVerbose) {
@@ -1037,6 +1287,7 @@ namespace rrr {
     durationCare += Duration(timeStart, GetCurrentTime());
     nCex++;
   }
+  */
   
   /* }}} */
 

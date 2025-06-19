@@ -4,7 +4,7 @@
 #include "rrrAbc.h"
 
 extern "C"
-Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy) {
+Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int fDeterministic, int nParallelPartitions, int fOptOnInsert, int fGreedy, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond) {
   rrr::AndNetwork ntk;
   ntk.Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
   rrr::Parameter Par;
@@ -33,6 +33,16 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   Par.nParallelPartitions = nParallelPartitions;
   Par.fOptOnInsert = fOptOnInsert;
   Par.fGreedy = fGreedy;
+  Par.nRelaxedPatterns = nRelaxedPatterns;
+  if(pTemporary) {
+    Par.strTemporary = std::string(pTemporary);
+  }
+  if(pPattern) {
+    Par.strPattern = std::string(pPattern);
+  }
+  if(pCond) {
+    Par.strCond = std::string(pCond);
+  }
   rrr::Perform(&ntk, &Par);
   Gia_Man_t *pNew = rrr::CreateGia(&ntk, false);
   return pNew;

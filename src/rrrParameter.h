@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace rrr {
 
   struct Parameter {
@@ -28,6 +30,10 @@ namespace rrr {
     int nParallelPartitions = 1;
     bool fOptOnInsert = false;
     bool fGreedy = true;
+    int nRelaxedPatterns = 0;
+    std::string strTemporary;
+    std::string strPattern;
+    std::string strCond;
   };
   
 }

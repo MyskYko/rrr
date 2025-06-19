@@ -32,6 +32,9 @@ namespace rrr {
     // pattern
     Pattern *pPat;
 
+    // cond
+    AndNetwork *pCond;
+
     // mark for network traversal
     bool fLockTrav;
     unsigned iTrav;
@@ -180,6 +183,8 @@ namespace rrr {
     void DeleteCallback(int index);
     void RegisterPattern(Pattern *pPat_);
     Pattern *GetPattern();
+    void RegisterCond(AndNetwork *pCond_);
+    AndNetwork *GetCond();
     void Print() const;
   };
 
@@ -246,6 +251,7 @@ namespace rrr {
     vvFaninEdges = from.vvFaninEdges;
     vRefs        = from.vRefs;
     pPat         = from.pPat;
+    pCond        = from.pCond;
   }
 
   inline void AndNetwork::TakenAction(Action const &action) const {
@@ -261,6 +267,7 @@ namespace rrr {
   AndNetwork::AndNetwork() :
     nNodes(0),
     pPat(NULL),
+    pCond(NULL),
     fLockTrav(false),
     iTrav(0),
     fPropagating(false) {
@@ -290,6 +297,7 @@ namespace rrr {
     vvFaninEdges.clear();
     vRefs.clear();
     pPat = NULL;
+    pCond = NULL;
     fLockTrav = false;
     iTrav = 0;
     vTrav.clear();
@@ -1698,6 +1706,14 @@ namespace rrr {
 
   Pattern *AndNetwork::GetPattern() {
     return pPat;
+  }
+
+  void AndNetwork::RegisterCond(AndNetwork *pCond_) {
+    pCond = pCond_;
+  }
+
+  AndNetwork *AndNetwork::GetCond() {
+    return pCond;
   }
   
   void AndNetwork::Print() const {

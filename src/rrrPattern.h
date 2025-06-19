@@ -26,7 +26,7 @@ namespace rrr {
     auto end = f.tellg();
     int nBytes = end - start;
     f.seekg(0, std::ios::beg);
-    std::cout << nBytes << std::endl;
+    std::cout << "num bytes in the file = " << nBytes << std::endl;
     assert(nBytes % nInputs == 0);
     std::cout << "num patterns in the file = " << 8 * nBytes / nInputs << std::endl;
     int nSize = nBytes / nInputs;
