@@ -1,19 +1,16 @@
 #pragma once
 
-#include "rrrAndNetwork.h"
-#include "rrrScheduler.h"
-#include "rrrScheduler3.h"
-#include "rrrOptimizer.h"
-#include "rrrBddAnalyzer.h"
-#include "rrrBddMspfAnalyzer.h"
-#include "rrrAnalyzer.h"
-#include "rrrApproxAnalyzer.h"
-#include "rrrSatSolver.h"
-#include "rrrSimulator.h"
-#include "rrrSimulator2.h"
-#include "rrrPartitioner.h"
-#include "rrrLevelBasePartitioner.h"
-#include "rrrPattern.h"
+#include "network/rrrAndNetwork.h"
+#include "scheduler/rrrScheduler.h"
+#include "optimizer/rrrOptimizer.h"
+#include "analyzer/rrrBddAnalyzer.h"
+#include "analyzer/rrrBddMspfAnalyzer.h"
+#include "analyzer/rrrAnalyzer.h"
+#include "analyzer/sat/rrrSatSolver.h"
+#include "analyzer/simulator/rrrSimulator.h"
+#include "partitioner/rrrPartitioner.h"
+#include "partitioner/rrrLevelBasePartitioner.h"
+#include "extra/rrrPattern.h"
 
 namespace rrr {
 

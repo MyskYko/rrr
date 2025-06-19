@@ -2,8 +2,8 @@
 
 #include <sat/bsat/satSolver.h>
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
 
 namespace rrr {
 

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
-#include "rrrBddManager.h"
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
+#include "engine/rrrBddManager.h"
 
 namespace rrr {
 
   template <typename Ntk>
-  class BddAnalyzer {
+  class BddMspfAnalyzer {
   private:
     // aliases
     using lit = int;
@@ -22,17 +22,17 @@ namespace rrr {
     // data
     bool fInitialized;
     NewBdd::Man *pBdd;
-    int target;
     std::vector<lit> vFs;
     std::vector<lit> vGs;
     std::vector<std::vector<lit>> vvCs;
-    bool fResim;
+    bool fUpdate;
     std::vector<bool> vUpdates;
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
-
+    std::vector<bool> vVisits;
+    
     // backups
-    std::vector<BddAnalyzer> vBackups;
+    std::vector<BddMspfAnalyzer> vBackups;
 
     // stats
     uint64_t nNodesOld;
@@ -41,7 +41,7 @@ namespace rrr {
     double durationPf;
     double durationCheck;
     double durationReorder;
-
+    
     // BDD utils
     void IncRef(lit x) const;
     void DecRef(lit x) const;
@@ -59,14 +59,16 @@ namespace rrr {
     void Allocate();
 
     // simulation
-    void SimulateNode(int id, std::vector<lit> &v) const;
+    bool SimulateNode(int id, std::vector<lit> &v) const;
     void Simulate();
-    
-    // CSPF computation
+
+    // PF computation
+    bool ComputeReconvergentG(int id);
     bool ComputeG(int id);
     void ComputeC(int id);
-    void CspfNode(int id);
-    void Cspf(int id = -1, bool fC = true);
+    bool ComputeCDebug(int id);
+    void MspfNode(int id);
+    void Mspf(int id = -1, bool fC = true);
 
     // preparation
     void Reset(bool fReuse = false);
@@ -76,18 +78,18 @@ namespace rrr {
     void Save(int slot);
     void Load(int slot);
     void PopBack();
-
+    
   public:
     // constructors
-    BddAnalyzer();
-    BddAnalyzer(Parameter const *pPar);
-    ~BddAnalyzer();
+    BddMspfAnalyzer();
+    BddMspfAnalyzer(Parameter const *pPar);
+    ~BddMspfAnalyzer();
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
-
+    
     // summary
     void ResetSummary();
     summary<int> GetStatsSummary() const;
@@ -97,28 +99,28 @@ namespace rrr {
   /* {{{ BDD utils */
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::IncRef(lit x) const {
+  inline void BddMspfAnalyzer<Ntk>::IncRef(lit x) const {
     if(x != LitMax) {
       pBdd->IncRef(x);
     }
   }
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DecRef(lit x) const {
+  inline void BddMspfAnalyzer<Ntk>::DecRef(lit x) const {
     if(x != LitMax) {
       pBdd->DecRef(x);
     }
   }
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::Assign(lit &x, lit y) const {
+  inline void BddMspfAnalyzer<Ntk>::Assign(lit &x, lit y) const {
     DecRef(x);
     x = y;
     IncRef(x);
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::CopyVec(std::vector<lit> &x, std::vector<lit> const &y) const {
+  inline void BddMspfAnalyzer<Ntk>::CopyVec(std::vector<lit> &x, std::vector<lit> const &y) const {
     for(size_t i = y.size(); i < x.size(); i++) {
       DecRef(x[i]);
     }
@@ -133,7 +135,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DelVec(std::vector<lit> &v) const {
+  inline void BddMspfAnalyzer<Ntk>::DelVec(std::vector<lit> &v) const {
     for(lit x: v) {
       DecRef(x);
     }
@@ -141,7 +143,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::CopyVecVec(std::vector<std::vector<lit>> &x, std::vector<std::vector<lit>> const &y) const {
+  inline void BddMspfAnalyzer<Ntk>::CopyVecVec(std::vector<std::vector<lit>> &x, std::vector<std::vector<lit>> const &y) const {
     for(size_t i = y.size(); i < x.size(); i++) {
       DelVec(x[i]);
     }
@@ -152,7 +154,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DelVecVec(std::vector<std::vector<lit>> &v) const {
+  inline void BddMspfAnalyzer<Ntk>::DelVecVec(std::vector<std::vector<lit>> &v) const {
     for(size_t i = 0; i < v.size(); i++) {
       DelVec(v[i]);
     }
@@ -160,7 +162,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  inline int BddAnalyzer<Ntk>::Xor(lit x, lit y) const {
+  inline typename BddMspfAnalyzer<Ntk>::lit BddMspfAnalyzer<Ntk>::Xor(lit x, lit y) const {
     lit f = pBdd->And(x, pBdd->LitNot(y));
     pBdd->IncRef(f);
     lit g = pBdd->And(pBdd->LitNot(x), y);
@@ -176,19 +178,17 @@ namespace rrr {
   /* {{{ Callback */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::ActionCallback(Action const &action) {
+  void BddMspfAnalyzer<Ntk>::ActionCallback(Action const &action) {
     switch(action.type) {
     case REMOVE_FANIN:
       assert(fInitialized);
+      fUpdate = true;
+      std::fill(vVisits.begin(), vVisits.end(), false);
       vUpdates[action.id] = true;
+      vCUpdates[action.id] = true;
       vGUpdates[action.fi] = true;
       DecRef(vvCs[action.id][action.idx]);
       vvCs[action.id].erase(vvCs[action.id].begin() + action.idx);
-      if(target != action.id) {
-        // require resimulate before next fesibility check
-        // (this is not mandatory if no pending updates are in TFI of new fanin, but we would rather update than checking every time)
-        target = -1;
-      }
       break;
     case REMOVE_UNUSED:
       if(fInitialized) {
@@ -197,7 +197,6 @@ namespace rrr {
             vGUpdates[fi] = true;
           }
         }
-        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -205,6 +204,7 @@ namespace rrr {
     case REMOVE_BUFFER:
       if(fInitialized) {
         if(vUpdates[action.id]) {
+          fUpdate = true;
           for(int fo: action.vFanouts) {
             vUpdates[fo] = true;
             vCUpdates[fo] = true;
@@ -213,7 +213,6 @@ namespace rrr {
         if(vGUpdates[action.id] || vCUpdates[action.id]) {
           vGUpdates[action.fi] = true;
         }
-        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -221,6 +220,7 @@ namespace rrr {
     case REMOVE_CONST:
       if(fInitialized) {
         if(vUpdates[action.id]) {
+          fUpdate = true;
           for(int fo: action.vFanouts) {
             vUpdates[fo] = true;
             vCUpdates[fo] = true;
@@ -229,14 +229,12 @@ namespace rrr {
         for(int fi: action.vFanins) {
           vGUpdates[fi] = true;
         }
-        Assign(vFs[action.id], LitMax);
-        Assign(vGs[action.id], LitMax);
-        DelVec(vvCs[action.id]);
       }
       break;
     case ADD_FANIN:
-      assert(action.id == target);
       assert(fInitialized);
+      fUpdate = true;
+      std::fill(vVisits.begin(), vVisits.end(), false);
       vUpdates[action.id] = true;
       vCUpdates[action.id] = true;
       vvCs[action.id].insert(vvCs[action.id].begin() + action.idx, LitMax);
@@ -261,17 +259,35 @@ namespace rrr {
         SimulateNode(action.fi, vFs);
         // time of this simulation is not measured for simplicity sake
         assert(vGs[action.fi] == LitMax);
-        Assign(vGs[action.fi], vGs[action.id]);
         std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
         assert(vvCs[action.fi].empty());
         vvCs[action.fi].insert(vvCs[action.fi].begin(), it, vvCs[action.id].end());
         vvCs[action.id].erase(it, vvCs[action.id].end());
         assert(vvCs[action.id].size() == action.idx);
+        if(!vGUpdates[action.id] && !vCUpdates[action.id]) {
+          // recompute here only when updates are unlikely to happen
+          if(pBdd->IsConst1(vGs[action.id])) {
+            Assign(vGs[action.fi], pBdd->Const1());
+          } else {
+            lit x = pBdd->Const1();
+            IncRef(x);
+            for(int idx2 = 0; idx2 < action.idx; idx2++) {
+              int fi = pNtk->GetFanin(action.id, idx2);
+              bool c = pNtk->GetCompl(action.id, idx2);
+              Assign(x, pBdd->And(x, pBdd->LitNotCond(vFs[fi], c)));
+            }
+            Assign(vGs[action.fi], pBdd->Or(pBdd->LitNot(x), vGs[action.id]));
+            DecRef(x);
+          }
+        } else {
+          // otherwise mark the node for future update
+          vCUpdates[action.id] = true;
+        }
         vvCs[action.id].resize(action.idx + 1, LitMax);
         Assign(vvCs[action.id][action.idx], vGs[action.fi]);
         vUpdates[action.fi] = false;
         vGUpdates[action.fi] = false;
-        vCUpdates[action.fi] = vCUpdates[action.id];
+        vCUpdates[action.fi] = false;
       }
       break;
     case SORT_FANINS:
@@ -281,29 +297,6 @@ namespace rrr {
         for(int index: action.vIndices) {
           vvCs[action.id].push_back(vCs[index]);
         }
-        if(!fResim) {
-          fResim = true;
-          /* commenting out the following because it might not be worth checking
-          // if sorted node is in TFO of functionally updated nodes, resimulation is required
-          std::vector<int> vFanouts;
-          pNtk->ForEachInt([&](int id) {
-            if(vUpdates[id]) {
-              pNtk->ForEachFanout(id, false, [&](int fo) {
-                vFanouts.push_back(fo);
-              });
-            }
-          });
-          pNtk->ForEachTfos(vFanouts, false, [&](int fo) {
-            if(fResim) {
-              return;
-            }
-            if(fo == action.id) {
-              fResim = true;
-            }
-          });
-          */
-        }
-        vCUpdates[action.id] = true;
       }
       break;
     case READ:
@@ -328,7 +321,7 @@ namespace rrr {
   /* {{{ Allocation */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Allocate() {
+  void BddMspfAnalyzer<Ntk>::Allocate() {
     int nNodes = pNtk->GetNumNodes();
     vFs.resize(nNodes, LitMax);
     vGs.resize(nNodes, LitMax);
@@ -336,6 +329,7 @@ namespace rrr {
     vUpdates.resize(nNodes);
     vGUpdates.resize(nNodes);
     vCUpdates.resize(nNodes);
+    vVisits.resize(nNodes);
   }
 
   /* }}} */
@@ -343,29 +337,33 @@ namespace rrr {
   /* {{{ Simulation */
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::SimulateNode(int id, std::vector<lit> &v) const {
+  inline bool BddMspfAnalyzer<Ntk>::SimulateNode(int id, std::vector<lit> &v) const {
     if(nVerbose) {
       std::cout << "simulating node " << id << std::endl;
     }
-    Assign(v[id], pBdd->Const1());
+    lit x = pBdd->Const1();
+    IncRef(x);
     pNtk->ForEachFanin(id, [&](int fi, bool c) {
-      Assign(v[id], pBdd->And(v[id], pBdd->LitNotCond(v[fi], c)));
+      Assign(x, pBdd->And(x, pBdd->LitNotCond(v[fi], c)));
     });
+    if(pBdd->LitIsEq(x, v[id])) {
+      DecRef(x);
+      return false;
+    }
+    Assign(v[id], x);
+    DecRef(x);
+    return true;
   }
   
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Simulate() {
+  void BddMspfAnalyzer<Ntk>::Simulate() {
     time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "symbolic simulation with BDD" << std::endl;
     }
     pNtk->ForEachInt([&](int id) {
       if(vUpdates[id]) {
-        lit x = vFs[id];
-        IncRef(x);
-        SimulateNode(id, vFs);
-        DecRef(x);
-        if(!pBdd->LitIsEq(x, vFs[id])) {
+        if(SimulateNode(id, vFs)) {
           pNtk->ForEachFanout(id, false, [&](int fo) {
             vUpdates[fo] = true;
             vCUpdates[fo] = true;
@@ -379,10 +377,37 @@ namespace rrr {
 
   /* }}} */
 
-  /* {{{ CSPF computation */
+  /* {{{ MSPF computation */
+
+  template <typename pNtk>
+  inline bool BddMspfAnalyzer<pNtk>::ComputeReconvergentG(int id) {
+    std::vector<lit> v;
+    CopyVec(v, vFs);
+    v[id] = pBdd->LitNot(v[id]);
+    pNtk->ForEachTfoUpdate(id, false, [&](int fo) {
+      return SimulateNode(fo, v);
+    });
+    lit x = pBdd->Const1();
+    IncRef(x);
+    pNtk->ForEachPoDriver([&](int fi) {
+      lit y = Xor(vFs[fi], v[fi]);
+      IncRef(y);
+      Assign(x, pBdd->And(x, pBdd->LitNot(y)));
+      DecRef(y);
+    });
+    if(pBdd->LitIsEq(vGs[id], x)) {
+      DecRef(x);
+      DelVec(v);
+      return false;
+    }
+    Assign(vGs[id], x);
+    DecRef(x);
+    DelVec(v);
+    return true;
+  }
   
-  template <typename Ntk>
-  inline bool BddAnalyzer<Ntk>::ComputeG(int id) {
+  template <typename pNtk>
+  inline bool BddMspfAnalyzer<pNtk>::ComputeG(int id) {
     if(pNtk->GetNumFanouts(id) == 0) {
       if(pBdd->IsConst1(vGs[id])) {
         return false;
@@ -404,8 +429,8 @@ namespace rrr {
     return true;
   }
 
-  template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::ComputeC(int id) {
+  template <typename pNtk>
+  inline void BddMspfAnalyzer<pNtk>::ComputeC(int id) {
     int nFanins = pNtk->GetNumFanins(id);
     assert(vvCs[id].size() == nFanins);
     if(pBdd->IsConst1(vGs[id])) {
@@ -421,10 +446,12 @@ namespace rrr {
     for(int idx = 0; idx < nFanins; idx++) {
       lit x = pBdd->Const1();
       IncRef(x);
-      for(int idx2 = idx + 1; idx2 < nFanins; idx2++) {
-        int fi = pNtk->GetFanin(id, idx2);
-        bool c = pNtk->GetCompl(id, idx2);
-        Assign(x, pBdd->And(x, pBdd->LitNotCond(vFs[fi], c)));
+      for(int idx2 = 0; idx2 < nFanins; idx2++) {
+        if(idx2 != idx) {
+          int fi = pNtk->GetFanin(id, idx2);
+          bool c = pNtk->GetCompl(id, idx2);
+          Assign(x, pBdd->And(x, pBdd->LitNotCond(vFs[fi], c)));
+        }
       }
       Assign(x, pBdd->Or(pBdd->LitNot(x), vGs[id]));
       if(!pBdd->LitIsEq(vvCs[id][idx], x)) {
@@ -435,20 +462,71 @@ namespace rrr {
       DecRef(x);
     }
   }
-
-  template <typename Ntk>
-  void BddAnalyzer<Ntk>::CspfNode(int id) {
-    if(!vGUpdates[id] && !vCUpdates[id]) {
-      return;
-    }
-    if(vGUpdates[id]) {
-      if(nVerbose) {
-        std::cout << "computing node " << id << " G " << std::endl;
+  
+  template <typename pNtk>
+  inline bool BddMspfAnalyzer<pNtk>::ComputeCDebug(int id) {
+    bool fUpdated = false;
+    int nFanins = pNtk->GetNumFanins(id);
+    assert(vvCs[id].size() == nFanins);
+    if(pBdd->IsConst1(vGs[id])) {
+      for(int idx = 0; idx < nFanins; idx++) {
+        if(!pBdd->IsConst1(vvCs[id][idx])) {
+          Assign(vvCs[id][idx], pBdd->Const1());
+          int fi = pNtk->GetFanin(id, idx);
+          vGUpdates[fi] = true;
+          fUpdated = true;
+        }
       }
-      if(ComputeG(id)) {
-        vCUpdates[id] = true;
+      return fUpdated;
+    }
+    for(int idx = 0; idx < nFanins; idx++) {
+      lit x = pBdd->Const1();
+      IncRef(x);
+      for(int idx2 = 0; idx2 < nFanins; idx2++) {
+        if(idx2 != idx) {
+          int fi = pNtk->GetFanin(id, idx2);
+          bool c = pNtk->GetCompl(id, idx2);
+          Assign(x, pBdd->And(x, pBdd->LitNotCond(vFs[fi], c)));
+        }
+      }
+      Assign(x, pBdd->Or(pBdd->LitNot(x), vGs[id]));
+      if(!pBdd->LitIsEq(vvCs[id][idx], x)) {
+        Assign(vvCs[id][idx], x);
+        int fi = pNtk->GetFanin(id, idx);
+        vGUpdates[fi] = true;
+        fUpdated = true;
+      }
+      DecRef(x);
+    }
+    return fUpdated;
+  }
+
+  template <typename pNtk>
+  void BddMspfAnalyzer<pNtk>::MspfNode(int id) {
+    if(vGUpdates[id]) {
+      if(pNtk->IsReconvergent(id)) {
+        if(nVerbose) {
+          std::cout << "computing reconvergent node " << id << " G " << std::endl;
+        }
+        if(ComputeReconvergentG(id)) {
+          vCUpdates[id] = true;
+        }
+      } else {
+        if(nVerbose) {
+          std::cout << "computing node " << id << " G " << std::endl;
+        }
+        if(ComputeG(id)) {
+          vCUpdates[id] = true;
+        }
       }
       vGUpdates[id] = false;
+    } else if(!vVisits[id] && pNtk->IsReconvergent(id)) {
+      if(nVerbose) {
+        std::cout << "computing unvisited reconvergent node " << id << " G " << std::endl;
+      }
+      if(ComputeReconvergentG(id)) {
+        vCUpdates[id] = true;
+      }
     }
     if(vCUpdates[id]) {
       if(nVerbose) {
@@ -457,26 +535,27 @@ namespace rrr {
       ComputeC(id);
       vCUpdates[id] = false;
     }
+    vVisits[id] = true;
   }
-  
-  template <typename Ntk>
-  void BddAnalyzer<Ntk>::Cspf(int id, bool fC) {
+
+  template <typename pNtk>
+  void BddMspfAnalyzer<pNtk>::Mspf(int id, bool fC) {
     time_point timeStart = GetCurrentTime();
     if(id != -1) {
       pNtk->ForEachTfoReverse(id, false, [&](int fo) {
-        CspfNode(fo);
+        MspfNode(fo);
       });
       bool fCUpdate = vCUpdates[id];
       if(!fC) {
         vCUpdates[id] = false;
       }
-      CspfNode(id);
+      MspfNode(id);
       if(!fC) {
         vCUpdates[id] = fCUpdate;
       }
     } else {
       pNtk->ForEachIntReverse([&](int id) {
-        CspfNode(id);
+        MspfNode(id);
       });
     }
     durationPf += Duration(timeStart, GetCurrentTime());
@@ -485,9 +564,9 @@ namespace rrr {
   /* }}} */
 
   /* {{{ Preparation */
-  
+
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Reset(bool fReuse) {
+  void BddMspfAnalyzer<Ntk>::Reset(bool fReuse) {
     while(!vBackups.empty()) {
       PopBack();
     }
@@ -495,11 +574,11 @@ namespace rrr {
     DelVec(vGs);
     DelVecVec(vvCs);
     fInitialized = false;
-    target = -1;
-    fResim = false;
+    fUpdate = false;
     vUpdates.clear();
     vGUpdates.clear();
     vCUpdates.clear();
+    vVisits.clear();
     if(!fReuse) {
       nNodesOld = 0;
       if(pBdd) {
@@ -511,7 +590,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Initialize() {
+  void BddMspfAnalyzer<Ntk>::Initialize() {
     bool fUseReo = false;
     if(!pBdd) {
       NewBdd::Param Par;
@@ -552,39 +631,41 @@ namespace rrr {
     });
     fInitialized = true;
   }
-  
+
   /* }}} */
   
   /* {{{ Save & load */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Save(int slot) {
+  void BddMspfAnalyzer<Ntk>::Save(int slot) {
     if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
-    vBackups[slot].target = target;
     CopyVec(vBackups[slot].vFs, vFs);
     CopyVec(vBackups[slot].vGs, vGs);
     CopyVecVec(vBackups[slot].vvCs, vvCs);
+    vBackups[slot].fUpdate = fUpdate;
     vBackups[slot].vUpdates = vUpdates;
     vBackups[slot].vGUpdates = vGUpdates;
     vBackups[slot].vCUpdates = vCUpdates;
+    vBackups[slot].vVisits = vVisits;
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Load(int slot) {
+  void BddMspfAnalyzer<Ntk>::Load(int slot) {
     assert(slot < int_size(vBackups));
-    target = vBackups[slot].target;
     CopyVec(vFs, vBackups[slot].vFs);
     CopyVec(vGs, vBackups[slot].vGs);
     CopyVecVec(vvCs, vBackups[slot].vvCs);
+    fUpdate = vBackups[slot].fUpdate;
     vUpdates = vBackups[slot].vUpdates;
     vGUpdates = vBackups[slot].vGUpdates;
     vCUpdates = vBackups[slot].vCUpdates;
+    vVisits = vBackups[slot].vVisits;
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::PopBack() {
+  void BddMspfAnalyzer<Ntk>::PopBack() {
     assert(!vBackups.empty());
     DelVec(vBackups.back().vFs);
     DelVec(vBackups.back().vGs);
@@ -594,55 +675,53 @@ namespace rrr {
 
   /* }}} */
   
-  /* {{{ Constructors */
+  /* {{{ Constructor */
 
   template <typename Ntk>
-  BddAnalyzer<Ntk>::BddAnalyzer() :
+  BddMspfAnalyzer<Ntk>::BddMspfAnalyzer() :
     pNtk(NULL),
     nVerbose(0),
     fInitialized(false),
     pBdd(NULL),
-    target(-1),
-    fResim(false) {
+    fUpdate(false) {
     ResetSummary();
   }
   
   template <typename Ntk>
-  BddAnalyzer<Ntk>::BddAnalyzer(Parameter const *pPar) :
+  BddMspfAnalyzer<Ntk>::BddMspfAnalyzer(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nAnalyzerVerbose),
     fInitialized(false),
     pBdd(NULL),
-    target(-1),
-    fResim(false) {
+    fUpdate(false) {
     ResetSummary();
   }
-  
+
   template <typename Ntk>
-  BddAnalyzer<Ntk>::~BddAnalyzer() {
+  BddMspfAnalyzer<Ntk>::~BddMspfAnalyzer() {
     Reset();
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+  void BddMspfAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     Reset(fReuse);
     pNtk = pNtk_;
-    pNtk->AddCallback(std::bind(&BddAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&BddMspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
-
+  
   /* }}} */
 
   /* {{{ Checks */
   
   template <typename Ntk>
-  bool BddAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
+  bool BddMspfAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
     if(!fInitialized) {
       Initialize();
-    } else if(fResim) {
+    } else if(fUpdate) {
       Simulate();
-      fResim = false;
+      fUpdate = false;
     }
-    Cspf(id);
+    Mspf(id);
     time_point timeStart = GetCurrentTime();
     bool fRedundant = false;
     switch(pNtk->GetNodeType(id)) {
@@ -670,17 +749,14 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  bool BddAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  bool BddMspfAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     if(!fInitialized) {
       Initialize();
-    } else if(target != id && (target == -1 || vUpdates[target])) {
-      // resimulation is required if there are pending updates in TFI of new fanin
-      // but it seems not worthwhile to check that condition every time
-      // so we update if pending updates are not only at current target
+    } else if(fUpdate) {
       Simulate();
+      fUpdate = false;
     }
-    target = id;
-    Cspf(id, false);
+    Mspf(id, false);
     time_point timeStart = GetCurrentTime();
     bool fFeasible = false;
     switch(pNtk->GetNodeType(id)) {
@@ -691,6 +767,7 @@ namespace rrr {
       DecRef(x);
       if(pBdd->IsConst1(y)) {
         fFeasible = true;
+        return true;
       }
       break;
     }
@@ -709,11 +786,11 @@ namespace rrr {
   }
 
   /* }}} */
-
+  
   /* {{{ Summary */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::ResetSummary() {
+  void BddMspfAnalyzer<Ntk>::ResetSummary() {
     if(pBdd) {
       nNodesOld = pBdd->GetNumTotalCreatedNodes();
     } else {
@@ -727,14 +804,14 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  summary<int> BddAnalyzer<Ntk>::GetStatsSummary() const {
+  summary<int> BddMspfAnalyzer<Ntk>::GetStatsSummary() const {
     summary<int> v;
     v.emplace_back("bdd node", pBdd->GetNumTotalCreatedNodes() - nNodesOld + nNodesAccumulated);
     return v;
   }
   
   template <typename Ntk>
-  summary<double> BddAnalyzer<Ntk>::GetTimesSummary() const {
+  summary<double> BddMspfAnalyzer<Ntk>::GetTimesSummary() const {
     summary<double> v;
     v.emplace_back("bdd symbolic simulation", durationSimulation);
     v.emplace_back("bdd care computation", durationPf);

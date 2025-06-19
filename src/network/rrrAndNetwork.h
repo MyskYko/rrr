@@ -5,9 +5,9 @@
 #include <map>
 #include <algorithm>
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
-#include "rrrPattern.h"
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
+#include "extra/rrrPattern.h"
 
 namespace rrr {
 

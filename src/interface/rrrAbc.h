@@ -5,7 +5,7 @@
 #include "base/cmd/cmd.h"
 #include "proof/cec/cec.h"
 
-#include "rrrUtils.h"
+#include "misc/rrrUtils.h"
 
 using namespace aabbcc;
 

@@ -9,9 +9,9 @@
 #include <condition_variable>
 #endif
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
-#include "rrrAbc.h"
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
+#include "interface/rrrAbc.h"
 
 namespace rrr {
 

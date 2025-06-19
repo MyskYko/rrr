@@ -10,7 +10,8 @@ add_subdirectory(abc)
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
-add_executable(rrr ${SRC_FILES})
+
+add_executable(rrr ${PROJECT_SOURCE_DIR}/src/application/main.cpp ${PROJECT_SOURCE_DIR}/src/application/giaRrr.cpp ${PROJECT_SOURCE_DIR}/src/interface/rrrMockturtle.cpp)
 #add_executable(rrr ${SRC_FILES} ${PROJECT_SOURCE_DIR}/src/main.c)
 
 target_link_libraries(rrr libabc mockturtle)
