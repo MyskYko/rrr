@@ -1711,11 +1711,11 @@ namespace rrr {
     return pPat;
   }
 
-  void AndNetwork::RegisterCond(AndNetwork *pCond_) {
+  inline void AndNetwork::RegisterCond(AndNetwork *pCond_) {
     pCond = pCond_;
   }
 
-  AndNetwork *AndNetwork::GetCond() {
+  inline AndNetwork *AndNetwork::GetCond() {
     return pCond;
   }
   

@@ -733,7 +733,7 @@ namespace rrr {
             continue;
           }
           SortFanins(*it);
-          fReduced_ |= ReduceFanins(*it);
+          fReduced_ |= RemoveRedundantFanins(*it);
           if(pNtk->GetNumFanins(*it) <= 1) {
             pNtk->Propagate(*it);
           }
