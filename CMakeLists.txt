@@ -4,8 +4,12 @@ project(rrr LANGUAGES C CXX)
 set(ABC_SKIP_TESTS true)
 add_compile_options(-O3)
 
-add_subdirectory(mockturtle)
-set(ABC_USE_NAMESPACE "aabbcc")
+option(USE_MOCKTURTLE "Enable mockturtle" ON)  
+if(USE_MOCKTURTLE)
+  add_subdirectory(mockturtle)
+  set(ABC_USE_NAMESPACE "aabbcc")
+endif()
+
 add_subdirectory(abc)
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
@@ -20,8 +24,13 @@ add_executable(rrr ${PROJECT_SOURCE_DIR}/src/application_c/main.cpp ${PROJECT_SO
 #  get_filename_component(basename ${filename} NAME_WE)
 #  add_executable(${basename} ${filename})
 #  target_link_libraries(${basename} bddmethod simplebdd cudd buddy cacbdd atbdd)
-#endforeach()  
+#endforeach()
 
-target_link_libraries(rrr libabc mockturtle)
+if(USE_MOCKTURTLE)
+  target_compile_definitions(rrr PRIVATE USE_MOCKTURTLE)
+  target_link_libraries(rrr libabc mockturtle)
+else()
+  target_link_libraries(rrr libabc)
+endif()
 
 target_compile_options(rrr PRIVATE -g -Wall -Wextra)

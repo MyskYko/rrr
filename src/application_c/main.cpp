@@ -11,7 +11,7 @@
 #define PARAMS_DEF int iSeed = 0, nWords = 10, nTimeout = 0, nSchedulerVerbose = 0, nPartitionerVerbose = 0, nOptimizerVerbose = 0, nAnalyzerVerbose = 0, nSimulatorVerbose = 0, nSatSolverVerbose = 0, nResynVerbose = 0, fUseBddCspf = 0, fUseBddMspf = 0, nConflictLimit = 0, nSortType = -1, nOptimizerFlow = 0, nSchedulerFlow = 0, nPartitionType = 0, nDistance = 0, nJobs = 1, nThreads = 1, nPartitionSize = 0, nPartitionSizeMin = 0, nPartitionInputMax = 0, nResynSize = 30, nResynInputMax = 16, fDeterministic = 1, nParallelPartitions = 1, nHops = 10, nJumps = 100, fOptOnInsert = 0, fGreedy = 1, fExSim = 0, fNoGlobalJump = 0, nRelaxedPatterns = 0; char *pTemporary = NULL, *pPattern = NULL, *pCond = NULL, *pOutput = NULL
 #define PARAMS_DECL int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int fNoGlobalJump, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput
 
-using namespace aabbcc;
+ABC_NAMESPACE_USING_NAMESPACE
 
 extern Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, PARAMS_DECL);
 Gia_Man_t *MinimizeTest(Gia_Man_t *pGia, PARAMS_DECL);

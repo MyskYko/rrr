@@ -1,5 +1,9 @@
 #include <random>
 
+#include "rrrMockturtle.h"
+
+#ifdef USE_MOCKTURTLE
+
 #include <mockturtle/networks/aig.hpp>
 #include <mockturtle/io/aiger_reader.hpp>
 #include <lorina/aiger.hpp>
@@ -26,8 +30,6 @@
 #include <mockturtle/algorithms/balancing/sop_balancing.hpp>
 
 #include <mockturtle/algorithms/functional_reduction.hpp>
-
-#include "rrrMockturtle.h"
 
 using namespace mockturtle;
 
@@ -281,3 +283,21 @@ namespace rrr {
   template std::string MockturtlePerformLocal<std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
   
 }
+
+#else
+
+namespace rrr {
+  
+  template <typename Rng>
+  std::string MockturtlePerformLocal(AndNetwork *pNtk, Rng &rng) {
+    (void)pNtk;
+    (void)rng;
+    std::string log = "mockturtle is disabled";
+    return log;
+  }
+
+  template std::string MockturtlePerformLocal<std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
+
+}
+
+#endif

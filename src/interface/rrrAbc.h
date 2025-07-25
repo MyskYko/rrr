@@ -7,7 +7,7 @@
 
 #include "misc/rrrUtils.h"
 
-using namespace aabbcc;
+ABC_NAMESPACE_USING_NAMESPACE
 
 namespace rrr {
 
