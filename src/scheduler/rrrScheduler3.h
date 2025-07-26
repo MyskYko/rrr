@@ -9,13 +9,13 @@
 #include <condition_variable>
 #endif
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
-#include "rrrAbc.h"
-#include "rrrMockturtle.h"
-#include "rrrSystemCall.h"
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
+#include "interface/rrrAbc.h"
+#include "interface/rrrMockturtle.h"
+#include "interface/rrrSystemCall.h"
 
-#include "rrrSimulator2.h"
+#include "analyzer/simulator/rrrSimulator2.h"
 
 namespace rrr {
 
@@ -1016,7 +1016,7 @@ namespace rrr {
             if(!AbcVerify(pNtk, pJob->pNtk)) {
               std::cout << "column" << pJob->column << " UNSAT" << std::endl;
               std::cout << pJob->log << std::endl;
-              DumpAig("before.aig", backups[pJob->column], false);
+              DumpGia("before.aig", backups[pJob->column], false);
               assert(0);
             }
           }
@@ -1024,7 +1024,7 @@ namespace rrr {
             pNtk->Read(*(pJob->pNtk));
             costBest = cost;
 	    if(!strOutput.empty()) {
-	      DumpAig(strOutput, pNtk, true);
+	      DumpGia(strOutput, pNtk, true);
 	    }
           }
           // next job
@@ -1188,7 +1188,7 @@ namespace rrr {
           if(cost < costBest) {
             pNtk->Read(*(pJob->pNtk));
             costBest = cost;
-            DumpAig("best.aig", pNtk, true);
+            DumpGia("best.aig", pNtk, true);
           }
         });
       }

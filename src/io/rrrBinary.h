@@ -27,6 +27,7 @@ namespace rrr {
   
   template <typename Ntk>
   void BinaryReader(std::string const &str, Ntk *pNtk) {
+    assert(pNtk->GetConst0() == 0);
     std::stringstream in(str);
     int nPis = decode(in);
     int nPos = decode(in);

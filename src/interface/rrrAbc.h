@@ -67,7 +67,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void DumpAig(std::string filename, Ntk *pNtk, bool fHash) {
+  void DumpGia(std::string filename, Ntk *pNtk, bool fHash) {
     Gia_Man_t *pGia = CreateGia(pNtk, fHash);
     char *cfilename = (char *)malloc(filename.size() + 1);
     strcpy(cfilename, filename.c_str());

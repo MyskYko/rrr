@@ -673,7 +673,7 @@ namespace rrr {
       }
       if(!strTemporary.empty() && n++ % 1000 == 0) {
 	std::string str = strTemporary + std::to_string(n / 1000) + ".aig";
-	DumpAig(str, pNtk, false);
+	DumpGia(str, pNtk, false);
       }
     }
     if(!fSubRoutine) {
@@ -1580,7 +1580,7 @@ namespace rrr {
       for(int i = 0; i < 1; i++) {
         if(!strTemporary.empty()) {
           std::string str = strTemporary + std::to_string(i) + ".aig";
-          DumpAig(str, pNtk, false);
+          DumpGia(str, pNtk, false);
         }
         std::vector<int> vCands;
         if(!nDistance) {
