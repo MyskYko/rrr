@@ -1,6 +1,5 @@
 #pragma once
 
-#include "network/rrrAndNetwork.h"
 #include "scheduler/rrrScheduler.h"
 #include "scheduler/rrrScheduler3.h"
 #include "optimizer/rrrOptimizer.h"
@@ -44,8 +43,8 @@ namespace rrr {
       char buf[100];
       strcpy(buf, pPar->strCond.c_str());
       Gia_Man_t *pGia = Gia_AigerRead(buf, 0, 0, 0);
-      pCond = new AndNetwork;
-      pCond->Read(pGia, rrr::GiaReader<rrr::AndNetwork>);
+      pCond = new Ntk;
+      pCond->Read(pGia, rrr::GiaReader<Ntk>);
       Gia_ManStop(pGia);
       pNtk->RegisterCond(pCond);
     }

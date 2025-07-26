@@ -2,6 +2,7 @@
 #include <cxxopts.hpp>
 
 #include "misc/rrrParameter.h"
+#include "network/rrrAndNetwork.h"
 #include "io/rrrAig.h"
 #include "rrr.h"
 

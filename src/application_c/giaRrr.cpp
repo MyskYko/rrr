@@ -1,7 +1,8 @@
 #include "aig/gia/gia.h"
 
-#include "rrr.h"
+#include "network/rrrAndNetwork.h"
 #include "interface/rrrAbc.h"
+#include "rrr.h"
 
 //extern "C"
 Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int nSchedulerVerbose, int nPartitionerVerbose, int nOptimizerVerbose, int nAnalyzerVerbose, int nSimulatorVerbose, int nSatSolverVerbose, int nResynVerbose, int fUseBddCspf, int fUseBddMspf, int nConflictLimit, int nSortType, int nOptimizerFlow, int nSchedulerFlow, int nPartitionType, int nDistance, int nJobs, int nThreads, int nPartitionSize, int nPartitionSizeMin, int nPartitionInputMax, int nResynSize, int nResynInputMax, int fDeterministic, int nParallelPartitions, int nHops, int nJumps, int fOptOnInsert, int fGreedy, int fExSim, int fNoGlobalJump, int nRelaxedPatterns, char *pTemporary, char *pPattern, char *pCond, char *pOutput) {

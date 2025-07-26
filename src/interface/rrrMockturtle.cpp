@@ -1,6 +1,7 @@
 #include <random>
 
 #include "rrrMockturtle.h"
+#include "network/rrrAndNetwork.h"
 
 #ifdef USE_MOCKTURTLE
 
@@ -260,8 +261,8 @@ namespace rrr {
     return aig;
   }
 
-  template <typename Rng>
-  std::string MockturtlePerformLocal(AndNetwork *pNtk, Rng &rng) {
+  template <typename Ntk, typename Rng>
+  std::string MockturtlePerformLocal(Ntk *pNtk, Rng &rng) {
     std::string log;
     aig_network *aig = CreateMockturtle(pNtk);
     switch(rng() % 3) {
@@ -275,12 +276,12 @@ namespace rrr {
       log = rs(*aig, rng);
       break;
     }
-    pNtk->Read(*aig, MockturtleReader<AndNetwork>);
+    pNtk->Read(*aig, MockturtleReader<Ntk>);
     delete aig;
     return log;
   }
 
-  template std::string MockturtlePerformLocal<std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
+  template std::string MockturtlePerformLocal<AndNetwork, std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
   
 }
 
@@ -288,15 +289,15 @@ namespace rrr {
 
 namespace rrr {
   
-  template <typename Rng>
-  std::string MockturtlePerformLocal(AndNetwork *pNtk, Rng &rng) {
+  template <typename Ntk, typename Rng>
+  std::string MockturtlePerformLocal(Ntk *pNtk, Rng &rng) {
     (void)pNtk;
     (void)rng;
     std::string log = "mockturtle is disabled";
     return log;
   }
 
-  template std::string MockturtlePerformLocal<std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
+  template std::string MockturtlePerformLocal<AndNetwork, std::mt19937>(AndNetwork *pNtk, std::mt19937 &rng);
 
 }
 
