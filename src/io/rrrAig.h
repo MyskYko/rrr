@@ -61,7 +61,7 @@ namespace rrr {
     for(int i = nPis + 1; i < nObjs; i++) {
       int n0 = i + i - decode(f);
       int n1 = n0 - decode(f);
-      pNtk->AddAnd(n0 >> 1, n1 >> 1, n0 & 1, n1 & 1);
+      pNtk->AddAnd(n1 >> 1, n0 >> 1, n1 & 1, n0 & 1);
     }
     for(int i = 0; i < nPos; i++) {
       pNtk->AddPo(vPos[i] >> 1, vPos[i] & 1);
@@ -93,16 +93,20 @@ namespace rrr {
     });
     pNtk->ForEachInt([&](int id) {
       if(pNtk->GetNumFanins(id) > 1) {
-        int n0 = vValues[pNtk->GetFanin(id, 0)] ^ (int)pNtk->GetCompl(id, 0);
-        int n1 = vValues[pNtk->GetFanin(id, 1)] ^ (int)pNtk->GetCompl(id, 1);
+        int i = pNtk->GetNumFanins(id) - 1;
+        int n0 = vValues[pNtk->GetFanin(id, i)] ^ (int)pNtk->GetCompl(id, i);
+        i--;
+        int n1 = vValues[pNtk->GetFanin(id, i)] ^ (int)pNtk->GetCompl(id, i);
+        i--;
         if(n0 < n1) {
           std::swap(n0, n1);
         }
         encode(ss, vValues[id] - n0);
         encode(ss, n0 - n1);
-        for(int i = 2; i < pNtk->GetNumFanins(id); i++) {
+        while(i >= 0) {
           encode(ss, 2);
           encode(ss, vValues[id] - (vValues[pNtk->GetFanin(id, i)] ^ (int)pNtk->GetCompl(id, i)));
+          i--;
           vValues[id] += 2;
         }
       }
