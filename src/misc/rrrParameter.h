@@ -39,6 +39,8 @@ namespace rrr {
     bool fExSim = false;
     bool fNoGlobalJump = false;
     int nRelaxedPatterns = 0;
+    bool fUseApprox = false;
+    int nReductionMethod = 0;
     std::string strTemporary;
     std::string strPattern;
     std::string strCond;

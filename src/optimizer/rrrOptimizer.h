@@ -14,7 +14,6 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   class Optimizer {
   private:
-    static constexpr int nReductionMethod = 1;
     static constexpr int nSamples = 1000;
     
     // aliases
@@ -33,6 +32,7 @@ namespace rrr {
     int nSortTypeOriginal;
     int nSortType;
     int nFlow;
+    int nReductionMethod;
     int nDistance;
     bool fCompatible;
     bool fGreedy;
@@ -1426,6 +1426,7 @@ namespace rrr {
     nSortTypeOriginal(pPar->nSortType),
     nSortType(pPar->nSortType),
     nFlow(pPar->nOptimizerFlow),
+    nReductionMethod(pPar->nReductionMethod),
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),

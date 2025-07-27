@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
   options.add_options("Optimizer")
     ("O,vopt", "Verbosity level of optimizer", cxxopts::value<int>()->default_value("0"))
     ("X,opt", "Optimization method\n 0: single-add resub\n 1: multi-add resub\n 2: repeat 0 and 1\n 3: random one meaningful resub\n", cxxopts::value<int>()->default_value("0"))
+    ("M,reduce", "Reduction method\n 0: reverse topological order\n 1: random order\n", cxxopts::value<int>()->default_value("0"))
     ("G,sort", "Fanin sorting method (-1 = random)", cxxopts::value<int>()->default_value("-1"))
     ("D,dist", "Maximum distance between node and new fanin (0 = no limit)", cxxopts::value<int>()->default_value("0"))
     ("g,greedy", "Discard changes that increased the cost", cxxopts::value<bool>()->default_value("true"))
@@ -98,6 +99,7 @@ int main(int argc, char **argv) {
   Par.nOptimizerVerbose = result["vopt"].as<int>();
   Par.nOptimizerFlow = result["opt"].as<int>();
   Par.nSortType = result["sort"].as<int>();
+  Par.nReductionMethod = result["reduce"].as<int>();
   Par.nDistance = result["dist"].as<int>();
   Par.fGreedy = result["greedy"].as<bool>();
   
