@@ -41,6 +41,8 @@ namespace rrr {
     int nRelaxedPatterns = 0;
     bool fUseApprox = false;
     int nReductionMethod = 0;
+    bool fSortInitial = false;
+    bool fSortPerNode = true;
     std::string strTemporary;
     std::string strPattern;
     std::string strCond;

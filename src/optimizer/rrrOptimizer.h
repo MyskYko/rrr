@@ -21,7 +21,6 @@ namespace rrr {
     using citr = std::vector<int>::const_iterator;
     using ritr = std::vector<int>::reverse_iterator;
     using critr = std::vector<int>::const_reverse_iterator;
-    static constexpr bool fFastRr = true;
     
     // pointer to network
     Ntk *pNtk;
@@ -31,6 +30,8 @@ namespace rrr {
     std::function<double(Ntk *)> CostFunction;
     int nSortTypeOriginal;
     int nSortType;
+    bool fSortInitial;
+    bool fSortPerNode;
     int nFlow;
     int nReductionMethod;
     int nDistance;
@@ -93,6 +94,7 @@ namespace rrr {
 
     // remove redundancy
     bool RemoveRedundancy();
+    bool RemoveRedundancyLegacy();
     bool RemoveRedundancyRandom();
 
     // reduce
@@ -658,7 +660,7 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
-    int n = 0;
+    // int n = 0;
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
         continue;
@@ -667,14 +669,17 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
+      if(fSortPerNode) {
+        SortFanins(*it);
+      }
       fReduced |= RemoveRedundantFanins(*it);
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
-      if(!strTemporary.empty() && n++ % 1000 == 0) {
-	std::string str = strTemporary + std::to_string(n / 1000) + ".aig";
-	DumpGia(str, pNtk, false);
-      }
+      // if(!strTemporary.empty() && n++ % 1000 == 0) {
+      //   std::string str = strTemporary + std::to_string(n / 1000) + ".aig";
+      //   DumpGia(str, pNtk, false);
+      // }
     }
     if(!fSubRoutine) {
       time_point timeEnd = GetCurrentTime();
@@ -713,57 +718,48 @@ namespace rrr {
   bool Optimizer<Ntk, Ana>::RemoveRedundancy() {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
-    if(fCompatible) {
-      while(RemoveRedundancyOneTraversal(true)) {
-        fReduced = true;
+    while(RemoveRedundancyOneTraversal(true)) {
+      fReduced = true;
+      if(!fSortPerNode) {
         SortFanins();
       }
-    } else if(fFastRr) {
-      bool fReduced_ = true;
-      std::vector<int> vInts;
-      while(fReduced_) {
-        fReduced_ = false;
-        vInts = pNtk->GetInts();
-        for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
-          if(!pNtk->IsInt(*it)) {
-            continue;
-          }
-          if(pNtk->GetNumFanouts(*it) == 0) {
-            pNtk->RemoveUnused(*it);
-            continue;
-          }
-          SortFanins(*it);
-          fReduced_ |= RemoveRedundantFanins(*it);
-          if(pNtk->GetNumFanins(*it) <= 1) {
-            pNtk->Propagate(*it);
-          }
-        }
-        fReduced |= fReduced_;
+    }
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationReduce += Duration(timeStart, timeEnd);
+    return fReduced;
+  }
+
+  template <typename Ntk, typename Ana>
+  bool Optimizer<Ntk, Ana>::RemoveRedundancyLegacy() {
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend();) {
+      if(!pNtk->IsInt(*it)) {
+        it++;
+        continue;
       }
-    } else {
-      std::vector<int> vInts = pNtk->GetInts();
-      for(critr it = vInts.rbegin(); it != vInts.rend();) {
-        if(!pNtk->IsInt(*it)) {
-          it++;
-          continue;
-        }
-        if(pNtk->GetNumFanouts(*it) == 0) {
-          pNtk->RemoveUnused(*it);
-          it++;
-          continue;
-        }
+      if(pNtk->GetNumFanouts(*it) == 0) {
+        pNtk->RemoveUnused(*it);
+        it++;
+        continue;
+      }
+      if(fSortPerNode) {
         SortFanins(*it);
-        bool fReduced_ = RemoveRedundantFanins(*it);
-        // design choice: we could stop at one removal and start over
-        fReduced |= fReduced_;
-        if(pNtk->GetNumFanins(*it) <= 1) {
-          pNtk->Propagate(*it);
+      }
+      bool fReduced_ = RemoveRedundantFanins(*it);
+      // design choice: we could stop at one removal and start over
+      fReduced |= fReduced_;
+      if(pNtk->GetNumFanins(*it) <= 1) {
+        pNtk->Propagate(*it);
+      }
+      if(fReduced_) {
+        it = vInts.rbegin();
+        if(!fSortPerNode) {
+          SortFanins();
         }
-        if(fReduced_) {
-          it = vInts.rbegin();
-        } else {
-          it++;
-        }
+      } else {
+        it++;
       }
     }
     time_point timeEnd = GetCurrentTime();
@@ -811,12 +807,16 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   bool Optimizer<Ntk, Ana>::Reduce() {
+    // Resub methods in this class assume this function removes all redundancies (all detectable ones, in case of compatible don't care)
     int r;
     switch(nReductionMethod) {
     case 0:
       r = RemoveRedundancy();
       break;
     case 1:
+      r = RemoveRedundancyLegacy();
+      break;
+    case 2:
       r = RemoveRedundancyRandom();
       break;
     default:
@@ -1425,6 +1425,8 @@ namespace rrr {
     CostFunction(CostFunction),
     nSortTypeOriginal(pPar->nSortType),
     nSortType(pPar->nSortType),
+    fSortInitial(pPar->fSortInitial),
+    fSortPerNode(pPar->fSortPerNode),
     nFlow(pPar->nOptimizerFlow),
     nReductionMethod(pPar->nReductionMethod),
     nDistance(pPar->nDistance),
@@ -1463,6 +1465,9 @@ namespace rrr {
     }
     nTimeout = nTimeout_;
     start = GetCurrentTime();
+    if(fSortInitial) {
+      SortFanins();
+    }
     switch(nFlow) {
     case 0:
       Reduce();
