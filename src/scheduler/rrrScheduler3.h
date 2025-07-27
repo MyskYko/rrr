@@ -15,7 +15,7 @@
 #include "interface/rrrMockturtle.h"
 #include "interface/rrrSystemCall.h"
 
-#include "analyzer/simulator/rrrSimulator2.h"
+#include "simulator/rrrSimulator2.h"
 
 namespace rrr {
 

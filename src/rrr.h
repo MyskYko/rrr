@@ -3,11 +3,13 @@
 #include "scheduler/rrrScheduler.h"
 #include "scheduler/rrrScheduler3.h"
 #include "optimizer/rrrOptimizer.h"
+#include "analyzer/rrrApproxAnalyzer.h"
 #include "analyzer/rrrBddAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
 #include "analyzer/rrrAnalyzer.h"
 #include "analyzer/sat/rrrSatSolver.h"
-#include "analyzer/simulator/rrrSimulator.h"
+#include "simulator/rrrSimulator.h"
+#include "simulator/rrrSimulator2.h"
 #include "partitioner/rrrPartitioner.h"
 #include "partitioner/rrrLevelBasePartitioner.h"
 #include "extra/rrrPattern.h"
@@ -16,8 +18,10 @@ namespace rrr {
 
   template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
   void PerformInt(Ntk *pNtk, Parameter const *pPar) {
-    assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
-    if(pPar->fUseBddCspf) {
+    assert(pPar->fUseApprox + pPar->fUseBddCspf + pPar->fUseBddMspf <= 1);
+    if(pPar->fUseApprox) {
+      Scheduler<Ntk, Optimizer<Ntk, ApproxAnalyzer<Ntk, Simulator2<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+    } else if(pPar->fUseBddCspf) {
       Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else if(pPar->fUseBddMspf) {
@@ -25,7 +29,6 @@ namespace rrr {
       sch.Run();
     } else {
       Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
-      //Scheduler<Ntk, Optimizer<Ntk, ApproxAnalyzer<Ntk, Simulator2<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
       sch.Run();
     }
   }
