@@ -1580,6 +1580,7 @@ namespace rrr {
     case 5:
       //RemoveRedundancy();
       Reduce();
+      //RemoveRedundancyOneTraversal();
       break;
     case 6:
       RemoveRedundancy();

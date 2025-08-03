@@ -10,6 +10,7 @@
 #include "analyzer/sat/rrrSatSolver.h"
 #include "simulator/rrrSimulator.h"
 #include "simulator/rrrSimulator2.h"
+#include "simulator/rrrSimulator3.h"
 #include "partitioner/rrrPartitioner.h"
 #include "partitioner/rrrLevelBasePartitioner.h"
 #include "extra/rrrPattern.h"
@@ -20,7 +21,8 @@ namespace rrr {
   void PerformInt(Ntk *pNtk, Parameter const *pPar) {
     assert(pPar->fUseApprox + pPar->fUseBddCspf + pPar->fUseBddMspf <= 1);
     if(pPar->fUseApprox) {
-      Scheduler<Ntk, Optimizer<Ntk, ApproxAnalyzer<Ntk, Simulator2<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+      Sch<Ntk, Opt<Ntk, ApproxAnalyzer<Ntk, Simulator3<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
     } else if(pPar->fUseBddCspf) {
       Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
@@ -39,6 +41,9 @@ namespace rrr {
     if(!pPar->strPattern.empty()) {
       pPat = new Pattern;
       pPat->Read(pPar->strPattern, pNtk->GetNumPis());
+      if(!pPar->strPatternOutput.empty()) {
+        pPat->ReadOutput(pPar->strPatternOutput, pNtk->GetNumPos());
+      }
       pNtk->RegisterPattern(pPat);
     }
     Ntk *pCond = NULL;
