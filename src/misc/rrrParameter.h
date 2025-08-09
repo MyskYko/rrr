@@ -45,7 +45,6 @@ namespace rrr {
     bool fSortPerNode = true;
     std::string strTemporary;
     std::string strPattern;
-    std::string strPatternOutput;
     std::string strCond;
     std::string strOutput;
   };
