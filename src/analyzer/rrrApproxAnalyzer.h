@@ -22,6 +22,10 @@ namespace rrr {
     ApproxAnalyzer(Parameter const *pPar);
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
+    // relax
+    int GetNumRelaxed() const;
+    void SetNumRelaxed(int nRelaxed);
+
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
@@ -49,6 +53,20 @@ namespace rrr {
 
   /* }}} */
 
+  /* {{{ Relax */
+
+  template <typename Ntk, typename Sim>
+  int ApproxAnalyzer<Ntk, Sim>::GetNumRelaxed() const {
+    return sim.GetNumRelaxed();
+  }
+  
+  template <typename Ntk, typename Sim>
+  void ApproxAnalyzer<Ntk, Sim>::SetNumRelaxed(int nRelaxed) {
+    sim.SetNumRelaxed(nRelaxed);
+  }
+  
+  /* }}} */
+  
   /* {{{ Checks */
   
   template <typename Ntk, typename Sim>
