@@ -43,6 +43,7 @@ namespace rrr {
     int nReductionMethod = 0;
     bool fSortInitial = false;
     bool fSortPerNode = true;
+    bool fRelaxOnRemoval = false;
     std::string strTemporary;
     std::string strPattern;
     std::string strPatternOutput;

@@ -25,6 +25,7 @@ int main(int argc, char **argv) {
     ("F,pattern", "File of simulation patterns", cxxopts::value<std::string>())
     ("H,opattern", "File of output patterns", cxxopts::value<std::string>())
     ("E,error", "Maximum erroneous simulation patterns", cxxopts::value<int>()->default_value("0"))
+    ("f,relax", "Increase error threshold on removal", cxxopts::value<bool>()->default_value("false"))
     ;
 
   options.add_options("Scheduler")
@@ -105,6 +106,7 @@ int main(int argc, char **argv) {
     Par.strPatternOutput = result["opattern"].as<std::string>();
   }
   Par.nRelaxedPatterns = result["error"].as<int>();
+  Par.fRelaxOnRemoval = result["relax"].as<bool>();
   
   Par.nSchedulerVerbose = result["verbose"].as<int>();
   Par.nSchedulerFlow = result["flow"].as<int>();

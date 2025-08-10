@@ -38,6 +38,7 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     bool fGreedy;
+    bool fRelaxOnRemoval;
     std::string strTemporary;
     seconds nTimeout; // assigned upon Run
     std::function<void(std::string)> PrintLine;
@@ -678,7 +679,7 @@ namespace rrr {
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
-      if(fReduced_) {
+      if(fReduced_ && fRelaxOnRemoval) {
         int nRelaxed = ana.GetNumRelaxed();
         if(!strTemporary.empty()) {
           std::string str = strTemporary + std::to_string(nRelaxed) + ".aig";
@@ -1438,6 +1439,7 @@ namespace rrr {
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
+    fRelaxOnRemoval(pPar->fRelaxOnRemoval),
     strTemporary(pPar->strTemporary),
     ana(pPar),
     target(-1) {
@@ -1587,7 +1589,11 @@ namespace rrr {
       //RemoveRedundancy();
       while(pNtk->GetNumInts()) {
         Reduce();
-        ana.SetNumRelaxed(ana.GetNumRelaxed() + 1);
+        if(fRelaxOnRemoval) {
+          ana.SetNumRelaxed(ana.GetNumRelaxed() + 1);
+        } else {
+          break;
+        }
       }
       //RemoveRedundancyOneTraversal();
       break;

@@ -53,7 +53,7 @@ namespace rrr {
   }
   
   /* }}} */
-  
+
   /* {{{ Print containers */
   
   template <typename T>
