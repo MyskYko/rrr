@@ -11,6 +11,7 @@ namespace rrr {
     using word = unsigned long long;
 
     int nWords = 0;
+    int nRemainder = 0;
     word last_mask = 0xffffffffffffffff;
     std::vector<std::vector<word>> data;
     std::vector<std::vector<word>> data_out;
@@ -23,6 +24,7 @@ namespace rrr {
     std::vector<word>::const_iterator GetIteratorOutput(int index) const;
     int GetNumWords() const;
     word GetLastMask() const;
+    int GetNumRemainder() const;
   };
 
   inline void Pattern::Read(std::string filename, int nInputs) {
@@ -39,6 +41,7 @@ namespace rrr {
     nWords = nSize / 8 + (nSize % 8 != 0);
     data.resize(nInputs);
     char c;
+    nRemainder = nSize % 8;
     for(int j = 0; j < nInputs; j++) {
       data[j].resize(nWords);
       int i = 0;
@@ -50,7 +53,6 @@ namespace rrr {
         }
       }
       if(nSize % 8) {
-        int nRemainder = nSize % 8;
         int k = 0;
         for(; k < nRemainder; k++) {
           f.get(c);
@@ -63,6 +65,7 @@ namespace rrr {
         }
       }
     }
+    nRemainder *= 8;
   }
   
   inline void Pattern::ReadOutput(std::string filename, int nOutputs) {
@@ -79,6 +82,7 @@ namespace rrr {
     assert(nWords == nSize / 8 + (nSize % 8 != 0));
     data_out.resize(nOutputs);
     char c;
+    nRemainder = nSize % 8;
     for(int j = 0; j < nOutputs; j++) {
       data_out[j].resize(nWords);
       int i = 0;
@@ -90,7 +94,6 @@ namespace rrr {
         }
       }
       if(nSize % 8) {
-        int nRemainder = nSize % 8;
         int k = 0;
         for(; k < nRemainder; k++) {
           f.get(c);
@@ -102,6 +105,7 @@ namespace rrr {
         }
       }
     }
+    nRemainder *= 8;
   }
 
   inline bool Pattern::HasOutput() const {
@@ -122,6 +126,10 @@ namespace rrr {
 
   inline unsigned long long Pattern::GetLastMask() const {
     return last_mask;
+  }
+
+  inline int Pattern::GetNumRemainder() const {
+    return nRemainder;
   }
   
 }

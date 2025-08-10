@@ -19,7 +19,8 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
-
+    static constexpr bool fPopCount = true;
+    static constexpr int nOutputsPerClass = 512;
     static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
                                         0xccccccccccccccccull,
                                         0xf0f0f0f0f0f0f0f0ull,
@@ -37,6 +38,7 @@ namespace rrr {
     int nRelaxedPatterns;
     bool fUseGivenPoValues;
     word last_mask;
+    int nRemainder;
 
     // data
     bool fGenerated;
@@ -49,7 +51,8 @@ namespace rrr {
     std::vector<word> tmp;
     //std::vector<std::vector<word>> vPoValues;
     std::vector<word> vGivenPoValues;
-    std::vector<word> vErrors;
+    std::vector<std::vector<int>> vGivenPoSums;
+    std::vector<word> w;
 
     // marks
     unsigned iTrav;
@@ -83,6 +86,7 @@ namespace rrr {
     bool IsEq(int n, citr x, citr y, bool c, word mask) const;
     bool AtMostK(int n, citr x, int k, word mask) const;
     void Print(int n, citr x) const;
+    std::vector<int> PopCount(std::vector<citr> const &v, std::vector<bool> const &cs);
 
     // callback
     void ActionCallback(Action const &action);
@@ -105,7 +109,7 @@ namespace rrr {
     void GenerateExhaustiveStimuli();
 
     // diff computation
-    void ComputeDiff(int id);
+    bool ComputeDiff(int id);
     //void ComputeCarePart(int nWords_, int offset);
 
     // preparation
@@ -319,6 +323,73 @@ namespace rrr {
     for(int i = 1; i < n; i++, x++) {
       std::cout << std::endl << std::string(10, ' ') << std::bitset<64>(*x);
     }
+  }
+
+  template <typename Ntk>
+  inline std::vector<int> Simulator3<Ntk>::PopCount(std::vector<citr> const &v, std::vector<bool> const &cs) {
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
+    static constexpr int K = 512;
+    static constexpr int L = 10; // clog2(K)
+    int d = 0;
+    std::vector<std::vector<word>> rs(L);
+    for(int i = 0; i < L; i++) {
+      rs[i].resize(N);
+    }
+    // LSB
+    w.resize(N * (K / 2));
+    for(int i = 0; i < N; i++)
+      rs[d][i] = *(v[0] + i) ^ (cs[0]? one: 0);
+    for(int j = 1; j+1 < K; j += 2) {
+      for(int i = 0; i < N; i++) {
+        word x = *(v[j] + i) ^ (cs[j]? one: 0);
+        w[N*(j/2)+i] = (rs[d][i] & x) | ((rs[d][i] | x) & (*(v[j+1] + i) ^ (cs[j+1]? one: 0)));
+      }
+      for(int i = 0; i < N; i++)
+        rs[d][i] = rs[d][i] ^ *(v[j] + i) ^ *(v[j+1] + i) ^ (cs[j] ^ cs[j+1]? one: 0);
+    }
+    if(K % 2 == 0) {
+      for(int i = 0; i < N; i++)
+        w[N*((K-1)/2)+i] = rs[d][i] & (*(v[K-1] +i) ^ (cs[K-1]? one: 0));
+      for(int i = 0; i < N; i++)
+        rs[d][i] = rs[d][i] ^ *(v[K-1] + i) ^ (cs[K-1]? one: 0);
+    }
+    d++;
+    // reduction
+    while(w.size() > N) {
+      int k = w.size() / N;
+      for(int i = 0; i < N; i++)
+        rs[d][i] = w[i];
+      for(int j = 1; j+1 < k; j += 2) {
+        for(int i = 0; i < N; i++)
+          w[N*(j/2)+i] = (rs[d][i] & w[N*j+i]) | ((rs[d][i] | w[N*j+i]) & w[N*(j+1)+i]);
+        for(int i = 0; i < N; i++)
+          rs[d][i] = rs[d][i] ^ w[N*j+i] ^ w[N*(j+1)+i];
+      }
+      if(k % 2 == 0) {
+        for(int i = 0; i < N; i++)
+          w[N*((k-1)/2)+i] = rs[d][i] & w[N*(k-1)+i];
+        for(int i = 0; i < N; i++)
+          rs[d][i] = rs[d][i] ^ w[N*(k-1)+i];
+      }
+      d++;
+      w.resize(N * (k / 2));
+    }
+    // MSB
+    for(int i = 0; i < N; i++) {
+      rs[d][i] = w[i];
+    }
+    // convert
+    std::vector<int> res(64 * N);
+    for(int i = 0; i < N; i++) {
+      for(int b = 0; b < 64; b++) {
+        int count = 0;
+        for(int j = 0; j < rs.size(); j++) {
+          count |= ((rs[j][i] >> (63 - b)) & 1) << j;
+        }
+        res[i*64+b] = count;
+      }
+    }
+    return res;
   }
   
   /* }}} */
@@ -555,6 +626,35 @@ namespace rrr {
     //     index++;
     //   });
     // }
+    
+    // if(fUseGivenPoValues) {
+    //   int nDiff = 0;
+    //   std::vector<citr> v(nOutputsPerClass);
+    //   std::vector<bool> cs(nOutputsPerClass);
+    //   int cls = 0;
+    //   int index = 0;
+    //   pNtk->ForEachPoDriverStop([&](int fi, bool c) { // this is actually expensive for design with many POs
+    //     v[index] = vValues.cbegin() + fi * nStimuli;
+    //     cs[index] = c;
+    //     index++;
+    //     if(index == nOutputsPerClass) {
+    //       std::vector<int> vSums = PopCount(v, cs);
+    //       for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
+    //         nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
+    //         if(vSums[i] != vGivenPoSums[cls][i]) {
+    //           std::cout << "diff at cls " << cls << " index " << i << " " << vGivenPoSums[cls][i] << " vs " << vSums[i] << std::endl;
+    //         }
+    //       }
+    //       index = 0;
+    //       cls++;
+    //       if(nDiff > nRelaxedPatterns) {
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   });
+    //   assert(nDiff == 0);
+    // }
   }
   
   template <typename Ntk>
@@ -642,11 +742,24 @@ namespace rrr {
       Copy(nStimuli, vValues.begin() + id * nStimuli, pPat->GetIterator(index), false);
     });
     last_mask = pPat->GetLastMask();
+    nRemainder = pPat->GetNumRemainder();
     if(pPat->HasOutput()) {
       fUseGivenPoValues = true;
       vGivenPoValues.resize(nStimuli * pNtk->GetNumPos());
       for(int index = 0; index < pNtk->GetNumPos(); index++) {
         Copy(nStimuli, vGivenPoValues.begin() + index * nStimuli, pPat->GetIteratorOutput(index), false);
+      }
+      if(fPopCount) {
+        int nClasses = pNtk->GetNumPos() / nOutputsPerClass;
+        vGivenPoSums.resize(nClasses);
+        std::vector<bool> cs(nOutputsPerClass);
+        for(int j = 0; j < nClasses; j++) {
+          std::vector<citr> v(nOutputsPerClass);
+          for(int i = 0; i < nOutputsPerClass; i++) {
+            v[i] = vGivenPoValues.begin() + (j * nOutputsPerClass + i) * nStimuli;
+          }
+          vGivenPoSums[j] = PopCount(v, cs);
+        }
       }
     } else {
       fUseGivenPoValues = false;
@@ -697,7 +810,7 @@ namespace rrr {
   /* {{{ Diff computation */
   
   template <typename Ntk>
-  void Simulator3<Ntk>::ComputeDiff(int id) {
+  bool Simulator3<Ntk>::ComputeDiff(int id) {
     // vValues2[id] should have been set
     int target = id;
     time_point timeStart = GetCurrentTime();
@@ -748,6 +861,39 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
+    if(fPopCount) {
+      int nDiff = 0;
+      if(fUseGivenPoValues) {
+        std::vector<citr> v(nOutputsPerClass);
+        std::vector<bool> cs(nOutputsPerClass);
+        int cls = 0;
+        int index = 0;
+        pNtk->ForEachPoDriverStop([&](int fi, bool c) { // this is actually expensive for design with many POs
+          if(vTrav[fi] == iTrav) {
+            v[index] = vValues2.cbegin() + fi * nStimuli;
+          } else {
+            v[index] = vValues.cbegin() + fi * nStimuli;
+          }
+          cs[index] = c;
+          index++;
+          if(index == nOutputsPerClass) {
+            std::vector<int> vSums = PopCount(v, cs);
+            for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
+              nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
+            }
+            index = 0;
+            cls++;
+            if(nDiff > nRelaxedPatterns) {
+              return true;
+            }
+          }
+          return false;
+        });
+      } else {
+        assert(0);
+      }
+      return nDiff <= nRelaxedPatterns;
+    }
     Clear(nStimuli, diff.begin());
     if(fUseGivenPoValues) {
       int index = 0;
@@ -778,6 +924,10 @@ namespace rrr {
       std::cout << std::endl;
     }
     durationDiff += Duration(timeStart, GetCurrentTime());
+    if(nRelaxedPatterns) {
+      return AtMostK(nStimuli, diff.begin(), nRelaxedPatterns, last_mask);
+    }
+    return IsZero(nStimuli, diff.begin(), last_mask);
   }
 
   /*
@@ -861,6 +1011,7 @@ namespace rrr {
     nRelaxedPatterns(0),
     fUseGivenPoValues(false),
     last_mask(one),
+    nRemainder(0),
     fGenerated(false),
     fInitialized(false),
     iTrav(0),
@@ -879,6 +1030,7 @@ namespace rrr {
     nRelaxedPatterns(pPar->nRelaxedPatterns),
     fUseGivenPoValues(false),
     last_mask(one),
+    nRemainder(0),
     fGenerated(false),
     fInitialized(false),
     iTrav(0),
@@ -963,11 +1115,7 @@ namespace rrr {
       } else if(x != y) {
         Copy(nStimuli, y, x, cx);
       }
-      ComputeDiff(id);
-      if(nRelaxedPatterns) {
-        return AtMostK(nStimuli, diff.begin(), nRelaxedPatterns, last_mask);
-      }
-      return IsZero(nStimuli, diff.begin(), last_mask);
+      return ComputeDiff(id);
     }
     default:
       assert(0);
@@ -1059,11 +1207,7 @@ namespace rrr {
       if(x != y) {
         Copy(nStimuli, y, x, cx);
       }
-      ComputeDiff(id);
-      if(nRelaxedPatterns) {
-        return AtMostK(nStimuli, diff.begin(), nRelaxedPatterns, last_mask);
-      }
-      return IsZero(nStimuli, diff.begin(), last_mask);
+      return ComputeDiff(id);
     }
     default:
       assert(0);

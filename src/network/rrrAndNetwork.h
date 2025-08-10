@@ -129,6 +129,8 @@ namespace rrr {
     template <typename Func>
     void ForEachPoDriver(Func const &func) const;
     template <typename Func>
+    void ForEachPoDriverStop(Func const &func) const;
+    template <typename Func>
     void ForEachFanin(int id, Func const &func) const;
     template <typename Func>
     void ForEachFaninIdx(int id, Func const &func) const; // func(index of fi in fanin list of id, fi[, c])
@@ -848,6 +850,22 @@ namespace rrr {
         func(GetFanin(po, 0));
       } else if constexpr(is_invokable<Func, int, bool>::value) {
         func(GetFanin(po, 0), GetCompl(po, 0));
+      }
+    }
+  }
+
+  template <typename Func>
+  inline void AndNetwork::ForEachPoDriverStop(Func const &func) const {
+    static_assert(is_invokable<Func, int>::value || is_invokable<Func, int, bool>::value, "for each edge function format error");
+    for(int po: vPos) {
+      if constexpr(is_invokable<Func, int>::value) {
+        if(func(GetFanin(po, 0))) {
+          break;
+        }
+      } else if constexpr(is_invokable<Func, int, bool>::value) {
+        if(func(GetFanin(po, 0), GetCompl(po, 0))) {
+          break;
+        }
       }
     }
   }
