@@ -20,7 +20,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 #add_executable(rrr ${SRC_FILES} ${PROJECT_SOURCE_DIR}/src/main.c)
 
 add_executable(rrr ${PROJECT_SOURCE_DIR}/src/application_c/main.cpp ${PROJECT_SOURCE_DIR}/src/application_c/giaRrr.cpp ${PROJECT_SOURCE_DIR}/src/interface/rrrMockturtle.cpp)
-target_compile_options(rrr PRIVATE -g -Wall -Wextra)
+target_compile_options(rrr PRIVATE -g -Wall -Wextra -march=native -funroll-loops)
 if(USE_MOCKTURTLE)
   target_compile_definitions(rrr PRIVATE USE_MOCKTURTLE)
   target_link_libraries(rrr libabc mockturtle)
