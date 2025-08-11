@@ -20,6 +20,7 @@ namespace rrr {
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
     static constexpr bool fPopCount = true;
+    static constexpr bool fElementWise = true;
     static constexpr int nOutputsPerClass = 512;
     static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
                                         0xccccccccccccccccull,
@@ -85,8 +86,9 @@ namespace rrr {
     bool IsZero(int n, citr x, word mask) const;
     bool IsEq(int n, citr x, citr y, bool c, word mask) const;
     bool AtMostK(int n, citr x, int k, word mask) const;
+    int PopCount(int n, citr x, word mask) const;
     void Print(int n, citr x) const;
-    std::vector<int> PopCount(std::vector<citr> const &v, std::vector<bool> const &cs);
+    std::vector<int> ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs);
 
     // callback
     void ActionCallback(Action const &action);
@@ -317,6 +319,22 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline int Simulator3<Ntk>::PopCount(int n, citr x, word mask) const {
+    int count = 0;
+    if(mask == one) {
+      for(int i = 0; i < n; i++, x++) {
+        count += __builtin_popcountll(*x);
+      }
+    } else {
+      for(int i = 0; i < n - 1; i++, x++) {
+        count += __builtin_popcountll(*x);
+      }
+      count += __builtin_popcountll(*x & mask);
+    }
+    return count;
+  }
+
+  template <typename Ntk>
   inline void Simulator3<Ntk>::Print(int n, citr x) const {
     std::cout << std::bitset<64>(*x);
     x++;
@@ -326,7 +344,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline std::vector<int> Simulator3<Ntk>::PopCount(std::vector<citr> const &v, std::vector<bool> const &cs) {
+  inline std::vector<int> Simulator3<Ntk>::ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs) {
     static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
     static constexpr int K = 512;
     static constexpr int L = 10; // clog2(K)
@@ -638,7 +656,7 @@ namespace rrr {
     //     cs[index] = c;
     //     index++;
     //     if(index == nOutputsPerClass) {
-    //       std::vector<int> vSums = PopCount(v, cs);
+    //       std::vector<int> vSums = ColumnPopCount(v, cs);
     //       for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
     //         nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
     //         if(vSums[i] != vGivenPoSums[cls][i]) {
@@ -758,7 +776,7 @@ namespace rrr {
           for(int i = 0; i < nOutputsPerClass; i++) {
             v[i] = vGivenPoValues.begin() + (j * nOutputsPerClass + i) * nStimuli;
           }
-          vGivenPoSums[j] = PopCount(v, cs);
+          vGivenPoSums[j] = ColumnPopCount(v, cs);
         }
       }
     } else {
@@ -877,7 +895,7 @@ namespace rrr {
           cs[index] = c;
           index++;
           if(index == nOutputsPerClass) {
-            std::vector<int> vSums = PopCount(v, cs);
+            std::vector<int> vSums = ColumnPopCount(v, cs);
             for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
               nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
             }
@@ -892,6 +910,32 @@ namespace rrr {
       } else {
         assert(0);
       }
+      durationDiff += Duration(timeStart, GetCurrentTime());
+      return nDiff <= nRelaxedPatterns;
+    }
+    if(fElementWise) {
+      int nDiff = 0;
+      if(fUseGivenPoValues) {
+        int index = 0;
+        pNtk->ForEachPoDriverStop([&](int fi, bool c) { // this is actually expensive for design with many POs
+          itr x;
+          if(vTrav[fi] == iTrav) {
+            x = vValues2.begin() + fi * nStimuli;
+          } else {
+            x = vValues.begin() + fi * nStimuli;
+          }
+          Xor(nStimuli, tmp.begin(), vGivenPoValues.begin() + index * nStimuli, x, c);
+          nDiff += PopCount(nStimuli, tmp.begin(), last_mask);
+          index++;
+          if(nDiff > nRelaxedPatterns) {
+            return true;
+          }
+          return false;
+        });
+      } else {
+        assert(0);
+      }
+      durationDiff += Duration(timeStart, GetCurrentTime());
       return nDiff <= nRelaxedPatterns;
     }
     Clear(nStimuli, diff.begin());

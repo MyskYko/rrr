@@ -1585,18 +1585,21 @@ namespace rrr {
       Print(0, statsLocal.GetString());
       break;
     }
-    case 5:
+    case 5: {
       //RemoveRedundancy();
+      int nInterval = 1;
       while(pNtk->GetNumInts()) {
         Reduce();
         if(fRelaxOnRemoval) {
-          ana.SetNumRelaxed(ana.GetNumRelaxed() + 1);
+          ana.SetNumRelaxed(ana.GetNumRelaxed() + nInterval);
+          nInterval <<= 1;
         } else {
           break;
         }
       }
       //RemoveRedundancyOneTraversal();
       break;
+    }
     case 6:
       RemoveRedundancy();
       for(int i = 0; i < 1; i++) {
