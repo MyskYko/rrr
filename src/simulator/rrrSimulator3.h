@@ -20,6 +20,7 @@ namespace rrr {
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
     static constexpr bool fPopCount = true;
+    static constexpr bool fMinErrors = true;
     static constexpr bool fElementWise = true;
     static constexpr int nOutputsPerClass = 512;
     static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
@@ -54,6 +55,7 @@ namespace rrr {
     std::vector<word> vGivenPoValues;
     std::vector<std::vector<int>> vGivenPoSums;
     std::vector<word> w;
+    int nMinErrors;
 
     // marks
     unsigned iTrav;
@@ -126,6 +128,8 @@ namespace rrr {
     // relax
     int GetNumRelaxed() const;
     void SetNumRelaxed(int nRelax);
+    int GetNumMinErrors() const;
+    void ResetNumMinErrors();
     
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -902,7 +906,9 @@ namespace rrr {
             index = 0;
             cls++;
             if(nDiff > nRelaxedPatterns) {
-              return true;
+              if(!fMinErrors || nDiff > nMinErrors) {
+                return true;
+              }
             }
           }
           return false;
@@ -911,6 +917,9 @@ namespace rrr {
         assert(0);
       }
       durationDiff += Duration(timeStart, GetCurrentTime());
+      if(nDiff < nMinErrors) {
+        nMinErrors = nDiff;
+      }
       return nDiff <= nRelaxedPatterns;
     }
     if(fElementWise) {
@@ -928,7 +937,9 @@ namespace rrr {
           nDiff += PopCount(nStimuli, tmp.begin(), last_mask);
           index++;
           if(nDiff > nRelaxedPatterns) {
-            return true;
+            if(!fMinErrors || nDiff > nMinErrors) {
+              return true;
+            }
           }
           return false;
         });
@@ -936,6 +947,9 @@ namespace rrr {
         assert(0);
       }
       durationDiff += Duration(timeStart, GetCurrentTime());
+      if(nDiff < nMinErrors) {
+        nMinErrors = nDiff;
+      }
       return nDiff <= nRelaxedPatterns;
     }
     Clear(nStimuli, diff.begin());
@@ -967,11 +981,22 @@ namespace rrr {
       Print(nStimuli, diff.begin());
       std::cout << std::endl;
     }
-    durationDiff += Duration(timeStart, GetCurrentTime());
+    bool r;
     if(nRelaxedPatterns) {
-      return AtMostK(nStimuli, diff.begin(), nRelaxedPatterns, last_mask);
+      if(nMinErrors) {
+        int nDiff = PopCount(nStimuli, diff.begin(), last_mask);
+        if(nDiff < nMinErrors) {
+          nMinErrors = nDiff;
+        }
+        r = nDiff <= nRelaxedPatterns;
+      } else {
+        r = AtMostK(nStimuli, diff.begin(), nRelaxedPatterns, last_mask);
+      }
+    } else {
+      r = IsZero(nStimuli, diff.begin(), last_mask);
     }
-    return IsZero(nStimuli, diff.begin(), last_mask);
+    durationDiff += Duration(timeStart, GetCurrentTime());
+    return 4;
   }
 
   /*
@@ -1058,6 +1083,7 @@ namespace rrr {
     nRemainder(0),
     fGenerated(false),
     fInitialized(false),
+    nMinErrors(std::numeric_limits<int>::max()),
     iTrav(0),
     iPivot(0),
     fUpdate(false) {
@@ -1077,6 +1103,7 @@ namespace rrr {
     nRemainder(0),
     fGenerated(false),
     fInitialized(false),
+    nMinErrors(std::numeric_limits<int>::max()),
     iTrav(0),
     iPivot(0),
     fUpdate(false) {
@@ -1121,7 +1148,17 @@ namespace rrr {
   void Simulator3<Ntk>::SetNumRelaxed(int nRelaxed) {
     nRelaxedPatterns = nRelaxed;
   }
-  
+
+  template <typename Ntk>
+  int Simulator3<Ntk>::GetNumMinErrors() const {
+    return nMinErrors;
+  }
+
+  template <typename Ntk>
+  void Simulator3<Ntk>::ResetNumMinErrors() {
+    nMinErrors = std::numeric_limits<int>::max();
+  }
+
   /* }}} */
   
   /* {{{ Checks */

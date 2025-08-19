@@ -51,6 +51,7 @@ namespace rrr {
     std::vector<int> vTmp;
     std::map<int, std::set<int>> mapNewFanins;
     time_point start;
+    int nDelta;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -218,7 +219,7 @@ namespace rrr {
       std::stringstream ss = GetActionDescription(action);
       std::string str;
       std::getline(ss, str);
-      Print(4, str);
+      Print(4, str, ",", "threshold", "=", ana.GetNumRelaxed());
       while(std::getline(ss, str)) {
         Print(5, str);
       }
@@ -685,7 +686,7 @@ namespace rrr {
           std::string str = strTemporary + std::to_string(nRelaxed) + ".aig";
           DumpAig(str, pNtk);
         }
-        ana.SetNumRelaxed(nRelaxed + 1);
+        ana.SetNumRelaxed(nRelaxed + nDelta);
       }
     }
     if(!fSubRoutine) {
@@ -729,6 +730,9 @@ namespace rrr {
       fReduced = true;
       if(!fSortPerNode) {
         SortFanins();
+      }
+      if(fRelaxOnRemoval) {
+        ana.ResetNumMinErrors();
       }
     }
     time_point timeEnd = GetCurrentTime();
@@ -1442,12 +1446,14 @@ namespace rrr {
     fRelaxOnRemoval(pPar->fRelaxOnRemoval),
     strTemporary(pPar->strTemporary),
     ana(pPar),
+    nDelta(1),
     target(-1) {
   }
   
   template <typename Ntk, typename Ana>
   void Optimizer3<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
+    nDelta = 1;
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer3<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     ana.AssignNetwork(pNtk, fReuse);
@@ -1587,12 +1593,19 @@ namespace rrr {
     }
     case 5: {
       //RemoveRedundancy();
-      int nInterval = 1;
       while(pNtk->GetNumInts()) {
         Reduce();
         if(fRelaxOnRemoval) {
-          ana.SetNumRelaxed(ana.GetNumRelaxed() + nInterval);
-          nInterval <<= 1;
+          int nRelaxed = ana.GetNumRelaxed();
+          int nMinErrors = ana.GetNumMinErrors();
+          assert(nRelaxed < nMinErrors);
+	  nDelta += nMinErrors - nRelaxed;
+          //if(nDelta < nMinErrors - nRelaxed) {
+	  //  nDelta = nMinErrors - nRelaxed;
+          //}
+          ana.SetNumRelaxed(nMinErrors);
+          Print(4, "increase", ":", "threshold", "=", ana.GetNumRelaxed(), ",", "delta", "=", nDelta);
+          ana.ResetNumMinErrors();
         } else {
           break;
         }

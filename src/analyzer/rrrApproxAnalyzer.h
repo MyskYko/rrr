@@ -25,6 +25,8 @@ namespace rrr {
     // relax
     int GetNumRelaxed() const;
     void SetNumRelaxed(int nRelaxed);
+    int GetNumMinErrors() const;
+    void ResetNumMinErrors();
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -64,7 +66,17 @@ namespace rrr {
   void ApproxAnalyzer<Ntk, Sim>::SetNumRelaxed(int nRelaxed) {
     sim.SetNumRelaxed(nRelaxed);
   }
+
+  template <typename Ntk, typename Sim>
+  int ApproxAnalyzer<Ntk, Sim>::GetNumMinErrors() const {
+    return sim.GetNumMinErrors();
+  }
   
+  template <typename Ntk, typename Sim>
+  void ApproxAnalyzer<Ntk, Sim>::ResetNumMinErrors() {
+    sim.ResetNumMinErrors();
+  }
+
   /* }}} */
   
   /* {{{ Checks */
