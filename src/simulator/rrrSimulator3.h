@@ -996,7 +996,7 @@ namespace rrr {
       r = IsZero(nStimuli, diff.begin(), last_mask);
     }
     durationDiff += Duration(timeStart, GetCurrentTime());
-    return 4;
+    return r;
   }
 
   /*

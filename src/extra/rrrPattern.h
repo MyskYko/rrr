@@ -61,9 +61,11 @@ namespace rrr {
         }
         for(; k < 8; k++) {
           data[j][i] = data[j][i] << 8;
-          last_mask = last_mask << 8;
         }
       }
+    }
+    for(int k = 0; k < nRemainder; k++) {
+      last_mask = last_mask << 8;
     }
     nRemainder *= 8;
   }
