@@ -19,6 +19,7 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
+    static constexpr bool fRCA = true;
     static constexpr bool fPopCount = true;
     static constexpr bool fMinErrors = true;
     static constexpr bool fElementWise = true;
@@ -54,6 +55,7 @@ namespace rrr {
     //std::vector<std::vector<word>> vPoValues;
     std::vector<word> vGivenPoValues;
     std::vector<std::vector<int>> vGivenPoSums;
+    std::vector<std::vector<std::vector<word>>> vGivenPoBinary;
     std::vector<word> w;
     int nMinErrors;
 
@@ -90,7 +92,10 @@ namespace rrr {
     bool AtMostK(int n, citr x, int k, word mask) const;
     int PopCount(int n, citr x, word mask) const;
     void Print(int n, citr x) const;
-    std::vector<int> ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs);
+    std::vector<std::vector<word>> ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs);
+    std::vector<int> BinaryToInteger(std::vector<std::vector<word>> const &rs);
+    void BinarySubtract(std::vector<std::vector<word>> &a, std::vector<std::vector<word>> const &b); // a = a - b
+    int BinaryPopCount(std::vector<std::vector<word>> const &a);
 
     // callback
     void ActionCallback(Action const &action);
@@ -348,10 +353,10 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline std::vector<int> Simulator3<Ntk>::ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs) {
+  inline std::vector<std::vector<unsigned long long>> Simulator3<Ntk>::ColumnPopCount(std::vector<citr> const &v, std::vector<bool> const &cs) {
     static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
     static constexpr int K = 512;
-    static constexpr int L = 10; // clog2(K)
+    static constexpr int L = 10; // clog2(K + 1)
     int d = 0;
     std::vector<std::vector<word>> rs(L);
     for(int i = 0; i < L; i++) {
@@ -400,7 +405,12 @@ namespace rrr {
     for(int i = 0; i < N; i++) {
       rs[d][i] = w[i];
     }
-    // convert
+    return rs;
+  }
+
+  template <typename Ntk>
+  inline std::vector<int> Simulator3<Ntk>::BinaryToInteger(std::vector<std::vector<word>> const &rs) {
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
     std::vector<int> res(64 * N);
     for(int i = 0; i < N; i++) {
       for(int b = 0; b < 64; b++) {
@@ -412,6 +422,45 @@ namespace rrr {
       }
     }
     return res;
+  }
+
+  template <typename Ntk>
+  inline void Simulator3<Ntk>::BinarySubtract(std::vector<std::vector<word>> &a, std::vector<std::vector<word>> const &b) {
+    // overwrite a = a - b
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
+    int L = a.size();
+    a.resize(L + 2); // carry in and out
+    a[L].resize(N, one); // first carry is 1 for subtraction
+    a[L+1].resize(N);
+    for(int l = 0; l < L; l++) {
+      for(int i = 0; i < N; i++)
+        a[L+1][i] = (a[l][i] & ~b[l][i]) | ((a[l][i] | ~b[l][i]) & a[L][i]);
+      for(int i = 0; i < N; i++)
+        a[l][i] = a[l][i] ^ ~b[l][i] ^ a[L][i];
+      std::swap(a[L], a[L+1]);
+    }
+    for(int i = 0; i < N; i++)
+      a[L][i] = ~a[L][i];
+    a.resize(L + 1);
+  }
+
+  template <typename Ntk>
+  inline int Simulator3<Ntk>::BinaryPopCount(std::vector<std::vector<word>> const &a) {
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
+    int L = a.size() - 1;
+    assert(last_mask == 0xffffffff00000000ull);
+    int count = 0;
+    for(int l = 0; l < L; l++) {
+      int count_ = 0;
+      for(int i = 0; i < N - 1; i++)
+        count_ += __builtin_popcountll(a[l][i] ^ a[L][i]);
+      count_ += __builtin_popcountll((a[l][N-1] ^ a[L][N-1]) & last_mask);
+      count += count_ << l;
+    }
+    for(int i = 0; i < N - 1; i++)
+      count += __builtin_popcountll(a[L][i]);
+    count += __builtin_popcountll(a[L][N-1] & last_mask);
+    return count;
   }
   
   /* }}} */
@@ -677,6 +726,41 @@ namespace rrr {
     //   });
     //   assert(nDiff == 0);
     // }
+
+    // if(fUseGivenPoValues) {
+    //   int nDiff = 0;
+    //   std::vector<citr> v(nOutputsPerClass);
+    //   std::vector<bool> cs(nOutputsPerClass);
+    //   int cls = 0;
+    //   int index = 0;
+    //   pNtk->ForEachPoDriverStop([&](int fi, bool c) { // this is actually expensive for design with many POs
+    //     v[index] = vValues.cbegin() + fi * nStimuli;
+    //     cs[index] = c;
+    //     index++;
+    //     if(index == nOutputsPerClass) {
+    //       auto rs = ColumnPopCount(v, cs);
+    //       BinarySubtract(rs, vGivenPoBinary[cls]);
+    //       int d = BinaryPopCount(rs);
+    //       std::cout << d << std::endl;
+    //       nDiff += d;
+    //       if(d) {
+    //         std::cout << "diff at cls " << cls << /*" index " << i << " " << vGivenPoSums[cls][i] << " vs " << vSums[i] << */ std::endl;
+    //         for(int i = 0; i < 11; i++) {
+    //           std::cout << i << ": ";
+    //           Print(10, rs[i].begin());
+    //           std::cout << std::endl;
+    //         }
+    //       }
+    //       index = 0;
+    //       cls++;
+    //       if(nDiff > nRelaxedPatterns) {
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   });
+    //   assert(nDiff == 0);
+    // }
   }
   
   template <typename Ntk>
@@ -773,14 +857,23 @@ namespace rrr {
       }
       if(fPopCount) {
         int nClasses = pNtk->GetNumPos() / nOutputsPerClass;
-        vGivenPoSums.resize(nClasses);
+        if(fRCA) {
+          vGivenPoBinary.resize(nClasses);
+        } else {
+          vGivenPoSums.resize(nClasses);
+        }
         std::vector<bool> cs(nOutputsPerClass);
         for(int j = 0; j < nClasses; j++) {
           std::vector<citr> v(nOutputsPerClass);
           for(int i = 0; i < nOutputsPerClass; i++) {
             v[i] = vGivenPoValues.begin() + (j * nOutputsPerClass + i) * nStimuli;
           }
-          vGivenPoSums[j] = ColumnPopCount(v, cs);
+          if(fRCA) {
+            vGivenPoBinary[j] = ColumnPopCount(v, cs);
+          } else {
+            auto rs = ColumnPopCount(v, cs);
+            vGivenPoSums[j] = BinaryToInteger(rs);
+          }
         }
       }
     } else {
@@ -899,9 +992,16 @@ namespace rrr {
           cs[index] = c;
           index++;
           if(index == nOutputsPerClass) {
-            std::vector<int> vSums = ColumnPopCount(v, cs);
-            for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
-              nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
+            if(fRCA) {
+              auto rs = ColumnPopCount(v, cs);
+              BinarySubtract(rs, vGivenPoBinary[cls]);
+              nDiff += BinaryPopCount(rs);
+            } else {
+              auto rs = ColumnPopCount(v, cs);
+              std::vector<int> vSums = BinaryToInteger(rs);
+              for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
+                nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
+              }
             }
             index = 0;
             cls++;

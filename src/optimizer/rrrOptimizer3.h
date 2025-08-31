@@ -123,6 +123,7 @@ namespace rrr {
     // apply
     void ApplyReverseTopologically(std::function<void(int)> const &func);
     void ApplyRandomlyStop(std::function<bool(int)> const &func);
+    void ApplySampled(int n, std::function<void(int)> const &func);
     void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
     void ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
     void ApplyMultisetSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
@@ -1358,6 +1359,23 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
+  void Optimizer3<Ntk, Ana>::ApplySampled(int n, std::function<void(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    int i = 0;
+    for(citr it = vInts.begin(); it != vInts.end() && i < n; it++, i++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      Print(1, "node", *it, "(", int_distance(vInts.cbegin(), it) + 1, "/", std::min(n, int_size(vInts)), ")", ":", "cost", "=", CostFunction(pNtk));
+      func(*it);
+    }
+  }
+
+  template <typename Ntk, typename Ana>
   void Optimizer3<Ntk, Ana>::ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
     std::shuffle(vInts.begin(), vInts.end(), rng); // order is decided here, so it's not truely exhaustive
@@ -1648,6 +1666,12 @@ namespace rrr {
         Print(0, "multi ", ":", statsMulti.GetString());
       }
       break;
+    case 7: {
+      ApplySampled(1000, [&](int id) {
+        RemoveRedundantFanins(id, true);
+      });
+      break;
+    }
     default:
       assert(0);
     }
