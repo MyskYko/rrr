@@ -72,6 +72,7 @@ namespace rrr {
 
   template <typename Ntk>
   void Partitioner<Ntk>::GetIo(std::set<int> const &sNodes, std::set<int> &sInputs, std::set<int> &sOutputs) {
+    // TODO: can be done using marks rather than count
     sInputs.clear();
     sOutputs.clear();
     for(int id: sNodes) {
@@ -110,6 +111,7 @@ namespace rrr {
     // return empty set on failure
     // get neighbors
     std::vector<int> vNodes = pNtk->GetNeighbors(id, false, nRadius);
+    // TODO: not sure why we are not using PIs here
     vNodes.push_back(id);
     std::set<int> sNodes(vNodes.begin(), vNodes.end());
     Print(2, "radius", NS(), nRadius, ":", "size =", int_size(sNodes));
