@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::Perform(&ntk, &Par);
+  rrr::PerformHelo(&ntk, &Par);
 
   if(!output_filename.empty()) {
     rrr::DumpAig(output_filename, &ntk);

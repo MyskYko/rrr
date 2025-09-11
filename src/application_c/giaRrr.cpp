@@ -55,7 +55,7 @@ Gia_Man_t *Gia_ManRrr(Gia_Man_t *pGia, int iSeed, int nWords, int nTimeout, int 
   if(pOutput) {
     Par.strOutput = pOutput;
   }
-  rrr::Perform(&ntk, &Par);
+  rrr::PerformHelo(&ntk, &Par);
   Gia_Man_t *pNew = rrr::CreateGia(&ntk, false);
   return pNew;
 }

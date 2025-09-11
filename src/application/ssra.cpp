@@ -7,25 +7,17 @@
 #include "rrr.h"
 
 int main(int argc, char **argv) {
-  cxxopts::Options options("als", "approximate logic synthesis");
+  cxxopts::Options options("helo", "high-effort logic optimization");
 
   options.set_width(100);
   
   options.add_options()
     ("input", "Input file name", cxxopts::value<std::string>())
     ("o,output", "Output file name", cxxopts::value<std::string>())
-    ("l,log", "Directory name to dump log files", cxxopts::value<std::string>())
     ("R,seed", "Random seed integer", cxxopts::value<int>()->default_value("0"))
     ("T,timeout", "Timeout in seconds (0 = no limit)", cxxopts::value<int>()->default_value("0"))
     ("J,thread", "Number of threads", cxxopts::value<int>()->default_value("1"))
     ("h,help", "Print this usage")
-    ;
-
-  options.add_options("Approximation")
-    ("F,pattern", "File of simulation patterns", cxxopts::value<std::string>())
-    ("H,opattern", "File of output patterns", cxxopts::value<std::string>())
-    ("E,error", "Maximum erroneous simulation patterns", cxxopts::value<int>()->default_value("0"))
-    ("f,relax", "Increase error threshold on removal", cxxopts::value<bool>()->default_value("false"))
     ;
 
   options.add_options("Scheduler")
@@ -89,24 +81,9 @@ int main(int argc, char **argv) {
   }
   
   rrr::Parameter Par;
-  Par.fUseApprox = true;
-
-  if(result.count("log")) {
-    Par.strTemporary = result["log"].as<std::string>();
-  }
-  
   Par.iSeed = result["seed"].as<int>();
   Par.nTimeout = result["timeout"].as<int>();
   Par.nThreads = result["thread"].as<int>();
-
-  if(result.count("pattern")) {
-    Par.strPattern = result["pattern"].as<std::string>();
-  }
-  if(result.count("opattern")) {
-    Par.strPatternOutput = result["opattern"].as<std::string>();
-  }
-  Par.nRelaxedPatterns = result["error"].as<int>();
-  Par.fRelaxOnRemoval = result["relax"].as<bool>();
   
   Par.nSchedulerVerbose = result["verbose"].as<int>();
   Par.nSchedulerFlow = result["flow"].as<int>();
@@ -150,8 +127,12 @@ int main(int argc, char **argv) {
 
   Par.fExSim = fExSim;
   
+  Par.nRelaxedPatterns = nRelaxedPatterns;
   if(pTemporary) {
     Par.strTemporary = std::string(pTemporary);
+  }
+  if(pPattern) {
+    Par.strPattern = std::string(pPattern);
   }
   if(pCond) {
     Par.strCond = std::string(pCond);
@@ -161,7 +142,7 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformAls(&ntk, &Par);
+  rrr::PerformSsra(&ntk, &Par);
 
   if(!output_filename.empty()) {
     rrr::DumpAig(output_filename, &ntk);

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rrrTypes.h"
-#include "rrrUtils.h"
+#include "misc/rrrTypes.h"
+#include "misc/rrrUtils.h"
 
 namespace rrr {
 

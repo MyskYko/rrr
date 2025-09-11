@@ -9,12 +9,12 @@
 #include <condition_variable>
 #endif
 
-#include "rrrParameter.h"
-#include "rrrUtils.h"
-#include "rrrAbc.h"
-#include "rrrBinary.h"
-#include "rrrCanonicalizer.h"
-#include "rrrTable.h"
+// #include "misc/rrrParameter.h"
+// #include "misc/rrrUtils.h"
+// #include "rrrAbc.h"
+#include "io/rrrBinary.h"
+#include "extra/rrrTable.h"
+#include "extra/rrrCanonicalizer.h"
 
 namespace rrr {
 
@@ -237,12 +237,12 @@ namespace rrr {
       int index;
       bool fNew = Register(&ntk, pJob->src, vActions, index);
       if(fNew) {
-        if(index % 1000 == 0)
-          Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
+        //if(index % 1000 == 0)
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
         CreateJob(index, true);
         nNews++;
       } else {
-        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
       /*
       for(auto action: vActions) {

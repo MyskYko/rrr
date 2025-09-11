@@ -1,10 +1,10 @@
 #pragma once
 
-#include "rrrUtils.h"
+#include "misc/rrrUtils.h"
 
 namespace rrr {
 
-  int decode(std::istream &in) {
+  int BinaryDecode(std::istream &in) {
     int x = 0, i = 0;
     char ch;
     while(in.get(ch) && (ch & 0x80)) {
@@ -13,7 +13,7 @@ namespace rrr {
     return x | (ch << (7 * i));
   }
 
-  void encode(std::ostream &out, int x) {
+  void BinaryEncode(std::ostream &out, int x) {
     assert(x >= 0);
     char ch;
     while(x & ~0x7f) {
@@ -29,19 +29,19 @@ namespace rrr {
   void BinaryReader(std::string const &str, Ntk *pNtk) {
     assert(pNtk->GetConst0() == 0);
     std::stringstream in(str);
-    int nPis = decode(in);
-    int nPos = decode(in);
-    int nInts = decode(in);
+    int nPis = BinaryDecode(in);
+    int nPos = BinaryDecode(in);
+    int nInts = BinaryDecode(in);
     for(int i = 0; i < nPis; i++) {
       pNtk->AddPi();
     }
     for(int id = nPis + 1; id < nPis + 1 + nInts; id++) {
-      int nFanins = decode(in);
+      int nFanins = BinaryDecode(in);
       std::vector<int> vFanins(nFanins);
       std::vector<bool> vCompls(nFanins);
       /* simple
       for(int idx = 0; idx < nFanins; idx++) {
-        int fi_edge = decode(in);
+        int fi_edge = BinaryDecode(in);
         int fi = fi_edge >> 1;
         bool c = fi_edge & 1;
         vFanins[idx] = fi;
@@ -50,7 +50,7 @@ namespace rrr {
       */
       int base = id << 1;
       for(int idx = nFanins - 1; idx >= 0; idx--) {
-        int fi_edge_diff = decode(in);
+        int fi_edge_diff = BinaryDecode(in);
         int fi_edge = base - fi_edge_diff;
         int fi = fi_edge >> 1;
         bool c = fi_edge & 1;
@@ -61,7 +61,7 @@ namespace rrr {
       pNtk->AddAnd(vFanins, vCompls);
     }
     for(int i = 0; i < nPos; i++) {
-      int fi_edge = decode(in);
+      int fi_edge = BinaryDecode(in);
       int fi = fi_edge >> 1;
       bool c = fi_edge & 1;
       pNtk->AddPo(fi, c);
@@ -72,15 +72,15 @@ namespace rrr {
   std::string CreateBinary(Ntk *pNtk, bool fSort = false) {
     // Assumption: POs must be located after internals
     std::stringstream ss;
-    encode(ss, pNtk->GetNumPis());
-    encode(ss, pNtk->GetNumPos());
-    encode(ss, pNtk->GetNumInts());
+    BinaryEncode(ss, pNtk->GetNumPis());
+    BinaryEncode(ss, pNtk->GetNumPos());
+    BinaryEncode(ss, pNtk->GetNumInts());
     pNtk->ForEachInt([&](int id) {
-      encode(ss, pNtk->GetNumFanins(id));
+      BinaryEncode(ss, pNtk->GetNumFanins(id));
       /* simple
       pNtk->ForEachFanin(id, [&](int fi, bool c) {
         int fi_edge = (fi << 1) + (int)c;
-        encode(ss, fi_edge);
+        BinaryEncode(ss, fi_edge);
       });
       */
       if(fSort) {
@@ -93,13 +93,13 @@ namespace rrr {
       pNtk->ForEachFaninReverse(id, [&](int fi, bool c) {
         int fi_edge = (fi << 1) + (int)c;
         int fi_edge_diff = base - fi_edge;
-        encode(ss, fi_edge_diff);
+        BinaryEncode(ss, fi_edge_diff);
         base = fi_edge;
       });
     });
     pNtk->ForEachPoDriver([&](int fi, bool c) {
       int fi_edge = (fi << 1) | (int)c;
-      encode(ss, fi_edge);
+      BinaryEncode(ss, fi_edge);
     });
     return ss.str(); 
   }
