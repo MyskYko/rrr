@@ -32,6 +32,9 @@ namespace rrr {
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
 
+    // assessment
+    int AssessRedundancy(int id, int idx);
+
     // summary
     void ResetSummary();
     summary<int> GetStatsSummary() const;
@@ -109,6 +112,15 @@ namespace rrr {
     return false;
   }
 
+  /* }}} */
+
+  /* {{{ Assessment */
+  
+  template <typename Ntk, typename Sim>
+  int ApproxAnalyzer<Ntk, Sim>::AssessRedundancy(int id, int idx) {
+    return sim.AssessRedundancy(id, idx);
+  }
+  
   /* }}} */
 
   /* {{{ Summary */

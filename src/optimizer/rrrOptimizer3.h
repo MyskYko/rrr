@@ -1672,6 +1672,17 @@ namespace rrr {
       });
       break;
     }
+    case 8:
+      // std::vector<std::vector<int>> vvErrors;
+      // vvErrors.reserve(pNtk->GetNumNodes());
+      pNtk->ForEachInt([&](int id) {
+        for(int i = 0; i < pNtk->GetNumFanins(id); i++) {
+          int nErrors = ana.AssessRedundancy(id, i);
+          // vvErrors[id].push_back(nErrors);
+          std::cout << id << "(" << i << ") : " << nErrors << std::endl;
+        }
+      });
+      break;
     default:
       assert(0);
     }

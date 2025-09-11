@@ -119,6 +119,7 @@ namespace rrr {
 
     // diff computation
     bool ComputeDiff(int id);
+    int CountDiff(int id);
     //void ComputeCarePart(int nWords_, int offset);
 
     // preparation
@@ -139,6 +140,9 @@ namespace rrr {
     // checks
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
+
+    // assessment
+    int AssessRedundancy(int id, int idx);
 
     // sdc
     std::vector<word> ComputeSdc(std::vector<int> const &ids);
@@ -1099,6 +1103,142 @@ namespace rrr {
     return r;
   }
 
+  template <typename Ntk>
+  int Simulator3<Ntk>::CountDiff(int id) {
+    // vValues2[id] should have been set
+    int target = id;
+    time_point timeStart = GetCurrentTime();
+    if(nVerbose) {
+      std::cout << "coounting diff for " << target << std::endl;
+    }
+    StartTraversal();
+    vTrav[target] = iTrav;
+    pNtk->ForEachTfo(target, false, [&](int id) {
+      itr x = vValues2.end();
+      itr y = vValues2.begin() + id * nStimuli;
+      bool cx = false;
+      switch(pNtk->GetNodeType(id)) {
+      case AND:
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(x == vValues2.end()) {
+            if(vTrav[fi] != iTrav) {
+              x = vValues.begin() + fi * nStimuli;
+            } else {
+              x = vValues2.begin() + fi * nStimuli;
+            }
+            cx = c;
+          } else {
+            if(vTrav[fi] != iTrav) {
+              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
+            } else {
+              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c);
+            }
+            x = y;
+            cx = false;
+          }
+        });
+        if(x == vValues2.end()) {
+          Fill(nStimuli, y);
+        } else if(x != y) {
+          Copy(nStimuli, y, x, cx);
+        }
+        break;
+      default:
+        assert(0);
+      }
+      vTrav[id] = iTrav;
+      if(nVerbose) {
+        std::cout << "node " << std::setw(3) << id << ": ";
+        Print(nStimuli, vValues2.begin() + id * nStimuli);
+        std::cout << std::endl;
+      }
+    });
+    if(fPopCount) {
+      int nDiff = 0;
+      assert(fUseGivenPoValues);
+      std::vector<citr> v(nOutputsPerClass);
+      std::vector<bool> cs(nOutputsPerClass);
+      int cls = 0;
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        if(vTrav[fi] == iTrav) {
+          v[index] = vValues2.cbegin() + fi * nStimuli;
+        } else {
+          v[index] = vValues.cbegin() + fi * nStimuli;
+        }
+        cs[index] = c;
+        index++;
+        if(index == nOutputsPerClass) {
+          if(fRCA) {
+            auto rs = ColumnPopCount(v, cs);
+            BinarySubtract(rs, vGivenPoBinary[cls]);
+            nDiff += BinaryPopCount(rs);
+          } else {
+            auto rs = ColumnPopCount(v, cs);
+            std::vector<int> vSums = BinaryToInteger(rs);
+            for(int i = 0; i < 64 * nStimuli - nRemainder; i++) {
+              nDiff += std::abs(vSums[i] - vGivenPoSums[cls][i]);
+            }
+          }
+          index = 0;
+          cls++;
+        }
+      });
+      durationDiff += Duration(timeStart, GetCurrentTime());
+      return nDiff;
+    }
+    if(fElementWise) {
+      int nDiff = 0;
+      assert(fUseGivenPoValues);
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        itr x;
+        if(vTrav[fi] == iTrav) {
+          x = vValues2.begin() + fi * nStimuli;
+        } else {
+          x = vValues.begin() + fi * nStimuli;
+        }
+        Xor(nStimuli, tmp.begin(), vGivenPoValues.begin() + index * nStimuli, x, c);
+        nDiff += PopCount(nStimuli, tmp.begin(), last_mask);
+        index++;
+      });
+      durationDiff += Duration(timeStart, GetCurrentTime());
+      return nDiff;
+    }
+    Clear(nStimuli, diff.begin());
+    if(fUseGivenPoValues) {
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) { // this is actually expensive for design with many POs
+        itr x;
+        if(vTrav[fi] == iTrav) {
+          x = vValues2.begin() + fi * nStimuli;
+        } else {
+          x = vValues.begin() + fi * nStimuli;
+        }
+        Xor(nStimuli, tmp.begin(), vGivenPoValues.begin() + index * nStimuli, x, c);
+        Or(nStimuli, diff.begin(), diff.begin(), tmp.begin(), false, false);
+        index++;
+      });
+    } else {
+      pNtk->ForEachPoDriver([&](int fi) {
+        for(int i = 0; i < nStimuli; i++) {
+          // skip unaffected POs
+          if(vTrav[fi] == iTrav) {
+            diff[i] = diff[i] | (vValues[fi * nStimuli + i] ^ vValues2[fi * nStimuli + i]);
+          }
+        }
+      });
+    }
+    if(nVerbose) {
+      std::cout << "diff " << std::setw(3) << target << ": ";
+      Print(nStimuli, diff.begin());
+      std::cout << std::endl;
+    }
+    int nDiff = PopCount(nStimuli, diff.begin(), last_mask);
+    durationDiff += Duration(timeStart, GetCurrentTime());
+    return nDiff;
+  }
+  
   /*
   template <typename Ntk>
   void Simulator3<Ntk>::ComputeCarePart(int nWords_, int offset) {
@@ -1398,6 +1538,51 @@ namespace rrr {
 
   /* }}} */
 
+  /* {{{ Checks */
+  
+  template <typename Ntk>
+  int Simulator3<Ntk>::AssessRedundancy(int id, int idx) {
+    if(!fInitialized) {
+      Initialize();
+    }
+    if(!sUpdates.empty()) {
+      Resimulate();
+      sUpdates.clear();
+    }
+    vValues2.resize(nStimuli * pNtk->GetNumNodes());
+    switch(pNtk->GetNodeType(id)) {
+    case AND: {
+      itr x = vValues.end();
+      itr y = vValues2.begin() + id * nStimuli;
+      bool cx = false;
+      pNtk->ForEachFaninIdx(id, [&](int idx2, int fi, bool c) {
+        if(idx == idx2) {
+          return;
+        }
+        if(x == vValues.end()) {
+          x = vValues.begin() + fi * nStimuli;
+          cx = c;
+        } else {
+          And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
+          x = y;
+          cx = false;
+        }
+      });
+      if(x == vValues.end()) {
+        Fill(nStimuli, y);
+      } else if(x != y) {
+        Copy(nStimuli, y, x, cx);
+      }
+      return CountDiff(id);
+    }
+    default:
+      assert(0);
+    }
+    return -1;
+  }
+
+  /* }}} */
+  
   /* {{{ Sdc */
   
   template <typename Ntk>
