@@ -3,11 +3,37 @@
 
 #include "misc/rrrParameter.h"
 #include "network/rrrAndNetwork.h"
+#include "scheduler/rrrScheduler2.h"
+#include "optimizer/rrrOptimizer2.h"
+#include "analyzer/rrrBddAnalyzer.h"
+#include "analyzer/rrrBddMspfAnalyzer.h"
+#include "analyzer/rrrAnalyzer.h"
+#include "analyzer/sat/rrrSatSolver.h"
+#include "simulator/rrrSimulator.h"
+#include "partitioner/rrrPartitioner.h"
 #include "io/rrrAig.h"
-#include "rrr.h"
+
+namespace rrr {
+  
+  template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
+  void PerformInt(Ntk *pNtk, Parameter const *pPar) {
+    assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
+    if(pPar->fUseBddCspf) {
+      Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    } else if(pPar->fUseBddMspf) {
+      Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    } else {
+      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    }
+  }
+  
+}
 
 int main(int argc, char **argv) {
-  cxxopts::Options options("helo", "high-effort logic optimization");
+  cxxopts::Options options("ssra", "structure-space reachability analysis");
 
   options.set_width(100);
   
@@ -142,7 +168,7 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformSsra(&ntk, &Par);
+  rrr::PerformInt<rrr::AndNetwork, rrr::Scheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
 
   if(!output_filename.empty()) {
     rrr::DumpAig(output_filename, &ntk);

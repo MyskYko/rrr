@@ -1,10 +1,8 @@
 #pragma once
 
 #include "scheduler/rrrScheduler.h"
-#include "scheduler/rrrScheduler2.h"
 #include "scheduler/rrrScheduler3.h"
 #include "optimizer/rrrOptimizer.h"
-#include "optimizer/rrrOptimizer2.h"
 #include "optimizer/rrrOptimizer3.h"
 #include "analyzer/rrrApproxAnalyzer.h"
 #include "analyzer/rrrBddAnalyzer.h"
@@ -118,20 +116,6 @@ namespace rrr {
     }
   }
 
-  template <typename Ntk>
-  void PerformSsra(Ntk *pNtk, Parameter const *pPar) {
-    switch(pPar->nPartitionType) {
-    case 0:
-      PerformInt<Ntk, Scheduler2, Optimizer2, Partitioner>(pNtk, pPar);
-      break;
-    case 1:
-      PerformInt<Ntk, Scheduler2, Optimizer2, LevelBasePartitioner>(pNtk, pPar);
-      break;
-    default:
-      assert(0);
-    }
-  }
-  
   template <typename Ntk>
   void Perform3(Ntk *pNtk, Parameter const *pPar) {
     switch(pPar->nPartitionType) {

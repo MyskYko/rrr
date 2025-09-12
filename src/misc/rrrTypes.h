@@ -36,6 +36,7 @@ namespace rrr {
     ADD_FANIN,
     TRIVIAL_COLLAPSE,
     TRIVIAL_DECOMPOSE,
+    TRIVIAL_SHARE,
     SORT_FANINS,
     READ,
     SAVE,
