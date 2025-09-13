@@ -3,8 +3,63 @@
 
 #include "misc/rrrParameter.h"
 #include "network/rrrAndNetwork.h"
+#include "scheduler/rrrScheduler.h"
+#include "optimizer/rrrOptimizer3.h"
+#include "analyzer/rrrApproxAnalyzer.h"
+#include "simulator/rrrSimulator3.h"
+#include "partitioner/rrrPartitioner.h"
+#include "partitioner/rrrLevelBasePartitioner.h"
 #include "io/rrrAig.h"
-#include "rrr.h"
+
+namespace rrr {
+  
+  template <typename Ntk>
+  void PerformAls(Ntk *pNtk, Parameter const *pPar) {
+    Pattern *pPat = NULL;
+    if(!pPar->strPattern.empty()) {
+      pPat = new Pattern;
+      pPat->Read(pPar->strPattern, pNtk->GetNumPis());
+      if(!pPar->strPatternOutput.empty()) {
+        pPat->ReadOutput(pPar->strPatternOutput, pNtk->GetNumPos());
+      }
+      if(!pPar->strPatternOther.empty()) {
+        pPat->ReadOther(pPar->strPatternOther, pNtk->GetNumPos()); // assume the same number of outputs
+      }
+      if(!pPar->strPatternLabel.empty()) {
+        pPat->ReadLabel(pPar->strPatternLabel);
+      }
+      pNtk->RegisterPattern(pPat);
+    }
+    Ntk *pCond = NULL;
+    if(!pPar->strCond.empty()) {
+      pCond = new Ntk;
+      pCond->Read(pPar->strCond, rrr::AigFileReader<rrr::AndNetwork>);
+      pNtk->RegisterCond(pCond);
+    }
+    assert(!pPar->fUseBddCspf && !pPar->fUseBddMspf);
+    switch(pPar->nPartitionType) {
+    case 0: {
+      Scheduler<Ntk, Optimizer3<Ntk, ApproxAnalyzer<Ntk, Simulator3<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+      break;
+    }
+    case 1: {
+      Scheduler<Ntk, Optimizer3<Ntk, ApproxAnalyzer<Ntk, Simulator3<Ntk>>>, LevelBasePartitioner<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+      break;
+    }
+    default:
+      assert(0);
+    }
+    if(pPat) {
+      delete pPat;
+    }
+    if(pCond) {
+      delete pCond;
+    }
+  }
+
+}
 
 int main(int argc, char **argv) {
   cxxopts::Options options("als", "approximate logic synthesis");
@@ -24,6 +79,8 @@ int main(int argc, char **argv) {
   options.add_options("Approximation")
     ("F,pattern", "File of simulation patterns", cxxopts::value<std::string>())
     ("H,opattern", "File of output patterns", cxxopts::value<std::string>())
+    ("i,apattern", "File of output patterns of other modules", cxxopts::value<std::string>())
+    ("j,label", "File of output labels", cxxopts::value<std::string>())
     ("E,error", "Maximum erroneous simulation patterns", cxxopts::value<int>()->default_value("0"))
     ("f,relax", "Increase error threshold on removal", cxxopts::value<bool>()->default_value("false"))
     ;
@@ -104,6 +161,12 @@ int main(int argc, char **argv) {
   }
   if(result.count("opattern")) {
     Par.strPatternOutput = result["opattern"].as<std::string>();
+  }
+  if(result.count("apattern")) {
+    Par.strPatternOther = result["apattern"].as<std::string>();
+  }
+  if(result.count("label")) {
+    Par.strPatternLabel = result["label"].as<std::string>();
   }
   Par.nRelaxedPatterns = result["error"].as<int>();
   Par.fRelaxOnRemoval = result["relax"].as<bool>();

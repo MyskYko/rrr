@@ -47,6 +47,8 @@ namespace rrr {
     std::string strTemporary;
     std::string strPattern;
     std::string strPatternOutput;
+    std::string strPatternOther;
+    std::string strPatternLabel;
     std::string strCond;
     std::string strOutput;
   };

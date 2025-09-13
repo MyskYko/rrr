@@ -19,7 +19,7 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
-    static constexpr bool fRCA = true;
+    static constexpr bool fRCA = false; // turned off to experiment with loss
     static constexpr bool fPopCount = true;
     static constexpr bool fMinErrors = true;
     static constexpr bool fElementWise = true;
@@ -56,7 +56,8 @@ namespace rrr {
     std::vector<word> vGivenPoValues;
     std::vector<std::vector<int>> vGivenPoSums;
     std::vector<std::vector<std::vector<word>>> vGivenPoBinary;
-    std::vector<word> w;
+    std::vector<std::vector<int>> vOtherSums;
+    std::vector<word> w; // columnpopcount
     int nMinErrors;
 
     // marks
@@ -121,6 +122,9 @@ namespace rrr {
     bool ComputeDiff(int id);
     int CountDiff(int id);
     //void ComputeCarePart(int nWords_, int offset);
+
+    // loss computation
+    double ComputeLoss(int id);
 
     // preparation
     void Initialize();
@@ -882,6 +886,26 @@ namespace rrr {
       }
     } else {
       fUseGivenPoValues = false;
+    }
+    if(pPat->HasOther()) {
+      int nClasses = pNtk->GetNumPos() / nOutputsPerClass;
+      vOtherSums.resize(nClasses);
+      std::vector<bool> cs(nOutputsPerClass);
+      for(int j = 0; j < nClasses; j++) {
+        std::vector<citr> v(nOutputsPerClass);
+        for(int i = 0; i < nOutputsPerClass; i++) {
+          v[i] = pPat->GetIteratorOutput(j * nOutputsPerClass + i);
+        }
+        auto rs = ColumnPopCount(v, cs);
+        vOtherSums[j] = BinaryToInteger(rs);
+      }
+      for(int i = 0; i < 60000; i++) {
+        for(int j = 0; j < nClasses; j++) {
+          std::cout << vOtherSums[j][i] << ",";
+        }
+        std::cout << " (" << pPat->GetLabel(i) << ")";
+        std::cout << std::endl;
+      }
     }
     fGenerated = true;
   }
