@@ -166,7 +166,9 @@ namespace rrr {
     void AddFanin(int id, int fi, bool c);
     void TrivialCollapse(int id);
     void TrivialCollapse();
+    void TrivialDecompose(int id, int nFanins);
     void TrivialDecompose(int id);
+    void SortFanins(int id, std::vector<int> const &vIndices);
     template <typename Func>
     void SortFanins(int id, Func const &cost);
     std::pair<std::vector<int>, std::vector<bool>> Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs);
@@ -1492,6 +1494,30 @@ namespace rrr {
     }
   }
 
+  inline void AndNetwork::TrivialDecompose(int id, int nFanins) {
+    assert(GetNumFanins(id) > 2);
+    assert(nFanins > 1);
+    assert(GetNumFanins(id) > nFanins);
+    Action action;
+    action.type = TRIVIAL_DECOMPOSE;
+    action.id = id;
+    action.idx = GetNumFanins(id) - nFanins;
+    int new_fi = CreateNode();
+    action.fi = new_fi;
+    for(int i = 0; i < nFanins; i++) {
+      int fi_edge = vvFaninEdges[id].back();
+      vvFaninEdges[id].pop_back();
+      vvFaninEdges[new_fi].push_back(fi_edge);
+      action.vFanins.push_back(Edge2Node(fi_edge));
+    }
+    vvFaninEdges[id].push_back(Node2Edge(new_fi, false));
+    vRefs[new_fi]++;
+    itr it = std::find(lInts.begin(), lInts.end(), id);
+    lInts.insert(it, new_fi);
+    sInts.insert(new_fi);
+    TakenAction(action);
+  }
+
   inline void AndNetwork::TrivialDecompose(int id) {
     while(GetNumFanins(id) > 2) {
       Action action;
@@ -1515,6 +1541,20 @@ namespace rrr {
       sInts.insert(new_fi);
       TakenAction(action);
     }
+  }
+
+  inline void AndNetwork::SortFanins(int id, std::vector<int> const &vIndices) {
+    assert(vIndices.size() == vvFaninEdges[id].size());
+    std::vector<int> vFaninEdges = vvFaninEdges[id];
+    vvFaninEdges[id].clear();
+    for(int idx: vIndices) {
+      vvFaninEdges[id].push_back(vFaninEdges[idx]);
+    }
+    Action action;
+    action.type = SORT_FANINS;
+    action.id = id;
+    action.vIndices = vIndices;
+    TakenAction(action);
   }
 
   template <typename Func>
