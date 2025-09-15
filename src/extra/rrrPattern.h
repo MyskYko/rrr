@@ -30,6 +30,7 @@ namespace rrr {
     std::vector<word>::const_iterator GetIteratorOutput(int index) const;
     std::vector<word>::const_iterator GetIteratorOther(int index) const;
     int GetLabel(int index) const;
+    std::vector<int> GetLabels() const;
     int GetNumWords() const;
     word GetLastMask() const;
     int GetNumRemainder() const;
@@ -201,6 +202,10 @@ namespace rrr {
   
   inline int Pattern::GetLabel(int index) const {
     return label[index];
+  }
+
+  inline std::vector<int> Pattern::GetLabels() const {
+    return label;
   }
 
   inline int Pattern::GetNumWords() const {

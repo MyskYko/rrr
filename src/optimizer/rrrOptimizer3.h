@@ -16,6 +16,7 @@ namespace rrr {
   class Optimizer3 {
   private:
     static constexpr int nSamples = 1000;
+    static constexpr bool fLoss = true;
     
     // aliases
     using itr = std::vector<int>::iterator;
@@ -52,6 +53,7 @@ namespace rrr {
     std::map<int, std::set<int>> mapNewFanins;
     time_point start;
     int nDelta;
+    float current_loss;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -220,7 +222,11 @@ namespace rrr {
       std::stringstream ss = GetActionDescription(action);
       std::string str;
       std::getline(ss, str);
-      Print(4, str, ",", "threshold", "=", ana.GetNumRelaxed());
+      if(fLoss) {
+        Print(4, str, ",", "loss", "=", current_loss);
+      } else {
+        Print(4, str, ",", "threshold", "=", ana.GetNumRelaxed());
+      }
       while(std::getline(ss, str)) {
         Print(5, str);
       }
@@ -575,6 +581,20 @@ namespace rrr {
         }
       }
       // reduce
+      if(fLoss) {
+        float loss = ana.AssessRedundancyLoss(id, idx);
+        if(loss < current_loss) {
+          int fi = pNtk->GetFanin(id, idx);
+          pNtk->RemoveFanin(id, idx);
+          current_loss = loss;
+          fReduced = true;
+          idx--;
+          if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
+            pNtk->RemoveUnused(fi, true);
+          }
+        }
+        continue;
+      }
       if(ana.CheckRedundancy(id, idx)) {
         int fi = pNtk->GetFanin(id, idx);
         pNtk->RemoveFanin(id, idx);
@@ -680,6 +700,12 @@ namespace rrr {
       fReduced |= fReduced_;
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
+      }
+      if(fReduced_ && fLoss) {
+        if(!strTemporary.empty()) {
+          std::string str = strTemporary + std::to_string(current_loss) + ".aig";
+          DumpAig(str, pNtk);
+        }
       }
       if(fReduced_ && fRelaxOnRemoval) {
         int nRelaxed = ana.GetNumRelaxed();
@@ -1475,6 +1501,9 @@ namespace rrr {
     target = -1;
     pNtk->AddCallback(std::bind(&Optimizer3<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     ana.AssignNetwork(pNtk, fReuse);
+    if(fLoss) {
+      current_loss = ana.GetOriginalLoss();
+    }
   }
   
   template <typename Ntk, typename Ana>
@@ -1680,6 +1709,14 @@ namespace rrr {
           int nErrors = ana.AssessRedundancy(id, i);
           // vvErrors[id].push_back(nErrors);
           std::cout << id << "(" << i << ") : " << nErrors << std::endl;
+        }
+      });
+      break;
+    case 9:
+      pNtk->ForEachInt([&](int id) {
+        for(int i = 0; i < pNtk->GetNumFanins(id); i++) {
+          float loss = ana.AssessRedundancyLoss(id, i);
+          std::cout << id << "(" << i << ") : " << loss << std::endl;
         }
       });
       break;

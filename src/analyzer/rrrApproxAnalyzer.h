@@ -27,6 +27,7 @@ namespace rrr {
     void SetNumRelaxed(int nRelaxed);
     int GetNumMinErrors() const;
     void ResetNumMinErrors();
+    float GetOriginalLoss() const;
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -34,6 +35,7 @@ namespace rrr {
 
     // assessment
     int AssessRedundancy(int id, int idx);
+    float AssessRedundancyLoss(int id, int idx);
 
     // summary
     void ResetSummary();
@@ -80,6 +82,11 @@ namespace rrr {
     sim.ResetNumMinErrors();
   }
 
+  template <typename Ntk, typename Sim>
+  float ApproxAnalyzer<Ntk, Sim>::GetOriginalLoss() const {
+    return sim.GetOriginalLoss();
+  }
+  
   /* }}} */
   
   /* {{{ Checks */
@@ -120,7 +127,12 @@ namespace rrr {
   int ApproxAnalyzer<Ntk, Sim>::AssessRedundancy(int id, int idx) {
     return sim.AssessRedundancy(id, idx);
   }
-  
+
+  template <typename Ntk, typename Sim>
+  float ApproxAnalyzer<Ntk, Sim>::AssessRedundancyLoss(int id, int idx) {
+    return sim.AssessRedundancyLoss(id, idx);
+  }
+
   /* }}} */
 
   /* {{{ Summary */

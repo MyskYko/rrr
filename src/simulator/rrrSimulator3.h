@@ -4,6 +4,8 @@
 #include <random>
 #include <bitset>
 
+#include <torch/torch.h>
+
 #include "misc/rrrParameter.h"
 #include "misc/rrrUtils.h"
 #include "extra/rrrPattern.h"
@@ -57,8 +59,10 @@ namespace rrr {
     std::vector<std::vector<int>> vGivenPoSums;
     std::vector<std::vector<std::vector<word>>> vGivenPoBinary;
     std::vector<std::vector<int>> vOtherSums;
+    torch::Tensor tLabels;
     std::vector<word> w; // columnpopcount
     int nMinErrors;
+    float original_loss;
 
     // marks
     unsigned iTrav;
@@ -124,7 +128,7 @@ namespace rrr {
     //void ComputeCarePart(int nWords_, int offset);
 
     // loss computation
-    double ComputeLoss(int id);
+    float ComputeLoss(int id);
 
     // preparation
     void Initialize();
@@ -140,6 +144,7 @@ namespace rrr {
     void SetNumRelaxed(int nRelax);
     int GetNumMinErrors() const;
     void ResetNumMinErrors();
+    float GetOriginalLoss() const;
     
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -147,6 +152,7 @@ namespace rrr {
 
     // assessment
     int AssessRedundancy(int id, int idx);
+    float AssessRedundancyLoss(int id, int idx);
 
     // sdc
     std::vector<word> ComputeSdc(std::vector<int> const &ids);
@@ -907,6 +913,22 @@ namespace rrr {
         std::cout << std::endl;
       }
     }
+    if(pPat->HasLabel()) {
+      tLabels = torch::tensor(pPat->GetLabels(), torch::dtype(torch::kLong));
+      assert(vOtherSums.size() == vGivenPoSums.size());
+      int nClasses = int_size(vGivenPoSums);
+      int nPatterns = int_size(vGivenPoSums[0]) - nRemainder;
+      torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat32);
+      float* __restrict dst = logits.data_ptr<float>();
+      for(int i = 0; i < nPatterns; i++) {
+        float* row = dst + i * nClasses;
+        for(int cls = 0; cls < nClasses; cls++) {
+          row[cls] = static_cast<float>(vGivenPoSums[cls][i] + vOtherSums[cls][i]);
+        }
+      }
+      torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
+      original_loss = loss.item<float>();
+    }
     fGenerated = true;
   }
 
@@ -1303,6 +1325,101 @@ namespace rrr {
 
   /* }}} */
 
+  /* {{{ Loss computation */
+
+  template <typename Ntk>
+  float Simulator3<Ntk>::ComputeLoss(int id) {
+    // vValues2[id] should have been set
+    int target = id;
+    time_point timeStart = GetCurrentTime();
+    if(nVerbose) {
+      std::cout << "computing loss for " << target << std::endl;
+    }
+    StartTraversal();
+    //Copy(nStimuli, vValues2.begin() + target * nStimuli, vValues.begin() + target * nStimuli, true);
+    vTrav[target] = iTrav;
+    pNtk->ForEachTfo(target, false, [&](int id) {
+      // alternative of SimulateNode(vValues2, id);
+      itr x = vValues2.end();
+      itr y = vValues2.begin() + id * nStimuli;
+      bool cx = false;
+      switch(pNtk->GetNodeType(id)) {
+      case AND:
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(x == vValues2.end()) {
+            if(vTrav[fi] != iTrav) {
+              x = vValues.begin() + fi * nStimuli;
+            } else {
+              x = vValues2.begin() + fi * nStimuli;
+            }
+            cx = c;
+          } else {
+            if(vTrav[fi] != iTrav) {
+              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
+            } else {
+              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c);
+            }
+            x = y;
+            cx = false;
+          }
+        });
+        if(x == vValues2.end()) {
+          Fill(nStimuli, y);
+        } else if(x != y) {
+          Copy(nStimuli, y, x, cx);
+        }
+        break;
+      default:
+        assert(0);
+      }
+      vTrav[id] = iTrav;
+      if(nVerbose) {
+        std::cout << "node " << std::setw(3) << id << ": ";
+        Print(nStimuli, vValues2.begin() + id * nStimuli);
+        std::cout << std::endl;
+      }
+    });
+    assert(fPopCount);
+    assert(fUseGivenPoValues);
+    std::vector<std::vector<int>> vSums;
+    {
+      std::vector<citr> v(nOutputsPerClass);
+      std::vector<bool> cs(nOutputsPerClass);
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        if(vTrav[fi] == iTrav) {
+          v[index] = vValues2.cbegin() + fi * nStimuli;
+        } else {
+          v[index] = vValues.cbegin() + fi * nStimuli;
+        }
+        cs[index] = c;
+        index++;
+        if(index == nOutputsPerClass) {
+          assert(!fRCA);
+          auto rs = ColumnPopCount(v, cs);
+          vSums.push_back(BinaryToInteger(rs));
+          index = 0;
+        }
+      });
+    }
+    assert(vOtherSums.size() == vSums.size());
+    int nClasses = int_size(vSums);
+    int nPatterns = int_size(vSums[0]) - nRemainder;
+    torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat32);
+    float* __restrict dst = logits.data_ptr<float>();
+    for(int i = 0; i < nPatterns; i++) {
+      float* row = dst + i * nClasses;
+      for(int cls = 0; cls < nClasses; cls++) {
+        row[cls] = static_cast<float>(vSums[cls][i] + vOtherSums[cls][i]);
+      }
+    }
+    torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
+    durationDiff += Duration(timeStart, GetCurrentTime());
+    return loss.item<float>();
+  }
+
+  /* }}} */
+
   /* {{{ Preparation */
 
   template <typename Ntk>
@@ -1348,6 +1465,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nMinErrors(std::numeric_limits<int>::max()),
+    original_loss(0),
     iTrav(0),
     iPivot(0),
     fUpdate(false) {
@@ -1368,6 +1486,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nMinErrors(std::numeric_limits<int>::max()),
+    original_loss(0),
     iTrav(0),
     iPivot(0),
     fUpdate(false) {
@@ -1421,6 +1540,11 @@ namespace rrr {
   template <typename Ntk>
   void Simulator3<Ntk>::ResetNumMinErrors() {
     nMinErrors = std::numeric_limits<int>::max();
+  }
+
+  template <typename Ntk>
+  float Simulator3<Ntk>::GetOriginalLoss() const {
+    return original_loss;
   }
 
   /* }}} */
@@ -1598,6 +1722,47 @@ namespace rrr {
         Copy(nStimuli, y, x, cx);
       }
       return CountDiff(id);
+    }
+    default:
+      assert(0);
+    }
+    return -1;
+  }
+
+  template <typename Ntk>
+  float Simulator3<Ntk>::AssessRedundancyLoss(int id, int idx) {
+    if(!fInitialized) {
+      Initialize();
+    }
+    if(!sUpdates.empty()) {
+      Resimulate();
+      sUpdates.clear();
+    }
+    vValues2.resize(nStimuli * pNtk->GetNumNodes());
+    switch(pNtk->GetNodeType(id)) {
+    case AND: {
+      itr x = vValues.end();
+      itr y = vValues2.begin() + id * nStimuli;
+      bool cx = false;
+      pNtk->ForEachFaninIdx(id, [&](int idx2, int fi, bool c) {
+        if(idx == idx2) {
+          return;
+        }
+        if(x == vValues.end()) {
+          x = vValues.begin() + fi * nStimuli;
+          cx = c;
+        } else {
+          And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
+          x = y;
+          cx = false;
+        }
+      });
+      if(x == vValues.end()) {
+        Fill(nStimuli, y);
+      } else if(x != y) {
+        Copy(nStimuli, y, x, cx);
+      }
+      return ComputeLoss(id);
     }
     default:
       assert(0);
