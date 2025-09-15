@@ -5,6 +5,8 @@
 #include "misc/rrrParameter.h"
 #include "misc/rrrUtils.h"
 
+ABC_NAMESPACE_USING_NAMESPACE
+
 namespace rrr {
 
   template <typename Ntk>

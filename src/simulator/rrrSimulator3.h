@@ -900,17 +900,10 @@ namespace rrr {
       for(int j = 0; j < nClasses; j++) {
         std::vector<citr> v(nOutputsPerClass);
         for(int i = 0; i < nOutputsPerClass; i++) {
-          v[i] = pPat->GetIteratorOutput(j * nOutputsPerClass + i);
+          v[i] = pPat->GetIteratorOther(j * nOutputsPerClass + i);
         }
         auto rs = ColumnPopCount(v, cs);
         vOtherSums[j] = BinaryToInteger(rs);
-      }
-      for(int i = 0; i < 60000; i++) {
-        for(int j = 0; j < nClasses; j++) {
-          std::cout << vOtherSums[j][i] << ",";
-        }
-        std::cout << " (" << pPat->GetLabel(i) << ")";
-        std::cout << std::endl;
       }
     }
     if(pPat->HasLabel()) {
@@ -924,10 +917,18 @@ namespace rrr {
         float* row = dst + i * nClasses;
         for(int cls = 0; cls < nClasses; cls++) {
           row[cls] = static_cast<float>(vGivenPoSums[cls][i] + vOtherSums[cls][i]);
+          std::cout << vGivenPoSums[cls][i] << " + " << vOtherSums[cls][i] << " (";
+          std::cout << row[cls] << "), ";
         }
+        std::cout << " (" << pPat->GetLabel(i) << ")";
+        std::cout << std::endl;
       }
       torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
       original_loss = loss.item<float>();
+      auto preds = logits.argmax(1);
+      auto correct = preds.eq(tLabels).sum().item<int64_t>();
+      double accuracy = static_cast<double>(correct) / tLabels.size(0);
+      std::cout << "accuracy: " << accuracy << std::endl;
     }
     fGenerated = true;
   }
