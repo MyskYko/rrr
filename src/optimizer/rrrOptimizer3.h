@@ -53,7 +53,7 @@ namespace rrr {
     std::map<int, std::set<int>> mapNewFanins;
     time_point start;
     int nDelta;
-    float current_loss;
+    double current_loss;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -582,7 +582,7 @@ namespace rrr {
       }
       // reduce
       if(fLoss) {
-        float loss = ana.AssessRedundancyLoss(id, idx);
+        double loss = ana.AssessRedundancyLoss(id, idx);
         if(loss < current_loss) {
           int fi = pNtk->GetFanin(id, idx);
           pNtk->RemoveFanin(id, idx);
@@ -1715,7 +1715,7 @@ namespace rrr {
     case 9:
       pNtk->ForEachInt([&](int id) {
         for(int i = 0; i < pNtk->GetNumFanins(id); i++) {
-          float loss = ana.AssessRedundancyLoss(id, i);
+          double loss = ana.AssessRedundancyLoss(id, i);
           std::cout << id << "(" << i << ") : " << loss << std::endl;
         }
       });

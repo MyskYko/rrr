@@ -20,6 +20,7 @@ namespace rrr {
     using itr = std::vector<word>::iterator;
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
+    static constexpr double temperature = 6.498019;
     static constexpr bool fKeepStimuli = true;
     static constexpr bool fRCA = false; // turned off to experiment with loss
     static constexpr bool fPopCount = true;
@@ -62,7 +63,7 @@ namespace rrr {
     torch::Tensor tLabels;
     std::vector<word> w; // columnpopcount
     int nMinErrors;
-    float original_loss;
+    double original_loss;
 
     // marks
     unsigned iTrav;
@@ -128,7 +129,7 @@ namespace rrr {
     //void ComputeCarePart(int nWords_, int offset);
 
     // loss computation
-    float ComputeLoss(int id);
+    double ComputeLoss(int id);
 
     // preparation
     void Initialize();
@@ -144,7 +145,7 @@ namespace rrr {
     void SetNumRelaxed(int nRelax);
     int GetNumMinErrors() const;
     void ResetNumMinErrors();
-    float GetOriginalLoss() const;
+    double GetOriginalLoss() const;
     
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -152,7 +153,7 @@ namespace rrr {
 
     // assessment
     int AssessRedundancy(int id, int idx);
-    float AssessRedundancyLoss(int id, int idx);
+    double AssessRedundancyLoss(int id, int idx);
 
     // sdc
     std::vector<word> ComputeSdc(std::vector<int> const &ids);
@@ -906,17 +907,18 @@ namespace rrr {
         vOtherSums[j] = BinaryToInteger(rs);
       }
     }
+
     if(pPat->HasLabel()) {
       tLabels = torch::tensor(pPat->GetLabels(), torch::dtype(torch::kLong));
       assert(vOtherSums.size() == vGivenPoSums.size());
       int nClasses = int_size(vGivenPoSums);
       int nPatterns = int_size(vGivenPoSums[0]) - nRemainder;
-      torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat32);
-      float* __restrict dst = logits.data_ptr<float>();
+      torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat64);
+      double* __restrict dst = logits.data_ptr<double>(); // 64bit?
       for(int i = 0; i < nPatterns; i++) {
-        float* row = dst + i * nClasses;
+        double* row = dst + i * nClasses;
         for(int cls = 0; cls < nClasses; cls++) {
-          row[cls] = static_cast<float>(vGivenPoSums[cls][i] + vOtherSums[cls][i]);
+          row[cls] = static_cast<double>(vGivenPoSums[cls][i] + vOtherSums[cls][i]) / temperature;
           std::cout << vGivenPoSums[cls][i] << " + " << vOtherSums[cls][i] << " (";
           std::cout << row[cls] << "), ";
         }
@@ -924,7 +926,7 @@ namespace rrr {
         std::cout << std::endl;
       }
       torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
-      original_loss = loss.item<float>();
+      original_loss = loss.item<double>();
       auto preds = logits.argmax(1);
       auto correct = preds.eq(tLabels).sum().item<int64_t>();
       double accuracy = static_cast<double>(correct) / tLabels.size(0);
@@ -1329,7 +1331,7 @@ namespace rrr {
   /* {{{ Loss computation */
 
   template <typename Ntk>
-  float Simulator3<Ntk>::ComputeLoss(int id) {
+  double Simulator3<Ntk>::ComputeLoss(int id) {
     // vValues2[id] should have been set
     int target = id;
     time_point timeStart = GetCurrentTime();
@@ -1406,17 +1408,17 @@ namespace rrr {
     assert(vOtherSums.size() == vSums.size());
     int nClasses = int_size(vSums);
     int nPatterns = int_size(vSums[0]) - nRemainder;
-    torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat32);
-    float* __restrict dst = logits.data_ptr<float>();
+    torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat64);
+    double* __restrict dst = logits.data_ptr<double>();
     for(int i = 0; i < nPatterns; i++) {
-      float* row = dst + i * nClasses;
+      double* row = dst + i * nClasses;
       for(int cls = 0; cls < nClasses; cls++) {
-        row[cls] = static_cast<float>(vSums[cls][i] + vOtherSums[cls][i]);
+        row[cls] = static_cast<double>(vSums[cls][i] + vOtherSums[cls][i]) / temperature;
       }
     }
     torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
     durationDiff += Duration(timeStart, GetCurrentTime());
-    return loss.item<float>();
+    return loss.item<double>();
   }
 
   /* }}} */
@@ -1544,7 +1546,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  float Simulator3<Ntk>::GetOriginalLoss() const {
+  double Simulator3<Ntk>::GetOriginalLoss() const {
     return original_loss;
   }
 
@@ -1731,7 +1733,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  float Simulator3<Ntk>::AssessRedundancyLoss(int id, int idx) {
+  double Simulator3<Ntk>::AssessRedundancyLoss(int id, int idx) {
     if(!fInitialized) {
       Initialize();
     }
