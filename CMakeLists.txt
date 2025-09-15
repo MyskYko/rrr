@@ -4,6 +4,8 @@ project(rrr LANGUAGES C CXX)
 set(ABC_SKIP_TESTS true)
 add_compile_options(-O3)
 
+find_package(Torch REQUIRED)
+
 add_subdirectory(lib)
 
 option(USE_MOCKTURTLE "Enable mockturtle" ON)  
@@ -41,5 +43,4 @@ foreach(filename ${FILENAMES})
   endif()
 endforeach()
 
-
-
+target_link_libraries(als "${TORCH_LIBRARIES}")
