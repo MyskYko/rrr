@@ -30,6 +30,7 @@ namespace rrr {
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
     std::vector<bool> vVisits;
+    std::vector<bool> vWasReconvergent;
     
     // backups
     std::vector<BddMspfAnalyzer> vBackups;
@@ -294,6 +295,7 @@ namespace rrr {
         vGUpdates[action.fi] = false;
         vCUpdates[action.fi] = false;
         vVisits[action.fi] = false;
+        vWasReconvergent[action.fi] = false;
       }
       break;
     case SORT_FANINS:
@@ -336,6 +338,7 @@ namespace rrr {
     vGUpdates.resize(nNodes);
     vCUpdates.resize(nNodes);
     vVisits.resize(nNodes);
+    vWasReconvergent.resize(nNodes);
   }
 
   /* }}} */
@@ -509,7 +512,7 @@ namespace rrr {
 
   template <typename pNtk>
   void BddMspfAnalyzer<pNtk>::MspfNode(int id) {
-    if(vGUpdates[id]) {
+    if(vGUpdates[id] || !vVisits[id]) {
       if(pNtk->IsReconvergent(id)) {
         if(nVerbose) {
           std::cout << "computing reconvergent node " << id << " G " << std::endl;
@@ -517,22 +520,17 @@ namespace rrr {
         if(ComputeReconvergentG(id)) {
           vCUpdates[id] = true;
         }
-      } else {
+        vWasReconvergent[id] = true;
+      } else if(vGUpdates[id] || vWasReconvergent[id]) {
         if(nVerbose) {
           std::cout << "computing node " << id << " G " << std::endl;
         }
         if(ComputeG(id)) {
           vCUpdates[id] = true;
         }
+        vWasReconvergent[id] = false;
       }
       vGUpdates[id] = false;
-    } else if(!vVisits[id] && pNtk->IsReconvergent(id)) {
-      if(nVerbose) {
-        std::cout << "computing unvisited reconvergent node " << id << " G " << std::endl;
-      }
-      if(ComputeReconvergentG(id)) {
-        vCUpdates[id] = true;
-      }
     }
     if(vCUpdates[id]) {
       if(nVerbose) {
@@ -585,6 +583,7 @@ namespace rrr {
     vGUpdates.clear();
     vCUpdates.clear();
     vVisits.clear();
+    vWasReconvergent.clear();
     if(!fReuse) {
       nNodesOld = 0;
       if(pBdd) {
@@ -655,6 +654,7 @@ namespace rrr {
     vBackups[slot].vGUpdates = vGUpdates;
     vBackups[slot].vCUpdates = vCUpdates;
     vBackups[slot].vVisits = vVisits;
+    vBackups[slot].vWasReconvergent = vWasReconvergent;
   }
 
   template <typename Ntk>
@@ -668,6 +668,7 @@ namespace rrr {
     vGUpdates = vBackups[slot].vGUpdates;
     vCUpdates = vBackups[slot].vCUpdates;
     vVisits = vBackups[slot].vVisits;
+    vWasReconvergent = vBackups[slot].vWasReconvergent;
   }
 
   template <typename Ntk>
