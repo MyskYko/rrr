@@ -37,6 +37,7 @@ namespace rrr {
     int nAddedId;
     int nAddedFi;
     std::vector<int> vCands;
+    std::vector<int> vTargets;
 
     // marks
     unsigned iTrav;
@@ -131,6 +132,7 @@ namespace rrr {
     nAddedId = -1;
     nAddedFi = -1;
     vCands = pNtk->GetPisInts();
+    vTargets = pNtk->GetInts();
   }
   
   template <typename Ntk, typename Ana>
@@ -226,17 +228,17 @@ namespace rrr {
         assert(fAdd);
         bool fAdded = false;
         int counter = 0;
-        pNtk->ForEachIntStop([&](int id) {
+        for(int fi: vCands) {
           StartTraversal(pNtk->GetNumNodes());
-          pNtk->ForEachTfo(id, false, [&](int fo) {
+          pNtk->ForEachTfi(fi, false, [&](int fi_) {
+            vTrav[fi_] = iTrav;
+          });
+          vTrav[fi] = iTrav;
+          pNtk->ForEachFanout(fi, false, [&](int fo) {
             vTrav[fo] = iTrav;
           });
-          vTrav[id] = iTrav;
-          pNtk->ForEachFanin(id, [&](int fi) {
-            vTrav[fi] = iTrav;
-          });
-          for(int fi: vCands) {
-            if(vTrav[fi] == iTrav) {
+          for(int id: vTargets) {
+            if(vTrav[id] == iTrav) {
               continue;
             }
             bool fAdding = false;
@@ -273,11 +275,13 @@ namespace rrr {
               vvActions.push_back(vActions);
               vRedChoices.push_back(0);
               fAdded = true;
-              return true;
+              break;
             }
           }
-          return false;
-        });
+          if(fAdded) {
+            break;
+          }
+        }
         if(!fAdded) {
           vvActions.pop_back();
           pNtk->PopBack();
