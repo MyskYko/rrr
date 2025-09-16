@@ -197,6 +197,7 @@ namespace rrr {
             vGUpdates[fi] = true;
           }
         }
+        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -213,6 +214,7 @@ namespace rrr {
         if(vGUpdates[action.id] || vCUpdates[action.id]) {
           vGUpdates[action.fi] = true;
         }
+        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -230,6 +232,9 @@ namespace rrr {
           vGUpdates[fi] = true;
         }
       }
+      Assign(vFs[action.id], LitMax);
+      Assign(vGs[action.id], LitMax);
+      DelVec(vvCs[action.id]);
       break;
     case ADD_FANIN:
       assert(fInitialized);
@@ -288,6 +293,7 @@ namespace rrr {
         vUpdates[action.fi] = false;
         vGUpdates[action.fi] = false;
         vCUpdates[action.fi] = false;
+        vVisits[action.fi] = false;
       }
       break;
     case SORT_FANINS:
