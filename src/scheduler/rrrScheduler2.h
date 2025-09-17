@@ -228,6 +228,9 @@ namespace rrr {
     //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
     ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
     opt.AssignNetwork(&ntk, pJob->fAdd);
+    opt.SetPrintLine([&](std::string str) {
+      Print(-1, pJob->prefix, str);
+    });
     int nChoices = 0, nNews = 0;
     while(true) {
       auto vActions = opt.Run();

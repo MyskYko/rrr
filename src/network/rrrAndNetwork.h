@@ -125,6 +125,7 @@ namespace rrr {
     void ForEachIntReverse(std::function<void(int)> const &func) const;
     void ForEachIntStop(std::function<bool(int)> const &func) const;
     void ForEachPiInt(std::function<void(int)> const &func) const;
+    void ForEachPiIntStop(std::function<bool(int)> const &func) const;
     void ForEachPo(std::function<void(int)> const &func) const;
     template <typename Func>
     void ForEachPoDriver(Func const &func) const;
@@ -166,7 +167,7 @@ namespace rrr {
     void AddFanin(int id, int fi, bool c);
     void TrivialCollapse(int id);
     void TrivialCollapse();
-    void TrivialDecompose(int id, int nFanins);
+    int  TrivialDecompose(int id, int nFanins);
     void TrivialDecompose(int id);
     void SortFanins(int id, std::vector<int> const &vIndices);
     template <typename Func>
@@ -838,6 +839,19 @@ namespace rrr {
     }
   }
   
+  inline void AndNetwork::ForEachPiIntStop(std::function<bool(int)> const &func) const {
+    for(int pi: vPis) {
+      if(func(pi)) {
+        return;
+      }
+    }
+    for(int id: lInts) {
+      if(func(id)) {
+        return;
+      }
+    }
+  }
+  
   inline void AndNetwork::ForEachPo(std::function<void(int)> const &func) const {
     for(int po: vPos) {
       func(po);
@@ -1494,7 +1508,7 @@ namespace rrr {
     }
   }
 
-  inline void AndNetwork::TrivialDecompose(int id, int nFanins) {
+  inline int AndNetwork::TrivialDecompose(int id, int nFanins) {
     assert(GetNumFanins(id) > 2);
     assert(nFanins > 1);
     assert(GetNumFanins(id) > nFanins);
@@ -1516,6 +1530,7 @@ namespace rrr {
     lInts.insert(it, new_fi);
     sInts.insert(new_fi);
     TakenAction(action);
+    return new_fi;
   }
 
   inline void AndNetwork::TrivialDecompose(int id) {
@@ -1549,6 +1564,9 @@ namespace rrr {
     vvFaninEdges[id].clear();
     for(int idx: vIndices) {
       vvFaninEdges[id].push_back(vFaninEdges[idx]);
+    }
+    if(vFaninEdges == vvFaninEdges[id]) {
+      return;
     }
     Action action;
     action.type = SORT_FANINS;
