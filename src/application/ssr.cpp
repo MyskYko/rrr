@@ -4,6 +4,7 @@
 #include "misc/rrrParameter.h"
 #include "network/rrrAndNetwork.h"
 #include "scheduler/rrrSsrScheduler.h"
+#include "scheduler/rrrSsrScheduler2.h"
 #include "optimizer/rrrOptimizer2.h"
 #include "analyzer/rrrBddAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
@@ -168,7 +169,7 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformInt<rrr::AndNetwork, rrr::Scheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
+  rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
 
   if(!output_filename.empty()) {
     rrr::DumpAig(output_filename, &ntk);

@@ -19,7 +19,7 @@
 namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
-  class SsrScheduler {
+  class SsrScheduler2 {
   private:
     // job
     struct Job;
@@ -83,8 +83,8 @@ namespace rrr {
 
   public:
     // constructors
-    SsrScheduler(Ntk *pNtk, Parameter const *pPar);
-    ~SsrScheduler();
+    SsrScheduler2(Ntk *pNtk, Parameter const *pPar);
+    ~SsrScheduler2();
     
     // run
     void Run();
@@ -93,7 +93,7 @@ namespace rrr {
   /* {{{ Job */
   
   template <typename Ntk, typename Opt, typename Par>
-  struct SsrScheduler<Ntk, Opt, Par>::Job {
+  struct SsrScheduler2<Ntk, Opt, Par>::Job {
     // data
     int id;
     int src;
@@ -117,7 +117,7 @@ namespace rrr {
   
   template <typename Ntk, typename Opt, typename Par>
   template<typename... Args>
-  inline void SsrScheduler<Ntk, Opt, Par>::Print(int nVerboseLevel, std::string prefix, Args... args) {
+  inline void SsrScheduler2<Ntk, Opt, Par>::Print(int nVerboseLevel, std::string prefix, Args... args) {
     if(nVerbose <= nVerboseLevel) {
       return;
     }
@@ -142,7 +142,7 @@ namespace rrr {
   /* {{{ Table */
 
   template <typename Ntk, typename Opt, typename Par>
-  bool SsrScheduler<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
+  bool SsrScheduler2<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
     std::string str, str_sym;
     {
       Ntk ntk;
@@ -223,7 +223,7 @@ namespace rrr {
   /* {{{ Run jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  void SsrScheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
+  void SsrScheduler2<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     Ntk ntk;
     //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
     ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
@@ -277,7 +277,7 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename SsrScheduler<Ntk, Opt, Par>::Job *SsrScheduler<Ntk, Opt, Par>::CreateJob(int src, bool fAdd) {
+  typename SsrScheduler2<Ntk, Opt, Par>::Job *SsrScheduler2<Ntk, Opt, Par>::CreateJob(int src, bool fAdd) {
     Job *pJob = new Job(nCreatedJobs++, src, fAdd);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
@@ -294,7 +294,7 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Opt, typename Par>
-  void SsrScheduler<Ntk, Opt, Par>::Wait() {
+  void SsrScheduler2<Ntk, Opt, Par>::Wait() {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       while(true) {
@@ -335,7 +335,7 @@ namespace rrr {
 
 #ifdef ABC_USE_PTHREADS
   template <typename Ntk, typename Opt, typename Par>
-  void SsrScheduler<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
+  void SsrScheduler2<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
     Opt opt(pPar);
     while(true) {
       Job *pJob = NULL;
@@ -362,7 +362,7 @@ namespace rrr {
   /* {{{ Constructors */
 
   template <typename Ntk, typename Opt, typename Par>
-  SsrScheduler<Ntk, Opt, Par>::SsrScheduler(Ntk *pNtk, Parameter const *pPar) :
+  SsrScheduler2<Ntk, Opt, Par>::SsrScheduler2(Ntk *pNtk, Parameter const *pPar) :
     pOriginal(pNtk),
     nVerbose(pPar->nSchedulerVerbose),
     iSeed(pPar->iSeed),
@@ -391,14 +391,14 @@ namespace rrr {
     if(fMultiThreading) {
       vThreads.reserve(pPar->nThreads);
       for(int i = 0; i < pPar->nThreads; i++) {
-        vThreads.emplace_back(std::bind(&SsrScheduler::Thread, this, pPar));
+        vThreads.emplace_back(std::bind(&SsrScheduler2::Thread, this, pPar));
       }
     }
 #endif
   }
 
   template <typename Ntk, typename Opt, typename Par>
-  SsrScheduler<Ntk, Opt, Par>::~SsrScheduler() {
+  SsrScheduler2<Ntk, Opt, Par>::~SsrScheduler2() {
     delete pOpt;
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
@@ -419,7 +419,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Opt, typename Par>
-  void SsrScheduler<Ntk, Opt, Par>::Run() {
+  void SsrScheduler2<Ntk, Opt, Par>::Run() {
     pOriginal->Sweep(true);
     pOriginal->TrivialCollapse();
     bool fRedundant = pOpt->IsRedundant(pOriginal);
