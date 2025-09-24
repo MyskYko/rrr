@@ -245,7 +245,7 @@ namespace rrr {
         CreateJob(index, true);
         nNews++;
       } else {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
       /*
       for(auto action: vActions) {

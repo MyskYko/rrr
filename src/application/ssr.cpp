@@ -3,7 +3,7 @@
 
 #include "misc/rrrParameter.h"
 #include "network/rrrAndNetwork.h"
-#include "scheduler/rrrScheduler2.h"
+#include "scheduler/rrrSsrScheduler.h"
 #include "optimizer/rrrOptimizer2.h"
 #include "analyzer/rrrBddAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
@@ -33,7 +33,7 @@ namespace rrr {
 }
 
 int main(int argc, char **argv) {
-  cxxopts::Options options("ssra", "structure-space reachability analysis");
+  cxxopts::Options options("ssr", "structure-space reachability analysis");
 
   options.set_width(100);
   
