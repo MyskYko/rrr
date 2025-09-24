@@ -44,10 +44,6 @@ namespace rrr {
     
     // data
     Table<std::vector<int>> tab;
-    int nUniques;
-    std::map<std::string, int> table;
-    std::vector<std::string> strs;
-    std::vector<std::vector<std::pair<int, std::vector<int>>>> history;
     int nCreatedJobs;
     int nFinishedJobs;
     std::queue<Job *> qPendingJobs;
@@ -174,54 +170,10 @@ namespace rrr {
       {
         std::unique_lock<std::mutex> l(mutexTable);
         return tab.Register(str, his, index, str_sym);
-        /*
-        if(table.count(str)) {
-          index = table[str];
-          history[index].emplace_back(src, vCommands);
-          return false;
-        }
-        if(fTwoArgSym && str != str_sym) {
-          if(table.count(str_sym)) {
-            index = table[str_sym];
-            history[index].emplace_back(src, vCommands);
-            return false;
-          }
-        }
-        index = nUniques++;
-        table[str] = index;
-        strs.push_back(str);
-        if(int_size(history) < nUniques) {
-          history.resize(nUniques);
-        }
-        history[index].emplace_back(src, vCommands);
-        return true;
-        */
       }
     }
 #endif
     return tab.Register(str, his, index, str_sym);
-    /*
-    if(table.count(str)) {
-      index = table[str];
-      history[index].emplace_back(src, vCommands);
-      return false;
-    }
-    if(fTwoArgSym) {
-      if(table.count(str_sym)) {
-        index = table[str_sym];
-        history[index].emplace_back(src, vCommands);
-        return false;
-      }
-    }
-    index = nUniques++;
-    table[str] = index;
-    strs.push_back(str);
-    if(int_size(history) < nUniques) {
-      history.resize(nUniques);
-    }
-    history[index].emplace_back(src, vCommands);
-    return true;
-    */
   }
   
   /* }}} */
@@ -252,7 +204,7 @@ namespace rrr {
         CreateJob(index);
         nNews++;
       } else {
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
       nChoices++;
     }
@@ -373,7 +325,6 @@ namespace rrr {
     fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
     tab(27),
-    nUniques(0),
     nCreatedJobs(0),
     nFinishedJobs(0) {
     CostFunction = [](Ntk *pNtk) {
