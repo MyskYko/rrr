@@ -11,7 +11,7 @@
 
 // #include "misc/rrrParameter.h"
 // #include "misc/rrrUtils.h"
-// #include "rrrAbc.h"
+#include "interface/rrrAbc.h"
 #include "io/rrrBinary.h"
 #include "extra/rrrTable.h"
 #include "extra/rrrCanonicalizer.h"
@@ -40,13 +40,14 @@ namespace rrr {
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     static constexpr bool fTwoArgSym = false;
+    std::vector<std::string> CommandList;
     
     // data
-    Table tab;
+    Table<std::vector<int>> tab;
     int nUniques;
     std::map<std::string, int> table;
     std::vector<std::string> strs;
-    std::vector<std::vector<std::pair<int, std::vector<Action>>>> history;
+    std::vector<std::vector<std::pair<int, std::vector<int>>>> history;
     int nCreatedJobs;
     int nFinishedJobs;
     std::queue<Job *> qPendingJobs;
@@ -65,15 +66,15 @@ namespace rrr {
     // print
     template <typename... Args>
     void Print(int nVerboseLevel, std::string prefix, Args... args);
-
+    
     // table
-    bool Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index);
+    bool Register(Ntk *pNtk, int src, std::vector<int> const &vCommands, int &index);
     
     // run jobs
     void RunJob(Opt &opt, Job *pJob);
 
     // manage jobs
-    Job *CreateJob(int src, bool fAdd);
+    Job *CreateJob(int src);
     void Wait();
 
     // thread
@@ -97,14 +98,12 @@ namespace rrr {
     // data
     int id;
     int src;
-    bool fAdd;
     std::string prefix;
     
     // constructor
-    Job(int id, int src, bool fAdd) :
+    Job(int id, int src) :
       id(id),
-      src(src),
-      fAdd(fAdd) {
+      src(src) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
       prefix = ss.str() + " ";
@@ -138,18 +137,18 @@ namespace rrr {
   }
 
   /* }}} */
-    
+  
   /* {{{ Table */
 
   template <typename Ntk, typename Opt, typename Par>
-  bool SsrScheduler2<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
+  bool SsrScheduler2<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<int> const &vCommands, int &index) {
     std::string str, str_sym;
     {
       Ntk ntk;
       ntk.Read(*pNtk);
       Canonicalizer<Ntk> can;
       can.Run(&ntk);
-      str = CreateBinary(&ntk);
+      str = CreateBinary(&ntk, true);
       if(fTwoArgSym) {
         std::vector<int> vOrder;
         for(int i = 0; i < ntk.GetNumPis() / 2; i++) {
@@ -160,24 +159,31 @@ namespace rrr {
         }        
         ntk.ChangePiOrder(vOrder);
         can.Run(&ntk);
-        str_sym = CreateBinary(&ntk);
+        str_sym = CreateBinary(&ntk, true);
+      }
+    }
+    std::vector<int> his;
+    {
+      his.push_back(src);
+      for(int command: vCommands) {
+        his.push_back(command);
       }
     }
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
         std::unique_lock<std::mutex> l(mutexTable);
-        return tab.Register(str, src, vActions, index, str_sym);
+        return tab.Register(str, his, index, str_sym);
         /*
         if(table.count(str)) {
           index = table[str];
-          history[index].emplace_back(src, vActions);
+          history[index].emplace_back(src, vCommands);
           return false;
         }
         if(fTwoArgSym && str != str_sym) {
           if(table.count(str_sym)) {
             index = table[str_sym];
-            history[index].emplace_back(src, vActions);
+            history[index].emplace_back(src, vCommands);
             return false;
           }
         }
@@ -187,23 +193,23 @@ namespace rrr {
         if(int_size(history) < nUniques) {
           history.resize(nUniques);
         }
-        history[index].emplace_back(src, vActions);
+        history[index].emplace_back(src, vCommands);
         return true;
         */
       }
     }
 #endif
-    return tab.Register(str, src, vActions, index, str_sym);
+    return tab.Register(str, his, index, str_sym);
     /*
     if(table.count(str)) {
       index = table[str];
-      history[index].emplace_back(src, vActions);
+      history[index].emplace_back(src, vCommands);
       return false;
     }
     if(fTwoArgSym) {
       if(table.count(str_sym)) {
         index = table[str_sym];
-        history[index].emplace_back(src, vActions);
+        history[index].emplace_back(src, vCommands);
         return false;
       }
     }
@@ -213,7 +219,7 @@ namespace rrr {
     if(int_size(history) < nUniques) {
       history.resize(nUniques);
     }
-    history[index].emplace_back(src, vActions);
+    history[index].emplace_back(src, vCommands);
     return true;
     */
   }
@@ -225,37 +231,29 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void SsrScheduler2<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     Ntk ntk;
-    //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
-    ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
-    opt.AssignNetwork(&ntk, pJob->fAdd);
-    opt.SetPrintLine([&](std::string str) {
-      Print(-1, pJob->prefix, str);
-    });
+    (void)opt;
+    // opt.AssignNetwork(&ntk, pJob->fAdd);
+    // opt.SetPrintLine([&](std::string str) {
+    //   Print(-1, pJob->prefix, str);
+    // });
     int nChoices = 0, nNews = 0;
-    while(true) {
-      auto vActions = opt.Run();
-      if(vActions.empty()) {
-        break;
-      }
+    for(int i = 0; i < int_size(CommandList); i++) {
+      ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
+      std::string cmd = "&put; ";
+      cmd += CommandList[i];
+      cmd += "; &get";
+      Abc9Execute(&ntk, cmd);
+      std::vector<int> vCommands {i};
       int index;
-      bool fNew = Register(&ntk, pJob->src, vActions, index);
+      bool fNew = Register(&ntk, pJob->src, vCommands, index);
       if(fNew) {
         //if(index % 1000 == 0)
         Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
-        CreateJob(index, true);
+        CreateJob(index);
         nNews++;
       } else {
-        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
       }
-      /*
-      for(auto action: vActions) {
-        auto ss = GetActionDescription(action);
-        std::string str;
-        std::getline(ss, str);
-        std::cout << str << std::endl;
-      }
-      std::cout << std::endl;
-      */
       nChoices++;
     }
     delete pJob;
@@ -277,8 +275,8 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename SsrScheduler2<Ntk, Opt, Par>::Job *SsrScheduler2<Ntk, Opt, Par>::CreateJob(int src, bool fAdd) {
-    Job *pJob = new Job(nCreatedJobs++, src, fAdd);
+  typename SsrScheduler2<Ntk, Opt, Par>::Job *SsrScheduler2<Ntk, Opt, Par>::CreateJob(int src) {
+    Job *pJob = new Job(nCreatedJobs++, src);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -385,6 +383,29 @@ namespace rrr {
       });
       return nTwoInputSize;
     };
+    CommandList = {"balance",
+                   "balance -l",
+                   "rewrite",
+                   "rewrite -l",
+                   "rewrite -z",
+                   "rewrite -zl",
+                   "refactor",
+                   "refactor -l",
+                   "refactor -z",
+                   "refactor -zl"};
+    for(int K = 4; K <= 16; K++) {
+      for(int N = 0; N <= 3; N++) {
+        std::string command = "resub";
+        command += " -N ";
+        command += std::to_string(N);
+        command += " -K ";
+        command += std::to_string(K);
+        CommandList.push_back(command);
+        CommandList.push_back(command + " -l");
+        CommandList.push_back(command + " -z");
+        CommandList.push_back(command + " -zl");
+      }
+    }
     pOpt = new Opt(pPar);
 #ifdef ABC_USE_PTHREADS
     fTerminate = false;
@@ -420,26 +441,16 @@ namespace rrr {
 
   template <typename Ntk, typename Opt, typename Par>
   void SsrScheduler2<Ntk, Opt, Par>::Run() {
-    pOriginal->Sweep(true);
-    pOriginal->TrivialCollapse();
-    bool fRedundant = pOpt->IsRedundant(pOriginal);
-    std::vector<Action> vActions;
+    std::vector<int> vCommands;
     int index;
-    Register(pOriginal, -1, vActions, index);
-    CreateJob(index, !fRedundant);
+    Register(pOriginal, -1, vCommands, index);
+    CreateJob(index);
 
     // wait until all jobs are done
     Wait();
 
-    //Print(-1, "","unique", "=", nUniques - (int)fRedundant);
-    Print(-1, "","unique", "=", tab.Size() - (int)fRedundant);
+    Print(-1, "","unique", "=", tab.Size());
     Print(-1, "","jobs", "=", nFinishedJobs);
-    
-    // for(std::string s: strs) {
-    //   Ntk a;
-    //   a.Read(s, BinaryReader<Ntk>);
-    //   a.Print();
-    // }
   }
 
   /* }}} */
