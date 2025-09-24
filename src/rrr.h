@@ -7,6 +7,7 @@
 #include "analyzer/rrrBddMspfAnalyzer.h"
 #include "analyzer/rrrAnalyzer.h"
 #include "analyzer/sat/rrrSatSolver.h"
+#include "analyzer/sat/rrrSatSolver2.h"
 #include "simulator/rrrSimulator.h"
 #include "simulator/rrrSimulator2.h"
 #include "partitioner/rrrPartitioner.h"
