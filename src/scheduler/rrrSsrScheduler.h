@@ -42,7 +42,7 @@ namespace rrr {
     static constexpr bool fTwoArgSym = false;
     
     // data
-    Table tab;
+    Table<std::vector<int>> tab;
     int nUniques;
     std::map<std::string, int> table;
     std::vector<std::string> strs;
@@ -140,7 +140,7 @@ namespace rrr {
   /* }}} */
     
   /* {{{ Table */
-
+  
   template <typename Ntk, typename Opt, typename Par>
   bool SsrScheduler<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
     std::string str, str_sym;
@@ -163,11 +163,24 @@ namespace rrr {
         str_sym = CreateBinary(&ntk);
       }
     }
+    std::vector<int> his;
+    {
+      his.push_back(src);
+      for(auto const &action: vActions) {
+        if(action.type == REMOVE_FANIN) {
+          his.push_back(action.id);
+          his.push_back(action.idx);
+        } else if(action.type == ADD_FANIN) {
+          his.push_back(-action.id);
+          his.push_back(action.fi);
+        }
+      }
+    }
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
         std::unique_lock<std::mutex> l(mutexTable);
-        return tab.Register(str, src, vActions, index, str_sym);
+        return tab.Register(str, his, index, str_sym);
         /*
         if(table.count(str)) {
           index = table[str];
@@ -193,7 +206,7 @@ namespace rrr {
       }
     }
 #endif
-    return tab.Register(str, src, vActions, index, str_sym);
+    return tab.Register(str, his, index, str_sym);
     /*
     if(table.count(str)) {
       index = table[str];

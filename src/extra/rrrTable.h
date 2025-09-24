@@ -5,12 +5,13 @@
 
 namespace rrr {
 
+  template <typename His>
   class Table {
   private:
     std::vector<std::string> data;
     std::vector<int> table;
     std::vector<int> next;
-    std::vector<std::vector<std::vector<int>>> record;
+    std::vector<std::vector<His>> record;
 
     unsigned mask;
     std::hash<std::string> hash_fn;
@@ -28,21 +29,6 @@ namespace rrr {
       return key & mask;
     }
     */
-
-    std::vector<int> translate(int src, std::vector<Action> const &vActions) const {
-      std::vector<int> v;
-      v.push_back(src);
-      for(auto const &action: vActions) {
-        if(action.type == REMOVE_FANIN) {
-          v.push_back(action.id);
-          v.push_back(action.idx);
-        } else if(action.type == ADD_FANIN) {
-          v.push_back(-action.id);
-          v.push_back(action.fi);
-        }
-      }
-      return v;
-    }
     
   public:
     Table(int size_pow) {
@@ -54,11 +40,11 @@ namespace rrr {
       mask = size - 1;
     }
 
-    bool Register(std::string const &str, int src, std::vector<Action> const &vActions, int &index, std::string const &str2) {
+    bool Register(std::string const &str, His const &his, int &index, std::string const &str2) {
       std::vector<int>::iterator it;
       for(it = table.begin() + hash(str); *it != -1; it = next.begin() + *it) {
         if(data[*it] == str) {
-          record[*it].push_back(translate(src, vActions));
+          record[*it].push_back(his);
           index = *it;
           return false;
         }
@@ -67,7 +53,7 @@ namespace rrr {
         std::vector<int>::iterator it2;
         for(it2 = table.begin() + hash(str2); *it2 != -1; it2 = next.begin() + *it2) {
           if(data[*it2] == str2) {
-            record[*it2].push_back(translate(src, vActions));
+            record[*it2].push_back(his);
             index = *it2;
             return false;
           }
@@ -77,7 +63,7 @@ namespace rrr {
       data.push_back(str);
       next.push_back(-1);
       record.resize(record.size() + 1);
-      record[*it].push_back(translate(src, vActions));
+      record[*it].push_back(his);
       index = *it;
       return true;
     }
