@@ -44,3 +44,4 @@ foreach(filename ${FILENAMES})
 endforeach()
 
 target_link_libraries(als "${TORCH_LIBRARIES}")
+target_link_libraries(dls "${TORCH_LIBRARIES}")
