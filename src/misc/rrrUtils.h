@@ -131,12 +131,14 @@ namespace rrr {
   }
   
   static inline void PrintNext(std::ostream &os, double t) {
-    os << std::fixed << std::setprecision(2) << std::setw(8) << t;
+    //os << std::fixed << std::setprecision(2) << std::setw(8) << t;
+    os << std::scientific << std::setprecision(std::numeric_limits<double>::max_digits10) << t;
   }
 
   template <typename... Args>
   static inline void PrintNext(std::ostream &os, double t, Args... args) {
-    os << std::fixed << std::setprecision(2) << std::setw(8) << t << " ";
+    //os << std::fixed << std::setprecision(2) << std::setw(8) << t << " ";
+    os << std::scientific << std::setprecision(std::numeric_limits<double>::max_digits10) << t << " ";
     PrintNext(os, args...);
   }
 

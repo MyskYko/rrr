@@ -819,6 +819,7 @@ namespace rrr {
         }
       });
     }
+    // TODO: this could be also take diff like resim
     durationPopcount += Duration(timeStart, GetCurrentTime());
     timeStart = GetCurrentTime();
     torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat64);
@@ -934,18 +935,6 @@ namespace rrr {
     if(!sUpdates.empty()) {
       Resimulate();
       sUpdates.clear();
-    }
-    if(!vBias.empty()) {
-      for(int i = 0; i < nPatterns; i++) {
-        for(int cls = 0; cls < nClasses; cls++) {
-          //std::cout << vOutputs[cls][i] << " + " << vBias[cls][i] << " (";
-          std::cout << vOutputs[cls][i] + vBias[cls][i] << " (";
-          std::cout << static_cast<double>(vOutputs[cls][i] + vBias[cls][i]) / temperature << "), ";
-        }
-        Pattern *pPat = pNtk->GetPattern();
-        std::cout << " (" << pPat->GetLabel(i) << ")";
-        std::cout << std::endl;
-      }
     }
     return dCurrentLoss;
   }

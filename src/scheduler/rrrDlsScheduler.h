@@ -185,42 +185,77 @@ namespace rrr {
       vOpts[i]->AssignNetwork(vNtks[i], i);
     }
 
-    for(int i = 0; i < int_size(vNtks); i++) {
-      std::cout << "module " << i << std::endl;
-      std::vector<std::vector<int>> vBias;
-      for(int j = 0; j < int_size(vNtks); j++) {
-        if(i != j) {
-          auto vOutputs = vOpts[j]->GetOutputs();
-          if(vBias.empty()) {
-            vBias = vOutputs;
-          } else {
-            assert(0); // take sum
+    int nTemporary = 0;
+    double cost = costStart;
+    for(int k = 0; cost > 0; k++) {
+      Print(0, "round", k, ":", "cost", "=", cost);
+      bool fReduced = false;
+      for(int i = 0; i < int_size(vNtks); i++) {
+        Print(1, "module", i);
+        std::vector<std::vector<int>> vBias;
+        for(int j = 0; j < int_size(vNtks); j++) {
+          if(i != j) {
+            auto vOutputs = vOpts[j]->GetOutputs();
+            if(vBias.empty()) {
+              vBias = vOutputs;
+            } else {
+              assert(0); // take sum
+            }
           }
         }
+        vOpts[i]->SetBias(vBias);
+        vOpts[i]->SetNumTemporary(nTemporary);
+        vOpts[i]->SetThreshold(vOpts[i]->GetLoss());
+        vOpts[i]->SetPrintLine([&](std::string str) {
+          Print(-1, "module " + std::to_string(i) + " : ", str);
+        });
+        fReduced |= vOpts[i]->Run();
+        nTemporary = vOpts[i]->GetNumTemporary();
       }
-      vOpts[i]->SetBias(vBias);
-      vOpts[i]->GetLoss();
+      if(!fReduced) {
+        int idx = -1;
+        double dMinimum = std::numeric_limits<double>::max();
+        for(int i = 0; i < int_size(vNtks); i++) {
+          if(dMinimum > vOpts[i]->GetMinimum()) {
+            dMinimum = vOpts[i]->GetMinimum();
+            idx = i;
+          }
+        }
+        Print(1, "increasing threshold to", dMinimum, "for module", idx);
+        std::vector<std::vector<int>> vBias;
+        for(int j = 0; j < int_size(vNtks); j++) {
+          if(idx != j) {
+            auto vOutputs = vOpts[j]->GetOutputs();
+            if(vBias.empty()) {
+              vBias = vOutputs;
+            } else {
+              assert(0); // take sum
+            }
+          }
+        }
+        vOpts[idx]->SetBias(vBias);
+        vOpts[idx]->SetNumTemporary(nTemporary);
+        vOpts[idx]->SetThreshold(dMinimum);
+        vOpts[idx]->SetPrintLine([&](std::string str) {
+          Print(-1, "module " + std::to_string(idx) + " : ", str);
+        });
+        fReduced |= vOpts[idx]->Run();
+        nTemporary = vOpts[idx]->GetNumTemporary();
+        assert(fReduced);
+      }
+      cost = 0;
+      for(Ntk *pNtk: vNtks) {
+        cost += CostFunction(pNtk);
+      }
     }
-    /*
-    {
-    time_point timeStartLocal = GetCurrentTime();
 
-    opt.SetPrintLine([&](std::string str) {
-      Print(-1, pJob->prefix, str);
-    });
-    // start flow
-    opt.Run(pJob->iSeed, GetRemainingTime());
-    
-    time_point timeEndLocal = GetCurrentTime();
-    pJob->duration = Duration(timeStartLocal, timeEndLocal);
-    pJob->stats = opt.GetStatsSummary();
-    pJob->times = opt.GetTimesSummary();
-    opt.ResetSummary();
+    for(int i = 0; i < int_size(vNtks); i++) {
+      AddToSummary(vStatsSummaryKeys, mStatsSummary, vOpts[i]->GetStatsSummary());
+      AddToSummary(vTimesSummaryKeys, mTimesSummary, vOpts[i]->GetTimesSummary());
+      vOpts[i]->ResetSummary();
     }
-    */
     
-    
-    double cost = 0;
+    cost = 0;
     for(Ntk *pNtk: vNtks) {
       cost += CostFunction(pNtk);
     }

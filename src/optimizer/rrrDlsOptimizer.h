@@ -144,6 +144,7 @@ namespace rrr {
     std::vector<std::vector<int>> GetOutputs();
     double GetMinimum();
     double GetLoss();
+    void SetThreshold(double dThreshold);
     void SetNumTargets(int nTargets_);
 
     // summary
@@ -590,7 +591,9 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
-        ana.SetThreshold(ana.GetLoss());        
+        double loss = ana.GetLoss();
+        ana.SetThreshold(loss);
+        Print(0, "cost", "=", CostFunction(pNtk), ",", "loss", "=", loss);
       }
     }
     return fReduced;
@@ -1454,7 +1457,6 @@ namespace rrr {
       SortFanins();
     }
     ana.ResetMinimum();
-    ana.SetThreshold(ana.GetLoss());
     return RemoveRedundancyOneTraversal();
   }
 
@@ -1486,6 +1488,11 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   double DlsOptimizer<Ntk, Ana>::GetLoss() {
     return ana.GetLoss();
+  }
+
+  template <typename Ntk, typename Ana>
+  void DlsOptimizer<Ntk, Ana>::SetThreshold(double dThreshold) {
+    ana.SetThreshold(dThreshold);
   }
 
   template <typename Ntk, typename Ana>
