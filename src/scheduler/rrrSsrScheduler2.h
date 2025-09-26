@@ -402,6 +402,25 @@ namespace rrr {
 
     Print(-1, "","unique", "=", tab.Size());
     Print(-1, "","jobs", "=", nFinishedJobs);
+
+    // another table with canonicalization with trivial collapse
+    Table<std::vector<int>> tab2(27);
+    for(int i = 0; i < tab.Size(); i++) {
+      std::string str = tab.Get(i);
+      Ntk ntk;
+      ntk.Read(str, BinaryReader<Ntk>);
+      //ntk.Sweep(true);
+      ntk.TrivialCollapse();
+      //bool fRedundant = pOpt->IsRedundant(&ntk);
+      Canonicalizer<Ntk> can;
+      can.Run(&ntk);
+      str = CreateBinary(&ntk);
+      int index;
+      std::vector<int> his{i};
+      tab2.Register(str, his, index, "");
+    }
+
+    Print(-1, "","unique2", "=", tab2.Size());
   }
 
   /* }}} */
