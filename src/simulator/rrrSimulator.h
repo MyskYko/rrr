@@ -25,6 +25,7 @@ namespace rrr {
     // parameters
     int nVerbose;
     int nWords;
+    bool fSave;
 
     // data
     bool fGenerated;
@@ -270,10 +271,16 @@ namespace rrr {
       fInitialized = false;
       break;
     case SAVE:
-      Save(action.idx);
+      if(fSave) {
+        Save(action.idx);
+      }
       break;
     case LOAD:
-      Load(action.idx);
+      if(fSave) {
+        Load(action.idx);
+      } else {
+        fInitialized = false;
+      }
       break;
     case POP_BACK:
       // Do nothing: it may be good to keep the word vector allocated
@@ -670,6 +677,7 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(0),
     nWords(0),
+    fSave(false),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -683,6 +691,7 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
+    fSave(pPar->fSave),
     fGenerated(false),
     fInitialized(false),
     target(-1),

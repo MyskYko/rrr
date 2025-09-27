@@ -37,6 +37,7 @@ namespace rrr {
     bool fOptOnInsert = false;
     bool fGreedy = true;
     bool fExSim = false;
+    bool fSave = true;
     bool fNoGlobalJump = false;
     int nRelaxedPatterns = 0;
     bool fUseApprox = false;

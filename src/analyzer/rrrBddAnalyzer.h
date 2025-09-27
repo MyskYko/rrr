@@ -18,6 +18,7 @@ namespace rrr {
     
     // parameters
     int nVerbose;
+    bool fSave;
     
     // data
     bool fInitialized;
@@ -310,13 +311,21 @@ namespace rrr {
       Reset(true);
       break;
     case SAVE:
-      Save(action.idx);
+      if(fSave) {
+        Save(action.idx);
+      }
       break;
     case LOAD:
-      Load(action.idx);
+      if(fSave) {
+        Load(action.idx);
+      } else {
+        Reset(true);
+      }
       break;
     case POP_BACK:
-      PopBack();
+      if(fSave) {
+        PopBack();
+      }
       break;
     default:
       assert(0);
@@ -600,6 +609,7 @@ namespace rrr {
   BddAnalyzer<Ntk>::BddAnalyzer() :
     pNtk(NULL),
     nVerbose(0),
+    fSave(false),
     fInitialized(false),
     pBdd(NULL),
     target(-1),
@@ -611,6 +621,7 @@ namespace rrr {
   BddAnalyzer<Ntk>::BddAnalyzer(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nAnalyzerVerbose),
+    fSave(pPar->fSave),
     fInitialized(false),
     pBdd(NULL),
     target(-1),
