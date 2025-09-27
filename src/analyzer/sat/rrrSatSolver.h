@@ -91,7 +91,7 @@ namespace rrr {
     case TRIVIAL_COLLAPSE:
       break;
     case TRIVIAL_DECOMPOSE:
-      fUpdate = true;
+      fUpdate = true; // necessary if function or don't care of new edge needs to be considered
       break;
     case SORT_FANINS:
       break;
