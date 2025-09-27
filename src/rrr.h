@@ -38,7 +38,7 @@ namespace rrr {
       Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else {
-      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver2<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     }
   }
