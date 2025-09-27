@@ -415,6 +415,7 @@ namespace rrr {
       vBackups.resize(slot + 1);
     }
     vBackups[slot].target = target;
+    Assign(vBackups[slot].care, care);
     CopyVec(vBackups[slot].vFs, vFs);
     vBackups[slot].fUpdate = fUpdate;
     vBackups[slot].sUpdates = sUpdates;
@@ -425,6 +426,7 @@ namespace rrr {
   void BddResimAnalyzer<Ntk>::Load(int slot) {
     assert(slot < int_size(vBackups));
     target = vBackups[slot].target;
+    Assign(care, vBackups[slot].care);
     CopyVec(vFs, vBackups[slot].vFs);
     fUpdate = vBackups[slot].fUpdate;
     sUpdates = vBackups[slot].sUpdates;
