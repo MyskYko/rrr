@@ -15,8 +15,11 @@ namespace rrr {
     int nSimulatorVerbose = 0;
     int nSatSolverVerbose = 0;
     int nResynVerbose = 0;
-    bool fUseBddCspf = false;
     bool fUseBddMspf = false;
+    bool fUseBddCspf = false;
+    bool fUseBddResim = false;
+    bool fUseTt = false;
+    bool fUseTtResim = false;
     int nConflictLimit = 0;
     int nSortType = -1;
     int nOptimizerFlow = 0;

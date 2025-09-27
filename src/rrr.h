@@ -3,8 +3,9 @@
 #include "scheduler/rrrScheduler.h"
 #include "scheduler/rrrScheduler3.h"
 #include "optimizer/rrrOptimizer.h"
-#include "analyzer/rrrBddAnalyzer.h"
+#include "analyzer/rrrBddCspfAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
+#include "analyzer/rrrBddResimAnalyzer.h"
 #include "analyzer/rrrAnalyzer.h"
 #include "analyzer/sat/rrrSatSolver.h"
 #include "analyzer/sat/rrrSatSolver2.h"
@@ -19,8 +20,11 @@ namespace rrr {
   template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
   void PerformInt(Ntk *pNtk, Parameter const *pPar) {
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
-    if(pPar->fUseBddCspf) {
-      Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+    if(pPar->fUseBddResim) {
+      Sch<Ntk, Opt<Ntk, BddResimAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    } else if(pPar->fUseBddCspf) {
+      Sch<Ntk, Opt<Ntk, BddCspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else if(pPar->fUseBddMspf) {
       Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);

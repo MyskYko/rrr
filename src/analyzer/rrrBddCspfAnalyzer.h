@@ -7,7 +7,7 @@
 namespace rrr {
 
   template <typename Ntk>
-  class BddAnalyzer {
+  class BddCspfAnalyzer {
   private:
     // aliases
     using lit = int;
@@ -33,7 +33,7 @@ namespace rrr {
     std::vector<bool> vCUpdates;
 
     // backups
-    std::vector<BddAnalyzer> vBackups;
+    std::vector<BddCspfAnalyzer> vBackups;
 
     // stats
     uint64_t nNodesOld;
@@ -80,9 +80,9 @@ namespace rrr {
 
   public:
     // constructors
-    BddAnalyzer();
-    BddAnalyzer(Parameter const *pPar);
-    ~BddAnalyzer();
+    BddCspfAnalyzer();
+    BddCspfAnalyzer(Parameter const *pPar);
+    ~BddCspfAnalyzer();
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
@@ -98,28 +98,28 @@ namespace rrr {
   /* {{{ BDD utils */
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::IncRef(lit x) const {
+  inline void BddCspfAnalyzer<Ntk>::IncRef(lit x) const {
     if(x != LitMax) {
       pBdd->IncRef(x);
     }
   }
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DecRef(lit x) const {
+  inline void BddCspfAnalyzer<Ntk>::DecRef(lit x) const {
     if(x != LitMax) {
       pBdd->DecRef(x);
     }
   }
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::Assign(lit &x, lit y) const {
+  inline void BddCspfAnalyzer<Ntk>::Assign(lit &x, lit y) const {
     DecRef(x);
     x = y;
     IncRef(x);
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::CopyVec(std::vector<lit> &x, std::vector<lit> const &y) const {
+  inline void BddCspfAnalyzer<Ntk>::CopyVec(std::vector<lit> &x, std::vector<lit> const &y) const {
     for(size_t i = y.size(); i < x.size(); i++) {
       DecRef(x[i]);
     }
@@ -134,7 +134,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DelVec(std::vector<lit> &v) const {
+  inline void BddCspfAnalyzer<Ntk>::DelVec(std::vector<lit> &v) const {
     for(lit x: v) {
       DecRef(x);
     }
@@ -142,7 +142,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::CopyVecVec(std::vector<std::vector<lit>> &x, std::vector<std::vector<lit>> const &y) const {
+  inline void BddCspfAnalyzer<Ntk>::CopyVecVec(std::vector<std::vector<lit>> &x, std::vector<std::vector<lit>> const &y) const {
     for(size_t i = y.size(); i < x.size(); i++) {
       DelVec(x[i]);
     }
@@ -153,7 +153,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::DelVecVec(std::vector<std::vector<lit>> &v) const {
+  inline void BddCspfAnalyzer<Ntk>::DelVecVec(std::vector<std::vector<lit>> &v) const {
     for(size_t i = 0; i < v.size(); i++) {
       DelVec(v[i]);
     }
@@ -161,7 +161,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  inline int BddAnalyzer<Ntk>::Xor(lit x, lit y) const {
+  inline int BddCspfAnalyzer<Ntk>::Xor(lit x, lit y) const {
     lit f = pBdd->And(x, pBdd->LitNot(y));
     pBdd->IncRef(f);
     lit g = pBdd->And(pBdd->LitNot(x), y);
@@ -177,7 +177,7 @@ namespace rrr {
   /* {{{ Callback */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::ActionCallback(Action const &action) {
+  void BddCspfAnalyzer<Ntk>::ActionCallback(Action const &action) {
     switch(action.type) {
     case REMOVE_FANIN:
       assert(fInitialized);
@@ -337,7 +337,7 @@ namespace rrr {
   /* {{{ Allocation */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Allocate() {
+  void BddCspfAnalyzer<Ntk>::Allocate() {
     int nNodes = pNtk->GetNumNodes();
     vFs.resize(nNodes, LitMax);
     vGs.resize(nNodes, LitMax);
@@ -352,7 +352,7 @@ namespace rrr {
   /* {{{ Simulation */
   
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::SimulateNode(int id, std::vector<lit> &v) const {
+  inline void BddCspfAnalyzer<Ntk>::SimulateNode(int id, std::vector<lit> &v) const {
     if(nVerbose) {
       std::cout << "simulating node " << id << std::endl;
     }
@@ -363,7 +363,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Simulate() {
+  void BddCspfAnalyzer<Ntk>::Simulate() {
     time_point timeStart = GetCurrentTime();
     if(nVerbose) {
       std::cout << "symbolic simulation with BDD" << std::endl;
@@ -391,7 +391,7 @@ namespace rrr {
   /* {{{ CSPF computation */
   
   template <typename Ntk>
-  inline bool BddAnalyzer<Ntk>::ComputeG(int id) {
+  inline bool BddCspfAnalyzer<Ntk>::ComputeG(int id) {
     if(pNtk->GetNumFanouts(id) == 0) {
       if(pBdd->IsConst1(vGs[id])) {
         return false;
@@ -414,7 +414,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline void BddAnalyzer<Ntk>::ComputeC(int id) {
+  inline void BddCspfAnalyzer<Ntk>::ComputeC(int id) {
     int nFanins = pNtk->GetNumFanins(id);
     assert(vvCs[id].size() == nFanins);
     if(pBdd->IsConst1(vGs[id])) {
@@ -446,7 +446,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::CspfNode(int id) {
+  void BddCspfAnalyzer<Ntk>::CspfNode(int id) {
     if(!vGUpdates[id] && !vCUpdates[id]) {
       return;
     }
@@ -469,7 +469,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Cspf(int id, bool fC) {
+  void BddCspfAnalyzer<Ntk>::Cspf(int id, bool fC) {
     time_point timeStart = GetCurrentTime();
     if(id != -1) {
       pNtk->ForEachTfoReverse(id, false, [&](int fo) {
@@ -496,7 +496,7 @@ namespace rrr {
   /* {{{ Preparation */
   
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Reset(bool fReuse) {
+  void BddCspfAnalyzer<Ntk>::Reset(bool fReuse) {
     while(!vBackups.empty()) {
       PopBack();
     }
@@ -520,7 +520,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Initialize() {
+  void BddCspfAnalyzer<Ntk>::Initialize() {
     bool fUseReo = false;
     if(!pBdd) {
       NewBdd::Param Par;
@@ -567,7 +567,7 @@ namespace rrr {
   /* {{{ Save & load */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Save(int slot) {
+  void BddCspfAnalyzer<Ntk>::Save(int slot) {
     if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
@@ -581,7 +581,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::Load(int slot) {
+  void BddCspfAnalyzer<Ntk>::Load(int slot) {
     assert(slot < int_size(vBackups));
     target = vBackups[slot].target;
     CopyVec(vFs, vBackups[slot].vFs);
@@ -593,7 +593,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::PopBack() {
+  void BddCspfAnalyzer<Ntk>::PopBack() {
     assert(!vBackups.empty());
     DelVec(vBackups.back().vFs);
     DelVec(vBackups.back().vGs);
@@ -606,7 +606,7 @@ namespace rrr {
   /* {{{ Constructors */
 
   template <typename Ntk>
-  BddAnalyzer<Ntk>::BddAnalyzer() :
+  BddCspfAnalyzer<Ntk>::BddCspfAnalyzer() :
     pNtk(NULL),
     nVerbose(0),
     fSave(false),
@@ -618,7 +618,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  BddAnalyzer<Ntk>::BddAnalyzer(Parameter const *pPar) :
+  BddCspfAnalyzer<Ntk>::BddCspfAnalyzer(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nAnalyzerVerbose),
     fSave(pPar->fSave),
@@ -630,15 +630,15 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  BddAnalyzer<Ntk>::~BddAnalyzer() {
+  BddCspfAnalyzer<Ntk>::~BddCspfAnalyzer() {
     Reset();
   }
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+  void BddCspfAnalyzer<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     Reset(fReuse);
     pNtk = pNtk_;
-    pNtk->AddCallback(std::bind(&BddAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&BddCspfAnalyzer<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   /* }}} */
@@ -646,7 +646,7 @@ namespace rrr {
   /* {{{ Checks */
   
   template <typename Ntk>
-  bool BddAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
+  bool BddCspfAnalyzer<Ntk>::CheckRedundancy(int id, int idx) {
     if(!fInitialized) {
       Initialize();
     } else if(fResim) {
@@ -681,7 +681,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  bool BddAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  bool BddCspfAnalyzer<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     if(!fInitialized) {
       Initialize();
     } else if(target != id && (target == -1 || vUpdates[target])) {
@@ -724,7 +724,7 @@ namespace rrr {
   /* {{{ Summary */
 
   template <typename Ntk>
-  void BddAnalyzer<Ntk>::ResetSummary() {
+  void BddCspfAnalyzer<Ntk>::ResetSummary() {
     if(pBdd) {
       nNodesOld = pBdd->GetNumTotalCreatedNodes();
     } else {
@@ -738,14 +738,14 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  summary<int> BddAnalyzer<Ntk>::GetStatsSummary() const {
+  summary<int> BddCspfAnalyzer<Ntk>::GetStatsSummary() const {
     summary<int> v;
     v.emplace_back("bdd node", pBdd->GetNumTotalCreatedNodes() - nNodesOld + nNodesAccumulated);
     return v;
   }
   
   template <typename Ntk>
-  summary<double> BddAnalyzer<Ntk>::GetTimesSummary() const {
+  summary<double> BddCspfAnalyzer<Ntk>::GetTimesSummary() const {
     summary<double> v;
     v.emplace_back("bdd symbolic simulation", durationSimulation);
     v.emplace_back("bdd care computation", durationPf);

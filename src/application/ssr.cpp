@@ -6,7 +6,7 @@
 #include "scheduler/rrrSsrScheduler.h"
 #include "scheduler/rrrSsrScheduler2.h"
 #include "optimizer/rrrOptimizer2.h"
-#include "analyzer/rrrBddAnalyzer.h"
+#include "analyzer/rrrBddCspfAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
 #include "analyzer/rrrAnalyzer.h"
 #include "analyzer/sat/rrrSatSolver.h"
@@ -20,7 +20,7 @@ namespace rrr {
   void PerformInt(Ntk *pNtk, Parameter const *pPar) {
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     if(pPar->fUseBddCspf) {
-      Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      Sch<Ntk, Opt<Ntk, BddCspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else if(pPar->fUseBddMspf) {
       Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
