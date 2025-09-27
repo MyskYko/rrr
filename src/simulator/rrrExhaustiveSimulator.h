@@ -92,7 +92,6 @@ namespace rrr {
     // save & load
     void Save(int slot);
     void Load(int slot);
-    void PopBack();
     
   public:
     // constructors
@@ -302,6 +301,7 @@ namespace rrr {
     case SORT_FANINS:
       break;
     case READ:
+      // Keep backups; it may be good to keep the word vector allocated
       fInitialized = false;
       break;
     case SAVE:
@@ -317,10 +317,10 @@ namespace rrr {
       }
       break;
     case POP_BACK:
-      // Do nothing: it may be good to keep the word vector allocated
+      // Keep backups; it may be good to keep the word vector allocated
       break;
     case INSERT:
-      // Do nothing: it may be good to keep the word vector allocated
+      // Keep backups; it may be good to keep the word vector allocated
       fInitialized = false;
       break;
     default:
@@ -650,12 +650,6 @@ namespace rrr {
     vValues = vBackups[slot].vValues;
     fUpdate = vBackups[slot].fUpdate;
     sUpdates = vBackups[slot].sUpdates;
-  }
-
-  template <typename Ntk>
-  void ExhaustiveSimulator<Ntk>::PopBack() {
-    assert(!vBackups.empty());
-    vBackups.pop_back();
   }
 
   /* }}} */

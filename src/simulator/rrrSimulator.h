@@ -268,6 +268,7 @@ namespace rrr {
     case SORT_FANINS:
       break;
     case READ:
+      // Keep backups; it may be good to keep the word vector allocated
       fInitialized = false;
       break;
     case SAVE:
@@ -283,7 +284,7 @@ namespace rrr {
       }
       break;
     case POP_BACK:
-      // Do nothing: it may be good to keep the word vector allocated
+      // Keep backups; it may be good to keep the word vector allocated
       break;
     default:
       assert(0);
