@@ -50,7 +50,8 @@ int main(int argc, char **argv) {
 
   options.add_options("Analyzer")
     ("A,vana", "Verbosity level of analyzer", cxxopts::value<int>()->default_value("0"))
-    ("U,ana", "Analysis method\n 0: SAT\n 1: BDD (MSPF)\n 2: BDD (CSPF)\n", cxxopts::value<int>()->default_value("0"))
+    ("U,ana", "Analysis method\n 0: SAT\n 1: BDD (MSPF)\n 2: BDD (CSPF)\n 3: BDD (resim)\n 4: TT (MSPF)\n 5: TT (resim)\n", cxxopts::value<int>()->default_value("0"))
+    ("s,save", "Save data while testing temporary changes", cxxopts::value<bool>()->default_value("true"))
     ;    
 
   options.add_options("SAT handler")
@@ -108,8 +109,12 @@ int main(int argc, char **argv) {
   Par.fSortPerNode = result["nsort"].as<bool>();
   
   Par.nAnalyzerVerbose = result["vana"].as<int>();
-  Par.fUseBddCspf = result["ana"].as<int>() == 2;
   Par.fUseBddMspf = result["ana"].as<int>() == 1;
+  Par.fUseBddCspf = result["ana"].as<int>() == 2;
+  Par.fUseBddResim = result["ana"].as<int>() == 3;
+  Par.fUseTt = result["ana"].as<int>() == 4;
+  Par.fUseTtResim = result["ana"].as<int>() == 5;
+  Par.fSave = result["save"].as<bool>();
 
   Par.nSatSolverVerbose = result["vsat"].as<int>();
   Par.nConflictLimit = result["conf"].as<int>();
