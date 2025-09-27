@@ -14,8 +14,6 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   class Optimizer {
   private:
-    static constexpr int nSamples = 1000;
-    
     // aliases
     using itr = std::vector<int>::iterator;
     using citr = std::vector<int>::const_iterator;
@@ -35,6 +33,7 @@ namespace rrr {
     int nFlow;
     int nReductionMethod;
     int nDistance;
+    int nSamples;
     bool fCompatible;
     bool fGreedy;
     std::string strTemporary;
@@ -119,6 +118,7 @@ namespace rrr {
     
     // apply
     void ApplyReverseTopologically(std::function<void(int)> const &func);
+    void ApplyReverseTopologicallyStop(std::function<bool(int)> const &func);
     void ApplyRandomlyStop(std::function<bool(int)> const &func);
     void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
     void ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
@@ -1329,6 +1329,23 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
+  void Optimizer<Ntk, Ana>::ApplyReverseTopologicallyStop(std::function<bool(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      Print(1, "node", *it, "(", int_distance(vInts.crbegin(), it) + 1, "/", int_size(vInts), ")", ":", "cost", "=", CostFunction(pNtk));
+      if(func(*it)) {
+        break;
+      }
+    }
+  }
+
+  template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::ApplyRandomlyStop(std::function<bool(int)> const &func) {
     std::vector<int> vInts = pNtk->GetInts();
     std::shuffle(vInts.begin(), vInts.end(), rng);
@@ -1430,6 +1447,7 @@ namespace rrr {
     nFlow(pPar->nOptimizerFlow),
     nReductionMethod(pPar->nReductionMethod),
     nDistance(pPar->nDistance),
+    nSamples(pPar->nSamples),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
     strTemporary(pPar->strTemporary),
@@ -1469,10 +1487,11 @@ namespace rrr {
       SortFanins();
     }
     switch(nFlow) {
-    case 0:
+    case 0: {
       Reduce();
       statsLocal.Reset();
-      ApplyReverseTopologically([&](int id) {
+      int nTried = 0;
+      ApplyReverseTopologicallyStop([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
           vCands = pNtk->GetNeighbors(id, true, nDistance);
@@ -1480,14 +1499,18 @@ namespace rrr {
           vCands = pNtk->GetPisInts();
         }
         SingleResub(id, vCands);
+        nTried++;
+        return nTried == nSamples;
       });
       stats["single"] += statsLocal;
       Print(0, statsLocal.GetString());
       break;
-    case 1:
+    }
+    case 1: {
       Reduce();
       statsLocal.Reset();
-      ApplyReverseTopologically([&](int id) {
+      int nTried = 0;
+      ApplyReverseTopologicallyStop([&](int id) {
         std::vector<int> vCands;
         if(nDistance) {
           vCands = pNtk->GetNeighbors(id, true, nDistance);
@@ -1495,10 +1518,13 @@ namespace rrr {
           vCands = pNtk->GetPisInts();
         }
         MultiResub(id, vCands);
+        nTried++;
+        return nTried == nSamples;
       });
       stats["multi"] += statsLocal;
       Print(0, statsLocal.GetString());
       break;
+    }
     case 2: {
       Reduce();
       double dCost = CostFunction(pNtk);

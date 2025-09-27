@@ -26,6 +26,7 @@ namespace rrr {
     int nSchedulerFlow = 0;
     int nPartitionType = 0;
     int nDistance = 0;
+    int nSamples = 0;
     int nJobs = 1;
     int nThreads = 1;
     int nPartitionSize = 0;
