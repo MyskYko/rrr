@@ -437,6 +437,7 @@ namespace rrr {
   void BddResimAnalyzer<Ntk>::PopBack() {
     assert(!vBackups.empty());
     DelVec(vBackups.back().vFs);
+    Assign(vBackups.back().care, LitMax);
     vBackups.pop_back();
   }
 
