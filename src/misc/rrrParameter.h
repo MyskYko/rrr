@@ -6,7 +6,7 @@ namespace rrr {
 
   struct Parameter {
     int iSeed = 0;
-    int nWords = 10;
+    int nWords = 16;
     int nTimeout = 0;
     int nSchedulerVerbose = 0;
     int nPartitionerVerbose = 0;
