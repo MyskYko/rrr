@@ -16,8 +16,14 @@ namespace rrr {
     using word = unsigned long long;
     using itr = std::vector<word>::iterator;
     using citr = std::vector<word>::const_iterator;
-    static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimula = true;
+    static constexpr word one = 0xffffffffffffffff;
+    static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
+                                        0xccccccccccccccccull,
+                                        0xf0f0f0f0f0f0f0f0ull,
+                                        0xff00ff00ff00ff00ull,
+                                        0xffff0000ffff0000ull,
+                                        0xffffffff00000000ull};
 
     // pointer to network
     Ntk *pNtk;
@@ -25,11 +31,13 @@ namespace rrr {
     // parameters
     int nVerbose;
     int nWords;
+    int nWordsOld;
     bool fSave;
 
     // data
     bool fGenerated;
     bool fInitialized;
+    bool fEx;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
@@ -79,6 +87,7 @@ namespace rrr {
 
     // generate stimuli
     void GenerateRandomStimuli();
+    void GenerateExhaustiveStimuli();
 
     // careset computation
     void ComputeCare(int id);
@@ -97,6 +106,7 @@ namespace rrr {
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
+    bool IsExhaustive() const;
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
 
@@ -453,6 +463,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "generating random stimuli" << std::endl;
     }
+    vValues.resize(nWords * pNtk->GetNumNodes());
     std::mt19937_64 rng;
     pNtk->ForEachPi([&](int id) {
       for(int i = 0; i < nWords; i++) {
@@ -464,7 +475,45 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
-    Clear(nWords * pNtk->GetNumPis(), vAssignedStimuli.begin());
+    fEx = false;
+  }
+
+  template <typename Ntk>
+  void Simulator<Ntk>::GenerateExhaustiveStimuli() {
+    if(nVerbose) {
+      std::cout << "generating exhaustive stimuli" << std::endl;
+    }
+    if(pNtk->GetNumPis() <= 6) {
+      nWords = 1;
+    } else {
+      nWords = 1 << (pNtk->GetNumPis() - 6);
+    }
+    assert(nWords <= nWordsOld);
+    vValues.resize(nWords * pNtk->GetNumNodes());
+    pNtk->ForEachPiIdx([&](int index, int id) {
+      if(index < 6) {
+        itr it = vValues.begin() + id * nWords;
+        for(int i = 0; i < nWords; i++, it++) {
+          *it = basepats[index];
+        }
+      } else {
+        itr it = vValues.begin() + id * nWords;
+        for(int i = 0; i < nWords;) {
+          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
+            *it = 0;
+          }
+          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
+            *it = 0xffffffffffffffffull;
+          }
+        }
+      }
+      if(nVerbose) {
+        std::cout << "node " << std::setw(3) << id << ": ";
+        Print(nWords, vValues.begin() + id * nWords);
+        std::cout << std::endl;
+      }
+    });
+    fEx = true;
   }
 
   /* }}} */
@@ -541,8 +590,12 @@ namespace rrr {
   template <typename Ntk>
   void Simulator<Ntk>::Initialize() {
     if(!fGenerated) {
-      // TODO: reset nWords to default here maybe, if such a mechanism that changes nWords has been implemneted
-      vValues.resize(nWords * pNtk->GetNumNodes());
+      nWords = nWordsOld;
+      if(nWords == 0 || pNtk->GetNumPis() > 36 || (pNtk->GetNumPis() > 6 && (1 << (pNtk->GetNumPis() - 6)) > nWords)) {
+        GenerateRandomStimuli();
+      } else {
+        GenerateExhaustiveStimuli();
+      }
       iPivot = 0;
       vAssignedStimuli.clear();
       vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
@@ -553,7 +606,6 @@ namespace rrr {
       }
       vPackedCount.clear();
       vPackedCount.resize(nWords * 64);
-      GenerateRandomStimuli();
       fGenerated = true;
     } else {
       // use same nWords as we are reusing patterns even if nWords has changed
@@ -663,7 +715,7 @@ namespace rrr {
           }
         }
       } else {
-        // TODO: when nWords has changed
+        // TODO: when nWords has changed, which currently happens only for exhaustive patterns but not comes here
         assert(0);
       }
     }
@@ -678,6 +730,7 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(0),
     nWords(0),
+    nWordsOld(0),
     fSave(false),
     fGenerated(false),
     fInitialized(false),
@@ -692,6 +745,7 @@ namespace rrr {
     pNtk(NULL),
     nVerbose(pPar->nSimulatorVerbose),
     nWords(pPar->nWords),
+    nWordsOld(pPar->nWords),
     fSave(pPar->fSave),
     fGenerated(false),
     fInitialized(false),
@@ -719,6 +773,11 @@ namespace rrr {
   /* }}} */
 
   /* {{{ Checks */
+
+  template <typename Ntk>
+  bool Simulator<Ntk>::IsExhaustive() const {
+    return fEx;
+  }
   
   template <typename Ntk>
   bool Simulator<Ntk>::CheckRedundancy(int id, int idx) {

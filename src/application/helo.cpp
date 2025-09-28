@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
   
   options.add_options("Simulator")
     ("Q,vsim", "Verbosity level of simulator", cxxopts::value<int>()->default_value("0"))
-    ("W,word", "Number of simualtion words", cxxopts::value<int>()->default_value("10"))
+    ("W,word", "Number of simualtion words", cxxopts::value<int>()->default_value("20"))
     ;
   
   options.parse_positional({"input"});
