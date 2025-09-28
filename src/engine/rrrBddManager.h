@@ -156,11 +156,11 @@ namespace NewBdd {
     int    nVerbose;
     std::vector<var> *pVar2Level;
     Param() {
-      nObjsAllocLog  = 28;
+      nObjsAllocLog  = 20;
       nObjsMaxLog    = 28;
       nUniqueSizeLog = 10;
       UniqueDensity  = 4;
-      nCacheSizeLog  = 27;
+      nCacheSizeLog  = 20;
       nCacheMaxLog   = 27;
       nCacheVerbose  = 0;
       fCountOnes     = false;
