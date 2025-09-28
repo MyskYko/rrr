@@ -575,8 +575,6 @@ namespace rrr {
       nWords = 1 << (pNtk->GetNumPis() - 6);
     }
     vFs.resize(pNtk->GetNumNodes() * nWords);
-    vGs.resize(pNtk->GetNumNodes() * nWords);
-    vvCs.resize(pNtk->GetNumNodes());
     pNtk->ForEachPiIdx([&](int index, int id) {
       if(index < 6) {
         itr it = vFs.begin() + id * nWords;
@@ -796,8 +794,12 @@ namespace rrr {
   void DcSimulator<Ntk>::Initialize() {
     assert(fGenerated);
     vFs.resize(pNtk->GetNumNodes() * nWords);
+    vGs.clear();
     vGs.resize(pNtk->GetNumNodes() * nWords);
     vvCs.resize(pNtk->GetNumNodes());
+    for(int i = 0; i < pNtk->GetNumNodes(); i++) {
+      vvCs[i].clear();
+    }
     Simulate();
     vUpdates.clear();
     vUpdates.resize(pNtk->GetNumNodes());
