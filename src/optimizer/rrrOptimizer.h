@@ -1579,6 +1579,7 @@ namespace rrr {
         std::shuffle(vCands.begin(), vCands.end(), rng);
       }
       Stats statsSingle, statsMulti;
+      int nTried = 0;
       ApplyRandomlyStop([&](int id) {
         statsLocal.Reset();
         if(nDistance) {
@@ -1593,7 +1594,8 @@ namespace rrr {
           fChanged = MultiResubStop(id, vCands);
           statsMulti += statsLocal;
         }
-        return fChanged;
+        nTried++;
+        return fChanged || nTried == nSamples;
       });
       stats["single"] += statsSingle;
       stats["multi"] += statsMulti;
