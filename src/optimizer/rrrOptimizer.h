@@ -922,7 +922,7 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands) {
-    static constexpr no_save_except_compatible = true;
+    static constexpr bool no_save_except_compatible = true;
     // NOTE: this assumes trivial collapse/decompose does not change cost
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
