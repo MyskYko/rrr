@@ -922,6 +922,7 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   void Optimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands) {
+    static constexpr no_save_except_compatible = true;
     // NOTE: this assumes trivial collapse/decompose does not change cost
     // let us assume the node is not trivially redundant for now
     assert(pNtk->GetNumFanouts(id) != 0);
@@ -931,7 +932,9 @@ namespace rrr {
     // save if wanted
     int slot = -2;
     if(fGreedy || fCompatible) {
-      slot = pNtk->Save();
+      if(!no_save_except_compatible || fCompatible) {
+        slot = pNtk->Save();
+      }
     }
     // main loop
     double cost = CostFunction(pNtk);
@@ -964,9 +967,12 @@ namespace rrr {
         // greedy
         if(fGreedy) {
           if(costNew <= cost) {
-            pNtk->Save(slot);
+            if(!no_save_except_compatible || fCompatible) {
+              pNtk->Save(slot);
+            }
             cost = costNew;
           } else {
+            assert(!no_save_except_compatible);
             pNtk->Load(slot);
           }
         } else {
@@ -990,7 +996,9 @@ namespace rrr {
       }
     }
     if(fGreedy || fCompatible) {
-      pNtk->PopBack();
+      if(!no_save_except_compatible || fCompatible) {
+        pNtk->PopBack();
+      }
     }
     if(fTried) {
       statsLocal.nTried++;
