@@ -321,6 +321,13 @@ namespace rrr {
       opt.Run(pJob->iSeed, GetRemainingTime());
       CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
       break;
+    case 4: {
+      for(int i = 0; i < 100; i++) {
+        opt.Run(pJob->iSeed, GetRemainingTime());
+        CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+      }
+      break;
+    }
     default:
       assert(0);
     }
