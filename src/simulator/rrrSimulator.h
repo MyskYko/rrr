@@ -225,6 +225,7 @@ namespace rrr {
   
   template <typename Ntk>
   void Simulator<Ntk>::ActionCallback(Action const &action) {
+    // TODO: do we need to add to sUpdates when target == -1?
     switch(action.type) {
     case REMOVE_FANIN:
       assert(fInitialized);
@@ -275,10 +276,12 @@ namespace rrr {
       break;
     case TRIVIAL_DECOMPOSE:
       if(fInitialized) {
+        vValues.resize(nWords * pNtk->GetNumNodes());
         if(target != -1) {
-          vValues.resize(nWords * pNtk->GetNumNodes());
           SimulateNode(vValues, action.fi);
           // time of this simulation is not measured for simplicity sake
+        } else {
+          sUpdates.insert(action.fi);
         }
       }
       break;

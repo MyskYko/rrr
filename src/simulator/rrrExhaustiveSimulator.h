@@ -241,6 +241,7 @@ namespace rrr {
   
   template <typename Ntk>
   void ExhaustiveSimulator<Ntk>::ActionCallback(Action const &action) {
+    // TODO: do we need to add to sUpdates when target == -1?
     switch(action.type) {
     case REMOVE_FANIN:
       assert(fInitialized);
