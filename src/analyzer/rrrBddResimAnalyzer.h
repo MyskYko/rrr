@@ -176,12 +176,10 @@ namespace rrr {
     switch(action.type) {
     case REMOVE_FANIN:
       assert(fInitialized);
-      if(target != -1) {
-        if(action.id == target) {
-          fUpdate = true;
-        } else {
-          sUpdates.insert(action.id);
-        }
+      if(action.id == target) {
+        fUpdate = true;
+      } else {
+        sUpdates.insert(action.id);
       }
       break;
     case REMOVE_UNUSED:
@@ -190,21 +188,19 @@ namespace rrr {
     case REMOVE_BUFFER:
     case REMOVE_CONST:
       if(fInitialized) {
-        if(target != -1) {
-          if(action.id == target) {
-            if(fUpdate) {
-              for(int fo: action.vFanouts) {
-                sUpdates.insert(fo);
-              }
-              fUpdate = false;
+        if(action.id == target) {
+          if(fUpdate) {
+            for(int fo: action.vFanouts) {
+              sUpdates.insert(fo);
             }
-            target = -1;
-          } else {
-            if(sUpdates.count(action.id)) {
-              sUpdates.erase(action.id);
-              for(int fo: action.vFanouts) {
-                sUpdates.insert(fo);
-              }
+            fUpdate = false;
+          }
+          target = -1;
+        } else {
+          if(sUpdates.count(action.id)) {
+            sUpdates.erase(action.id);
+            for(int fo: action.vFanouts) {
+              sUpdates.insert(fo);
             }
           }
         }
@@ -213,12 +209,10 @@ namespace rrr {
       break;
     case ADD_FANIN:
       assert(fInitialized);
-      if(target != -1) {
-        if(action.id == target) {
-          fUpdate = true;
-        } else {
-          sUpdates.insert(action.id);
-        }
+      if(action.id == target) {
+        fUpdate = true;
+      } else {
+        sUpdates.insert(action.id);
       }
       break;
     case TRIVIAL_COLLAPSE:
@@ -226,12 +220,10 @@ namespace rrr {
       break;
     case TRIVIAL_DECOMPOSE:
       if(fInitialized) {
-        if(target != -1) {
-          vFs.resize(pNtk->GetNumNodes(), LitMax);
-          vUpdates.resize(pNtk->GetNumNodes());
-          SimulateNode(action.fi, vFs);
-          // time of this simulation is not measured for simplicity sake
-        }
+        vFs.resize(pNtk->GetNumNodes(), LitMax);
+        vUpdates.resize(pNtk->GetNumNodes());
+        SimulateNode(action.fi, vFs);
+        // time of this simulation is not measured for simplicity sake
       }
       break;
     case SORT_FANINS:
