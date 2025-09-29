@@ -627,21 +627,42 @@ namespace rrr {
     if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
-    vBackups[slot].target = target;
-    vBackups[slot].care = care;
+    vBackups[slot].fInitialized = fInitialized;
+    if(!fInitialized) {
+      return;
+    }
+    if(sUpdates.empty()) {
+      vBackups[slot].target = target;
+      vBackups[slot].care = care;
+    } else {
+      vBackups[slot].target = -1;
+      vBackups[slot].care = care;
+    }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
+    if(!sUpdates.empty()) {
+      Resimulate();
+      sUpdates.clear();
+    }
+    target = vBackups[slot].target; // assigned to -1 when careset needs updating
     vBackups[slot].vValues = vValues;
-    vBackups[slot].fUpdate = fUpdate;
-    vBackups[slot].sUpdates = sUpdates;
   }
 
   template <typename Ntk>
   void ExhaustiveSimulator<Ntk>::Load(int slot) {
     assert(slot < int_size(vBackups));
+    fUpdate = false;
+    sUpdates.clear();
+    if(!vBackups[slot].fInitialized) {
+      target = -1;
+      fInitialized = false;
+      return;
+    }
     target = vBackups[slot].target;
     care = vBackups[slot].care;
     vValues = vBackups[slot].vValues;
-    fUpdate = vBackups[slot].fUpdate;
-    sUpdates = vBackups[slot].sUpdates;
   }
 
   /* }}} */

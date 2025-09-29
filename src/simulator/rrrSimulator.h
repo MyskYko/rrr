@@ -664,6 +664,8 @@ namespace rrr {
       } else {
         GenerateExhaustiveStimuli();
       }
+      care.resize(nWords);
+      tmp.resize(nWords);
       iPivot = 0;
       vAssignedStimuli.clear();
       vAssignedStimuli.resize(nWords * pNtk->GetNumPis());
@@ -733,6 +735,7 @@ namespace rrr {
     fUpdate = false;
     sUpdates.clear();
     if(!vBackups[slot].fInitialized) {
+      target = -1;
       fInitialized = false;
       return;
     }
@@ -822,8 +825,6 @@ namespace rrr {
     iTrav(0),
     iPivot(0),
     fUpdate(false) {
-    care.resize(nWords);
-    tmp.resize(nWords);
     ResetSummary();
   }
 

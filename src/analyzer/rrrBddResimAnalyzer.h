@@ -401,23 +401,46 @@ namespace rrr {
     if(slot >= int_size(vBackups)) {
       vBackups.resize(slot + 1);
     }
-    vBackups[slot].target = target;
-    Assign(vBackups[slot].care, care);
+    vBackups[slot].fInitialized = fInitialized;
+    if(!fInitialized) {
+      return;
+    }
+    if(sUpdates.empty()) {
+      vBackups[slot].target = target;
+      Assign(vBackups[slot].care, care);
+    } else {
+      vBackups[slot].target = -1;
+      Assign(vBackups[slot].care, care);
+    }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
+    if(!sUpdates.empty()) {
+      for(int id: sUpdates) {
+        vUpdates[id] = true;
+      }
+      Simulate();
+      sUpdates.clear();
+    }
+    target = vBackups[slot].target; // assigned to -1 when careset needs updating
     CopyVec(vBackups[slot].vFs, vFs);
-    vBackups[slot].fUpdate = fUpdate;
-    vBackups[slot].sUpdates = sUpdates;
-    vBackups[slot].vUpdates = vUpdates;
   }
 
   template <typename Ntk>
   void BddResimAnalyzer<Ntk>::Load(int slot) {
     assert(slot < int_size(vBackups));
+    if(!vBackups[slot].fInitialized) {
+      Reset(true);
+      return;
+    }
     target = vBackups[slot].target;
     Assign(care, vBackups[slot].care);
     CopyVec(vFs, vBackups[slot].vFs);
-    fUpdate = vBackups[slot].fUpdate;
-    sUpdates = vBackups[slot].sUpdates;
-    vUpdates = vBackups[slot].vUpdates;
+    fUpdate = false;
+    sUpdates.clear();
+    vUpdates.clear();
+    vUpdates.resize(pNtk->GetNumNodes());
   }
 
   template <typename Ntk>
