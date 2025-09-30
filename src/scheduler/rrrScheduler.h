@@ -213,6 +213,7 @@ namespace rrr {
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });
+    double durationAbc = 0;
     // start flow
     switch(nFlow) {
     case 0:
@@ -324,7 +325,10 @@ namespace rrr {
     case 4: {
       for(int i = 0; i < 100; i++) {
         opt.Run(pJob->iSeed, GetRemainingTime());
+        time_point timeAbcStart = GetCurrentTime();
         CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+        time_point timeAbcEnd = GetCurrentTime();
+        durationAbc += Duration(timeAbcStart, timeAbcEnd);
       }
       break;
     }
@@ -335,6 +339,7 @@ namespace rrr {
     pJob->duration = Duration(timeStartLocal, timeEndLocal);
     pJob->stats = opt.GetStatsSummary();
     pJob->times = opt.GetTimesSummary();
+    pJob->times.emplace_back("abc", durationAbc);
     opt.ResetSummary();
   }
 

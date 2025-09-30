@@ -798,6 +798,8 @@ namespace rrr {
         it++;
       }
     }
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationReduce += Duration(timeStart, timeEnd);
     return fReduced;
   }
 
