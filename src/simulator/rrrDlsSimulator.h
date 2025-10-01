@@ -52,7 +52,9 @@ namespace rrr {
     std::vector<word> diff;
     std::vector<word> tmp;
     std::vector<word> w; // columnpopcount
-
+    std::vector<word> vPositives; // resimulate
+    std::vector<word> vNegatives; // resimulate
+    
     // marks
     unsigned iTrav;
     std::vector<unsigned> vTrav;
@@ -80,7 +82,9 @@ namespace rrr {
     int Popcount(int n, citr x, word mask) const;
     void Print(int n, citr x) const;
     std::vector<std::vector<word>> ColumnPopcount(std::vector<citr> const &v, std::vector<bool> const &cs);
+    std::vector<std::vector<word>> ColumnPopcount2(std::vector<citr> const &v);
     std::vector<int> BinaryToInteger(std::vector<std::vector<word>> const &rs);
+    std::vector<int> BinaryToInteger2(std::vector<std::vector<word>> const &rs);
     void BinarySubtract(std::vector<std::vector<word>> &a, std::vector<std::vector<word>> const &b); // a = a - b
     int BinaryPopcount(std::vector<std::vector<word>> const &a);
 
@@ -92,7 +96,6 @@ namespace rrr {
     
     // simulation
     void SimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) const;
-    bool ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id);
     void Simulate();
     void Resimulate();
 
@@ -384,6 +387,68 @@ namespace rrr {
   }
 
   template <typename Ntk>
+  inline std::vector<std::vector<unsigned long long>> DlsSimulator<Ntk>::ColumnPopcount2(std::vector<citr> const &v) {
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
+    int K = int_size(v);
+    // clog2(K + 1)
+    int L = 0;
+    for(int j = K; j > 0; j >>= 1) {
+      L++;
+    }
+    std::vector<std::vector<word>> rs(L);
+    for(int i = 0; i < L; i++) {
+      rs[i].resize(N);
+    }
+    // LSB
+    int d = 0;
+    w.resize(N * (K / 2));
+    for(int i = 0; i < N; i++)
+      rs[d][i] = *(v[0] + i);
+    for(int j = 1; j+1 < K; j += 2) {
+      for(int i = 0; i < N; i++) {
+        word x = *(v[j] + i);
+        w[N*(j/2)+i] = (rs[d][i] & x) | ((rs[d][i] | x) & *(v[j+1] + i));
+      }
+      for(int i = 0; i < N; i++)
+        rs[d][i] = rs[d][i] ^ *(v[j] + i) ^ *(v[j+1] + i);
+    }
+    if(K % 2 == 0) {
+      for(int i = 0; i < N; i++)
+        w[N*((K-1)/2)+i] = rs[d][i] & *(v[K-1] +i);
+      for(int i = 0; i < N; i++)
+        rs[d][i] = rs[d][i] ^ *(v[K-1] + i);
+    }
+    d++;
+    // reduction
+    while(w.size() > N) {
+      int k = w.size() / N;
+      for(int i = 0; i < N; i++)
+        rs[d][i] = w[i];
+      for(int j = 1; j+1 < k; j += 2) {
+        for(int i = 0; i < N; i++)
+          w[N*(j/2)+i] = (rs[d][i] & w[N*j+i]) | ((rs[d][i] | w[N*j+i]) & w[N*(j+1)+i]);
+        for(int i = 0; i < N; i++)
+          rs[d][i] = rs[d][i] ^ w[N*j+i] ^ w[N*(j+1)+i];
+      }
+      if(k % 2 == 0) {
+        for(int i = 0; i < N; i++)
+          w[N*((k-1)/2)+i] = rs[d][i] & w[N*(k-1)+i];
+        for(int i = 0; i < N; i++)
+          rs[d][i] = rs[d][i] ^ w[N*(k-1)+i];
+      }
+      d++;
+      w.resize(N * (k / 2));
+    }
+    // MSB
+    if(L > 1) {
+      for(int i = 0; i < N; i++) {
+        rs[d][i] = w[i];
+      }
+    }
+    return rs;
+  }
+
+  template <typename Ntk>
   inline std::vector<int> DlsSimulator<Ntk>::BinaryToInteger(std::vector<std::vector<word>> const &rs) {
     static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
     std::vector<int> res(64 * N);
@@ -392,6 +457,25 @@ namespace rrr {
         int count = 0;
         for(int j = 0; j < rs.size(); j++) {
           count |= ((rs[j][i] >> (63 - b)) & 1) << j;
+        }
+        res[i*64+b] = count;
+      }
+    }
+    return res;
+  }
+
+  template <typename Ntk>
+  inline std::vector<int> DlsSimulator<Ntk>::BinaryToInteger2(std::vector<std::vector<word>> const &rs) {
+    static constexpr int N = 60000 / 64 + (60000 % 64 != 0);
+    std::vector<int> res(64 * N);
+    for(int i = 0; i < N; i++) {
+      for(int b = 0; b < 64; b++) {
+        int count = 0;
+        for(int j = 0; j < rs.size() - 1; j++) {
+          count |= ((rs[j][i] >> (63 - b)) & 1) << j;
+        }
+        if((rs.back()[i] >> (63 - b)) & 1) {
+          count = -count;
         }
         res[i*64+b] = count;
       }
@@ -547,39 +631,6 @@ namespace rrr {
   }
       
   template <typename Ntk>
-  bool DlsSimulator<Ntk>::ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) {
-    itr x = v.end();
-    bool cx = false;
-    switch(pNtk_->GetNodeType(id)) {
-    case AND:
-      pNtk_->ForEachFanin(id, [&](int fi, bool c) {
-        if(x == v.end()) {
-          x = v.begin() + fi * nStimuli;
-          cx = c;
-        } else {
-          And(nStimuli, tmp.begin(), x, v.begin() + fi * nStimuli, cx, c);
-          x = tmp.begin();
-          cx = false;
-        }
-      });
-      if(x == v.end()) {
-        Fill(nStimuli, tmp.begin());
-      } else if(x != tmp.begin()) {
-        Copy(nStimuli, tmp.begin(), x, cx);
-      }
-      break;
-    default:
-      assert(0);
-    }
-    itr y = v.begin() + id * nStimuli;
-    if(IsEq(nStimuli, y, tmp.begin(), false, last_mask)) {
-      return false;
-    }
-    Copy(nStimuli, y, tmp.begin(), false);
-    return true;
-  }
-
-  template <typename Ntk>
   void DlsSimulator<Ntk>::Simulate() {
     time_point timeStart = GetCurrentTime();
     if(nVerbose) {
@@ -594,6 +645,24 @@ namespace rrr {
       }
     });
     durationSimulation += Duration(timeStart, GetCurrentTime());
+    timeStart = GetCurrentTime();
+    vOutputs.clear();
+    {
+      std::vector<citr> v(nOutputsPerClass);
+      std::vector<bool> cs(nOutputsPerClass);
+      int index = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        v[index] = vValues.cbegin() + fi * nStimuli;
+        cs[index] = c;
+        index++;
+        if(index == nOutputsPerClass) {
+          auto rs = ColumnPopcount(v, cs);
+          vOutputs.push_back(BinaryToInteger(rs));
+          index = 0;
+        }
+      });
+    }
+    durationPopcount += Duration(timeStart, GetCurrentTime());
     Evaluate();
   }
   
@@ -603,12 +672,50 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "resimulating" << std::endl;
     }
+    std::vector<int> vUpdatedPoDrivers;
     pNtk->ForEachTfosUpdate(sUpdates, false, [&](int fo) {
-      bool fUpdated = ResimulateNode(pNtk, vValues, fo);
-      if(nVerbose) {
-        std::cout << "node " << std::setw(3) << fo << ": ";
-        Print(nStimuli, vValues.begin() + fo * nStimuli);
-        std::cout << std::endl;
+      bool fUpdated = false;
+      {
+        itr x = vValues.end();
+        bool cx = false;
+        switch(pNtk->GetNodeType(fo)) {
+        case AND:
+          pNtk->ForEachFanin(fo, [&](int fi, bool c) {
+            if(x == vValues.end()) {
+              x = vValues.begin() + fi * nStimuli;
+              cx = c;
+            } else {
+              And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, cx, c);
+              x = tmp.begin();
+              cx = false;
+            }
+          });
+          if(x == vValues.end()) {
+            Fill(nStimuli, tmp.begin());
+          } else if(x != tmp.begin()) {
+            Copy(nStimuli, tmp.begin(), x, cx);
+          }
+          break;
+        default:
+          assert(0);
+        }
+        itr y = vValues.begin() + fo * nStimuli;
+        if(!IsEq(nStimuli, y, tmp.begin(), false, last_mask)) {
+          if(pNtk->IsPoDriver(fo)) {
+            vPositives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+            vNegatives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+            And(nStimuli, vPositives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, tmp.begin(), true, false);
+            And(nStimuli, vNegatives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, tmp.begin(), false, true);
+            vUpdatedPoDrivers.push_back(fo);
+          }
+          Copy(nStimuli, y, tmp.begin(), false);
+          fUpdated = true;
+          if(nVerbose) {
+            std::cout << "node " << std::setw(3) << fo << ": ";
+            Print(nStimuli, vValues.begin() + fo * nStimuli);
+            std::cout << std::endl;
+          }
+        }
       }
       return fUpdated;
     });
@@ -623,8 +730,43 @@ namespace rrr {
     });
     */
     durationSimulation += Duration(timeStart, GetCurrentTime());
+    timeStart = GetCurrentTime();
+    std::set<int> s(vUpdatedPoDrivers.begin(), vUpdatedPoDrivers.end());
+    {
+      std::vector<citr> inc, dec;
+      int index = 0, cls = 0;
+      pNtk->ForEachPoDriver([&](int fi, bool c) {
+        if(s.count(fi)) {
+          auto it = std::find(vUpdatedPoDrivers.begin(), vUpdatedPoDrivers.end(), fi);
+          int i = std::distance(vUpdatedPoDrivers.begin(), it);
+          if(c) {
+            inc.push_back(vNegatives.cbegin() + i * nStimuli);
+            dec.push_back(vPositives.cbegin() + i * nStimuli);
+          } else {
+            inc.push_back(vPositives.cbegin() + i * nStimuli);
+            dec.push_back(vNegatives.cbegin() + i * nStimuli);
+          }
+        }
+        index++;
+        if(index == nOutputsPerClass) {
+          if(!inc.empty()) {
+            auto rs = ColumnPopcount2(inc);
+            auto minus = ColumnPopcount2(dec);
+            BinarySubtract(rs, minus);
+            auto res = BinaryToInteger2(rs);
+            for(int i = 0; i < nPatterns; i++) {
+              vOutputs[cls][i] += res[i];
+            }
+          }
+          index = 0;
+          cls++;
+          inc.clear();
+          dec.clear();
+        }
+      });
+    }
+    durationPopcount += Duration(timeStart, GetCurrentTime());
     Evaluate();
-    // TODO: we could compute diff (-1 to 1) for updated POs, and add it to the output it belongs to...
   }
 
   /* }}} */
@@ -708,24 +850,6 @@ namespace rrr {
   template <typename Ntk>
   void DlsSimulator<Ntk>::Evaluate() {
     time_point timeStart = GetCurrentTime();
-    vOutputs.clear();
-    {
-      std::vector<citr> v(nOutputsPerClass);
-      std::vector<bool> cs(nOutputsPerClass);
-      int index = 0;
-      pNtk->ForEachPoDriver([&](int fi, bool c) {
-        v[index] = vValues.cbegin() + fi * nStimuli;
-        cs[index] = c;
-        index++;
-        if(index == nOutputsPerClass) {
-          auto rs = ColumnPopcount(v, cs);
-          vOutputs.push_back(BinaryToInteger(rs));
-          index = 0;
-        }
-      });
-    }
-    durationPopcount += Duration(timeStart, GetCurrentTime());
-    timeStart = GetCurrentTime();
     torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat64);
     double* __restrict dst = logits.data_ptr<double>();
     for(int i = 0; i < nPatterns; i++) {
