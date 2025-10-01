@@ -731,8 +731,8 @@ namespace rrr {
     */
     durationSimulation += Duration(timeStart, GetCurrentTime());
     timeStart = GetCurrentTime();
-    std::set<int> s(vUpdatedPoDrivers.begin(), vUpdatedPoDrivers.end());
     {
+      std::set<int> s(vUpdatedPoDrivers.begin(), vUpdatedPoDrivers.end());
       std::vector<citr> inc, dec;
       int index = 0, cls = 0;
       pNtk->ForEachPoDriver([&](int fi, bool c) {
@@ -881,9 +881,18 @@ namespace rrr {
     }
     StartTraversal();
     vTrav[target] = iTrav;
-    pNtk->ForEachTfo(target, false, [&](int id) {
+    std::vector<int> vUpdatedPoDrivers;
+    if(pNtk->IsPoDriver(target)) {
+      itr y = vValues.begin() + target * nStimuli;
+      itr z = vValues2.begin() + target * nStimuli;
+      vPositives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+      vNegatives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+      And(nStimuli, vPositives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, z, true, false);
+      And(nStimuli, vNegatives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, z, false, true);
+      vUpdatedPoDrivers.push_back(target);
+    }
+    pNtk->ForEachTfoUpdate(target, false, [&](int id) {
       itr x = vValues2.end();
-      itr y = vValues2.begin() + id * nStimuli;
       bool cx = false;
       switch(pNtk->GetNodeType(id)) {
       case AND:
@@ -897,53 +906,78 @@ namespace rrr {
             cx = c;
           } else {
             if(vTrav[fi] != iTrav) {
-              And(nStimuli, y, x, vValues.begin() + fi * nStimuli, cx, c);
+              And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, cx, c);
             } else {
-              And(nStimuli, y, x, vValues2.begin() + fi * nStimuli, cx, c);
+              And(nStimuli, tmp.begin(), x, vValues2.begin() + fi * nStimuli, cx, c);
             }
-            x = y;
+            x = tmp.begin();
             cx = false;
           }
         });
         if(x == vValues2.end()) {
-          Fill(nStimuli, y);
-        } else if(x != y) {
-          Copy(nStimuli, y, x, cx);
+          Fill(nStimuli, tmp.begin());
+        } else if(x != tmp.begin()) {
+          Copy(nStimuli, tmp.begin(), x, cx);
         }
         break;
       default:
         assert(0);
       }
-      vTrav[id] = iTrav;
-      if(nVerbose) {
-        std::cout << "node " << std::setw(3) << id << ": ";
-        Print(nStimuli, vValues2.begin() + id * nStimuli);
-        std::cout << std::endl;
+      itr y = vValues.begin() + id * nStimuli;
+      if(!IsEq(nStimuli, y, tmp.begin(), false, last_mask)) {
+        if(pNtk->IsPoDriver(id)) {
+          vPositives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+          vNegatives.resize(nStimuli * (vUpdatedPoDrivers.size() + 1));
+          And(nStimuli, vPositives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, tmp.begin(), true, false);
+          And(nStimuli, vNegatives.begin() + vUpdatedPoDrivers.size() * nStimuli, y, tmp.begin(), false, true);
+          vUpdatedPoDrivers.push_back(id);
+        }
+        Copy(nStimuli, vValues2.begin() + id * nStimuli, tmp.begin(), false);
+        vTrav[id] = iTrav;
+        if(nVerbose) {
+          std::cout << "node " << std::setw(3) << id << ": ";
+          Print(nStimuli, vValues2.begin() + id * nStimuli);
+          std::cout << std::endl;
+        }
       }
+      return vTrav[id] == iTrav;
     });
     durationSimulation += Duration(timeStart, GetCurrentTime());
     timeStart = GetCurrentTime();
-    std::vector<std::vector<int>> vSums;
+    std::vector<std::vector<int>> vSums = vOutputs;
     {
-      std::vector<citr> v(nOutputsPerClass);
-      std::vector<bool> cs(nOutputsPerClass);
-      int index = 0;
+      std::vector<citr> inc, dec;
+      int index = 0, cls = 0;
       pNtk->ForEachPoDriver([&](int fi, bool c) {
         if(vTrav[fi] == iTrav) {
-          v[index] = vValues2.cbegin() + fi * nStimuli;
-        } else {
-          v[index] = vValues.cbegin() + fi * nStimuli;
+          auto it = std::find(vUpdatedPoDrivers.begin(), vUpdatedPoDrivers.end(), fi);
+          int i = std::distance(vUpdatedPoDrivers.begin(), it);
+          if(c) {
+            inc.push_back(vNegatives.cbegin() + i * nStimuli);
+            dec.push_back(vPositives.cbegin() + i * nStimuli);
+          } else {
+            inc.push_back(vPositives.cbegin() + i * nStimuli);
+            dec.push_back(vNegatives.cbegin() + i * nStimuli);
+          }
         }
-        cs[index] = c;
         index++;
         if(index == nOutputsPerClass) {
-          auto rs = ColumnPopcount(v, cs);
-          vSums.push_back(BinaryToInteger(rs));
+          if(!inc.empty()) {
+            auto rs = ColumnPopcount2(inc);
+            auto minus = ColumnPopcount2(dec);
+            BinarySubtract(rs, minus);
+            auto res = BinaryToInteger2(rs);
+            for(int i = 0; i < nPatterns; i++) {
+              vSums[cls][i] += res[i];
+            }
+          }
           index = 0;
+          cls++;
+          inc.clear();
+          dec.clear();
         }
       });
     }
-    // TODO: this could be also take diff like resim
     durationPopcount += Duration(timeStart, GetCurrentTime());
     timeStart = GetCurrentTime();
     torch::Tensor logits = torch::empty({nPatterns, nClasses}, torch::kFloat64);
