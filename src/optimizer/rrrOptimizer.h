@@ -88,13 +88,12 @@ namespace rrr {
     bool RemoveRedundantFaninsOneRandom(int id, bool fRemoveUnused = false);
 
     // remove traversal
-    bool RemoveRedundancyOneTraversal(bool fSubRoutine = false);
+    bool RemoveRedundancyOneTraversal(bool fSubRoutine = false, bool fRandom = false);
     void ReduceRandom();
 
     // remove redundancy
-    bool RemoveRedundancy();
+    bool RemoveRedundancy(bool fRandom = false);
     bool RemoveRedundancyLegacy();
-    bool RemoveRedundancyRandom();
 
     // reduce
     bool Reduce();
@@ -656,10 +655,13 @@ namespace rrr {
   /* {{{ Remove traversal */
 
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::RemoveRedundancyOneTraversal(bool fSubRoutine) {
+  bool Optimizer<Ntk, Ana>::RemoveRedundancyOneTraversal(bool fSubRoutine, bool fRandom) {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
+    if(fRandom) {
+      std::shuffle(vInts.begin(), vInts.end(), rng);
+    }
     // int n = 0;
     for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
@@ -672,7 +674,11 @@ namespace rrr {
       if(fSortPerNode) {
         SortFanins(*it);
       }
-      fReduced |= RemoveRedundantFanins(*it);
+      if(fRandom) {
+        fReduced |= RemoveRedundantFaninsRandom(*it);
+      } else {
+        fReduced |= RemoveRedundantFanins(*it);
+      }
       if(pNtk->GetNumFanins(*it) <= 1) {
         pNtk->Propagate(*it);
       }
@@ -715,10 +721,10 @@ namespace rrr {
   /* {{{ Redundancy removal */
   
   template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::RemoveRedundancy() {
+  bool Optimizer<Ntk, Ana>::RemoveRedundancy(bool fRandom) {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
-    while(RemoveRedundancyOneTraversal(true)) {
+    while(RemoveRedundancyOneTraversal(true, fRandom)) {
       fReduced = true;
       if(!fSortPerNode) {
         SortFanins();
@@ -767,42 +773,6 @@ namespace rrr {
     return fReduced;
   }
 
-  template <typename Ntk, typename Ana>
-  bool Optimizer<Ntk, Ana>::RemoveRedundancyRandom() {
-    // TODO: compatible dc?
-    time_point timeStart = GetCurrentTime();
-    bool fReduced = false;
-    //pNtk->Sweep(false);
-    std::vector<int> vInts = pNtk->GetInts();
-    std::shuffle(vInts.begin(), vInts.end(), rng);
-    for(citr it = vInts.begin(); it != vInts.end();) {
-      if(!pNtk->IsInt(*it)) {
-        it++;
-        continue;
-      }
-      if(pNtk->GetNumFanouts(*it) == 0) {
-        pNtk->RemoveUnused(*it);
-        it++;
-        continue;
-      }
-      bool fReduced_ = RemoveRedundantFaninsRandom(*it, true);
-      // design choice: we could stop at one removal and start over
-      fReduced |= fReduced_;
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-      }
-      if(fReduced_) {
-        std::shuffle(vInts.begin(), vInts.end(), rng);
-        it = vInts.begin();
-      } else {
-        it++;
-      }
-    }
-    time_point timeEnd = GetCurrentTime();
-    statsLocal.durationReduce += Duration(timeStart, timeEnd);
-    return fReduced;
-  }
-
   /* }}} */
 
   /* {{{ Reduce */
@@ -819,7 +789,7 @@ namespace rrr {
       r = RemoveRedundancyLegacy();
       break;
     case 2:
-      r = RemoveRedundancyRandom();
+      r = RemoveRedundancy(true);
       break;
     default:
       assert(0);
