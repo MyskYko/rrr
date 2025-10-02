@@ -143,6 +143,7 @@ namespace rrr {
     void SetBias(std::vector<std::vector<int>> const &vBias);
     std::vector<std::vector<int>> GetOutputs();
     double GetMinimum();
+    void RemoveMinimum();
     double GetLoss();
     void SetThreshold(double dThreshold);
     void SetNumTargets(int nTargets_);
@@ -1484,7 +1485,14 @@ namespace rrr {
   double DlsOptimizer<Ntk, Ana>::GetMinimum() {
     return ana.GetMinimum();
   }
-
+  
+  template <typename Ntk, typename Ana>
+  void DlsOptimizer<Ntk, Ana>::RemoveMinimum() {
+    auto p = ana.GetMinimumPair();
+    pNtk->RemoveFanin(p.first, p.second);
+    assert(ana.GetMinimum() == ana.GetLoss());
+  }
+  
   template <typename Ntk, typename Ana>
   double DlsOptimizer<Ntk, Ana>::GetLoss() {
     return ana.GetLoss();

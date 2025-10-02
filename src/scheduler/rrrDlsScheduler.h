@@ -222,26 +222,11 @@ namespace rrr {
           }
         }
         Print(1, "increasing threshold to", dMinimum, "for module", idx);
-        std::vector<std::vector<int>> vBias;
-        for(int j = 0; j < int_size(vNtks); j++) {
-          if(idx != j) {
-            auto vOutputs = vOpts[j]->GetOutputs();
-            if(vBias.empty()) {
-              vBias = vOutputs;
-            } else {
-              assert(0); // take sum
-            }
-          }
-        }
-        vOpts[idx]->SetBias(vBias);
-        vOpts[idx]->SetNumTemporary(nTemporary);
-        vOpts[idx]->SetThreshold(dMinimum);
         vOpts[idx]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(idx) + " : ", str);
         });
-        fReduced |= vOpts[idx]->Run();
+        vOpts[idx]->RemoveMinimum();
         nTemporary = vOpts[idx]->GetNumTemporary();
-        assert(fReduced);
       }
       cost = 0;
       for(Ntk *pNtk: vNtks) {
