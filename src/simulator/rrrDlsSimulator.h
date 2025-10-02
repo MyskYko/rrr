@@ -475,7 +475,7 @@ namespace rrr {
           count |= ((rs[j][i] >> (63 - b)) & 1) << j;
         }
         if((rs.back()[i] >> (63 - b)) & 1) {
-          count = -count;
+          count -= (1 << (rs.size() - 1));
         }
         res[i*64+b] = count;
       }
@@ -1071,6 +1071,9 @@ namespace rrr {
   template <typename Ntk>
   void DlsSimulator<Ntk>::SetBias(std::vector<std::vector<int>> const &vBias_) {
     vBias = vBias_;
+    if(fInitialized) {
+      Evaluate();
+    }
   }
 
   template <typename Ntk>

@@ -229,6 +229,7 @@ namespace rrr {
       std::stringstream ss = GetActionDescription(action);
       std::string str;
       std::getline(ss, str);
+      Print(4, str);
       while(std::getline(ss, str)) {
         Print(5, str);
       }
@@ -591,9 +592,7 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
-        double loss = ana.GetLoss();
-        ana.SetThreshold(loss);
-        Print(0, "cost", "=", CostFunction(pNtk), ",", "loss", "=", loss);
+        ana.SetThreshold(ana.GetLoss());
       }
     }
     return fReduced;
@@ -661,6 +660,7 @@ namespace rrr {
       }
       if(fReduced_) {
         if(!strTemporary.empty()) {
+          Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk), ",", "loss", "=", ana.GetLoss());
           std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
           DumpAig(str, pNtk);
         }
