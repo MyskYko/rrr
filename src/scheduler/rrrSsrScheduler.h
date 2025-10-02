@@ -21,6 +21,8 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   class SsrScheduler {
   private:
+    static constexpr bool fNoIncrease = true;
+
     // job
     struct Job;
     
@@ -73,7 +75,7 @@ namespace rrr {
     void RunJob(Opt &opt, Job *pJob);
 
     // manage jobs
-    Job *CreateJob(int src, bool fAdd);
+    Job *CreateJob(int src, int cost, bool fAdd);
     void Wait();
 
     // thread
@@ -97,13 +99,15 @@ namespace rrr {
     // data
     int id;
     int src;
+    int cost;
     bool fAdd;
     std::string prefix;
     
     // constructor
-    Job(int id, int src, bool fAdd) :
+    Job(int id, int src, int cost, bool fAdd) :
       id(id),
       src(src),
+      cost(cost),
       fAdd(fAdd) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
@@ -240,7 +244,8 @@ namespace rrr {
     Ntk ntk;
     //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
     ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
-    opt.AssignNetwork(&ntk, pJob->fAdd);
+    //opt.AssignNetwork(&ntk, pJob->fAdd);
+    opt.AssignNetwork(&ntk, nJobs);
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });
@@ -251,14 +256,16 @@ namespace rrr {
         break;
       }
       int index;
-      bool fNew = Register(&ntk, pJob->src, vActions, index);
-      if(fNew) {
-        //if(index % 1000 == 0)
-        Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
-        CreateJob(index, true);
-        nNews++;
-      } else {
-        //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+      if(!fNoIncrease || CostFunction(&ntk) <= pJob->cost) {
+        bool fNew = Register(&ntk, pJob->src, vActions, index);
+        if(fNew) {
+          //if(index % 1000 == 0)
+          Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
+          CreateJob(index, CostFunction(&ntk), true);
+          nNews++;
+        } else {
+          //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        }
       }
       /*
       for(auto action: vActions) {
@@ -290,8 +297,8 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename SsrScheduler<Ntk, Opt, Par>::Job *SsrScheduler<Ntk, Opt, Par>::CreateJob(int src, bool fAdd) {
-    Job *pJob = new Job(nCreatedJobs++, src, fAdd);
+  typename SsrScheduler<Ntk, Opt, Par>::Job *SsrScheduler<Ntk, Opt, Par>::CreateJob(int src, int cost, bool fAdd) {
+    Job *pJob = new Job(nCreatedJobs++, src, cost, fAdd);
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
@@ -439,7 +446,8 @@ namespace rrr {
     std::vector<Action> vActions;
     int index;
     Register(pOriginal, -1, vActions, index);
-    CreateJob(index, !fRedundant);
+    assert(!fRedundant);
+    CreateJob(index, CostFunction(pOriginal), !fRedundant);
 
     // wait until all jobs are done
     Wait();

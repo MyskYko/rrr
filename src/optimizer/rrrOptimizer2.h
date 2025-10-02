@@ -210,7 +210,7 @@ namespace rrr {
                   pNtk->Propagate(id);
                 }
                 pNtk->Sweep(false);
-                pNtk->TrivialCollapse();
+                //pNtk->TrivialCollapse();
                 pNtk->DeleteCallback(index);
                 slot = pNtk->Save();
                 Print(0, "saving", slot);
@@ -236,6 +236,11 @@ namespace rrr {
             // if slot >= 0 and !nRedChoice and !vRedChoices.empty(), nothing was redundant i.e. the circuit is irredundant
             // if slot >= 0 and !nRedChoice but vRedChoices.empty(), nothing was redundant except the added one, so we
             // continue to the next addition by loading the previous one
+            int index = pNtk->AddCallback([&](Action const &action) {
+              vActions.push_back(action);
+            });
+            pNtk->TrivialCollapse();
+            pNtk->DeleteCallback(index);
             break;
           }
           Print(0, "loading", slot, ":", "fan", vFaninChoices, ",", "tar", vTargetChoices, "," "red", vRedChoices);
@@ -335,9 +340,6 @@ namespace rrr {
                 counter++;
                 if(counter > vFaninChoices.back()) {
                   vFaninChoices.back() = counter;
-                  int index = pNtk->AddCallback([&](Action const &action) {
-                    vActions.push_back(action);
-                  });
                   int fi = id;
                   if(i + 1u < 1u << nFanins) {
                     std::vector<int> vIndices;
@@ -354,11 +356,14 @@ namespace rrr {
                       }
                     }
                     assert(int_size(vIndices) == nFanins);
+                    int index = pNtk->AddCallback([&](Action const &action) {
+                      vActions.push_back(action);
+                    });
                     pNtk->SortFanins(id, vIndices);
                     fi = pNtk->TrivialDecompose(id, nSelected);
+                    pNtk->DeleteCallback(index);
                     Print(0, "decomposing", "node", id, ",", "indices", vIndices, ",", "fanin", fi);
                   }
-                  pNtk->DeleteCallback(index);
                   nCurrentFanin = fi;
                   Print(0, "using", "fanin", nCurrentFanin);
                   slot = pNtk->Save();
