@@ -15,6 +15,7 @@ namespace rrr {
     bool nVerbose;
     double dThreshold;
     double dMinimum;
+    std::pair<int, int> pairMinimum;
 
     // data
     Sim sim;
@@ -32,6 +33,7 @@ namespace rrr {
     double GetLoss();
     void SetThreshold(double dThreshold_);
     double GetMinimum() const;
+    std::pair<int, int> GetMinimumPair() const;
     void ResetMinimum();
 
     // checks
@@ -52,6 +54,7 @@ namespace rrr {
     nVerbose(pPar->nAnalyzerVerbose),
     dThreshold(0),
     dMinimum(std::numeric_limits<double>::max()),
+    pairMinimum({-1, -1}),
     sim(pPar) {
   }
 
@@ -93,10 +96,16 @@ namespace rrr {
   double DlsAnalyzer<Ntk, Sim>::GetMinimum() const {
     return dMinimum;
   }
-  
+
+  template <typename Ntk, typename Sim>
+  std::pair<int, int> DlsAnalyzer<Ntk, Sim>::GetMinimumPair() const {
+    return pairMinimum;
+  }
+
   template <typename Ntk, typename Sim>
   void DlsAnalyzer<Ntk, Sim>::ResetMinimum() {
     dMinimum = std::numeric_limits<double>::max();
+    pairMinimum = {-1, -1};
   }
 
   /* }}} */
@@ -111,6 +120,7 @@ namespace rrr {
     }
     if(loss < dMinimum) {
       dMinimum = loss;
+      pairMinimum = {id, idx};
     }
     return false;
   }
