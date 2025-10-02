@@ -35,6 +35,7 @@ namespace rrr {
     bool fDeterministic;
     int nParallelPartitions;
     bool fOptOnInsert;
+    bool fRelaxOnRemoval;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -144,6 +145,7 @@ namespace rrr {
     fDeterministic(pPar->fDeterministic),
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
+    fRelaxOnRemoval(pPar->fRelaxOnRemoval),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -187,6 +189,7 @@ namespace rrr {
 
     int nTemporary = 0;
     double cost = costStart;
+    double dDelta = 0;
     for(int k = 0; cost > 0; k++) {
       Print(0, "round", k, ":", "cost", "=", cost);
       bool fReduced = false;
@@ -205,7 +208,7 @@ namespace rrr {
         }
         vOpts[i]->SetBias(vBias);
         vOpts[i]->SetNumTemporary(nTemporary);
-        vOpts[i]->SetThreshold(vOpts[i]->GetLoss());
+        vOpts[i]->SetThreshold(vOpts[i]->GetLoss() + dDelta);
         vOpts[i]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(i) + " : ", str);
         });
@@ -227,10 +230,22 @@ namespace rrr {
         });
         vOpts[idx]->RemoveMinimum();
         nTemporary = vOpts[idx]->GetNumTemporary();
-      }
-      cost = 0;
-      for(Ntk *pNtk: vNtks) {
-        cost += CostFunction(pNtk);
+        cost = 0;
+        for(Ntk *pNtk: vNtks) {
+          cost += CostFunction(pNtk);
+        }
+        if(fRelaxOnRemoval && dDelta == 0) {
+          dDelta = vOpts[idx]->GetLoss() / cost;
+          Print(1, "", "setting delta to", dDelta);
+          for(int i = 0; i < int_size(vNtks); i++) {
+            vOpts[i]->SetDelta(dDelta);
+          }
+        }
+      } else {
+        cost = 0;
+        for(Ntk *pNtk: vNtks) {
+          cost += CostFunction(pNtk);
+        }
       }
     }
 

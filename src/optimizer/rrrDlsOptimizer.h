@@ -38,7 +38,6 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     bool fGreedy;
-    bool fRelaxOnRemoval;
     std::string strTemporary;
     int nModule;
     seconds nTimeout; // assigned upon Run
@@ -52,7 +51,7 @@ namespace rrr {
     std::vector<int> vTmp;
     std::map<int, std::set<int>> mapNewFanins;
     time_point start;
-    int nDelta;
+    double dDelta;
     int nTemporary;
 
     // fanin sorting data
@@ -146,6 +145,7 @@ namespace rrr {
     void RemoveMinimum();
     double GetLoss();
     void SetThreshold(double dThreshold);
+    void SetDelta(double dDelta_);
     void SetNumTargets(int nTargets_);
 
     // summary
@@ -593,7 +593,7 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
-        ana.SetThreshold(ana.GetLoss());
+        ana.SetThreshold(ana.GetLoss() + dDelta);
       }
     }
     return fReduced;
@@ -686,9 +686,6 @@ namespace rrr {
       fReduced = true;
       if(!fSortPerNode) {
         SortFanins();
-      }
-      if(fRelaxOnRemoval) {
-        ana.ResetNumMinErrors();
       }
     }
     time_point timeEnd = GetCurrentTime();
@@ -1416,10 +1413,9 @@ namespace rrr {
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
-    fRelaxOnRemoval(pPar->fRelaxOnRemoval),
     strTemporary(pPar->strTemporary),
     ana(pPar),
-    nDelta(1),
+    dDelta(0),
     nTemporary(0),
     target(-1) {
   }
@@ -1428,7 +1424,7 @@ namespace rrr {
   void DlsOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, int nModule_, bool fReuse) {
     pNtk = pNtk_;
     nModule = nModule_;
-    nDelta = 1;
+    dDelta = 0;
     target = -1;
     pNtk->AddCallback(std::bind(&DlsOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     ana.AssignNetwork(pNtk, fReuse);
@@ -1501,6 +1497,11 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void DlsOptimizer<Ntk, Ana>::SetThreshold(double dThreshold) {
     ana.SetThreshold(dThreshold);
+  }
+
+  template <typename Ntk, typename Ana>
+  void DlsOptimizer<Ntk, Ana>::SetDelta(double dDelta_) {
+    dDelta = dDelta_;
   }
 
   template <typename Ntk, typename Ana>
