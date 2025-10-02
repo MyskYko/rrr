@@ -278,6 +278,7 @@ namespace rrr {
       */
       nChoices++;
     }
+    Print(0, pJob->prefix, "Rate", "=", opt.GetNumRegistered(), "/", opt.GetNumChecked());
     delete pJob;
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {

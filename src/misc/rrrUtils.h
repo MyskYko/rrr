@@ -54,6 +54,20 @@ namespace rrr {
   
   /* }}} */
 
+  /* {{{ Hash */
+
+  struct VecHash {
+    std::size_t operator()(std::vector<int> const& v) const noexcept {
+      std::size_t h = 0;
+      for(int x : v) {
+        h ^= std::hash<int>{}(x) + 0x9e3779b9 + (h << 6) + (h >> 2);
+      }
+      return h;
+    }
+  };
+  
+  /* }}} */
+  
   /* {{{ Print containers */
   
   template <typename T>

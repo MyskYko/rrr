@@ -39,7 +39,16 @@ namespace rrr {
     std::map<int, std::set<int>> mapNewFanins;
     std::vector<int> vAddedIds;
     std::vector<int> vAddedFis;
+    std::vector<std::pair<int, int>> vAdds;
+    std::set<std::set<std::pair<int, int>>> ssSeen;
     int nCurrentFanin;
+
+    int nChecked;
+
+    // pruning
+    int nVirtual;
+    std::unordered_map<std::vector<int>, int, VecHash> A;
+    std::vector<int> B;
 
     // marks
     unsigned iTrav;
@@ -57,6 +66,11 @@ namespace rrr {
     Optimizer2(Parameter const *pPar);
     void AssignNetwork(Ntk *pNtk_, int nAdd_);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
+
+    // pruning
+    int GetOrCreateVirtual(int root, std::vector<int> const &vFanins);
+    int GetNumChecked();
+    int GetNumRegistered();
 
     // run
     bool IsRedundant(Ntk *pNtk_);
@@ -113,6 +127,7 @@ namespace rrr {
     ana(pPar),
     slot(-1),
     nCurrentFanin(-1),
+    nVirtual(0),
     iTrav(0) {
   }
   
@@ -139,6 +154,14 @@ namespace rrr {
     assert(vvActions.empty());
     vvActions.push_back(vActions);
     assert(mapNewFanins.empty());
+    nVirtual = pNtk->GetNumNodes();
+    A.clear();
+    B.resize(pNtk->GetNumNodes());
+    for(int i = 0; i < pNtk->GetNumNodes(); i++) {
+      B[i] = i;
+    }
+    ssSeen.clear();
+    nChecked = 0;
   }
   
   template <typename Ntk, typename Ana>
@@ -146,6 +169,39 @@ namespace rrr {
     PrintLine = PrintLine_;
   }
 
+  /* }}} */
+
+  /* {{{ Pruning */
+
+  template <typename Ntk, typename Ana>
+  int Optimizer2<Ntk, Ana>::GetOrCreateVirtual(int root, std::vector<int> const & vFanins) {
+    int root_vid = B[root];
+    std::vector<int> key;
+    key.reserve(vFanins.size() + 1);
+    key.push_back(root_vid);
+    for(int fi: vFanins) {
+      key.push_back(B[fi]);
+    }
+    std::sort(key.begin() + 1, key.end());
+    auto it = A.find(key);
+    if(it != A.end()) {
+      return it->second;
+    }
+    int vid = nVirtual++;
+    A.emplace(std::move(key), vid);
+    return vid;
+  }
+
+  template <typename Ntk, typename Ana>
+  int Optimizer2<Ntk, Ana>::GetNumChecked() {
+    return nChecked;
+  }
+  
+  template <typename Ntk, typename Ana>
+  int Optimizer2<Ntk, Ana>::GetNumRegistered() {
+    return ssSeen.size();
+  }
+  
   /* }}} */
 
   /* {{{ Run */
@@ -185,7 +241,7 @@ namespace rrr {
           for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
             // skip fanins that were just added
             if(vRedChoices.size() == 1) {
-              // TODO: we shouldn't limit to size() == 1 when multiple edges have been added
+              // TODO: we shouldn't limit to size() == 1 when multiple edges have been added???
               bool fSkip = false;
               for(int i = 0; i < int_size(vAddedIds); i++) {
                 if(vAddedIds[i] == id && vAddedFis[i] == pNtk->GetFanin(id, idx)) {
@@ -249,6 +305,7 @@ namespace rrr {
           if(vRedChoices.empty()) {
             vAddedIds.pop_back();
             vAddedFis.pop_back();
+            vAdds.pop_back();
           }
         }
       } else {
@@ -289,6 +346,14 @@ namespace rrr {
               }
             }
             if(fAdding) {
+              vAdds.emplace_back(B[nCurrentFanin] * 2 + (int)c, B[id]);
+              std::set<std::pair<int, int>> sAdds(vAdds.begin(), vAdds.end());
+              nChecked++;
+              if(ssSeen.count(sAdds)) {
+                vAdds.pop_back();
+                return false;
+              }
+              ssSeen.insert(sAdds);
               Print(0, "adding", "node", id, ",", "fanin", (c? "!": ""), nCurrentFanin);
               int index = pNtk->AddCallback([&](Action const &action) {
                 vActions.push_back(action);
@@ -362,6 +427,8 @@ namespace rrr {
                     pNtk->SortFanins(id, vIndices);
                     fi = pNtk->TrivialDecompose(id, nSelected);
                     pNtk->DeleteCallback(index);
+                    B.resize(fi + 1);
+                    B[fi] = GetOrCreateVirtual(id, vActions.back().vFanins);
                     Print(0, "decomposing", "node", id, ",", "indices", vIndices, ",", "fanin", fi);
                   }
                   nCurrentFanin = fi;
@@ -403,6 +470,7 @@ namespace rrr {
             vActions = vvActions.back();
             vAddedIds.pop_back();
             vAddedFis.pop_back();
+            vAdds.pop_back();
           }
         }
       }
