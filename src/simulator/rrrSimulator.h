@@ -681,6 +681,9 @@ namespace rrr {
       // use same nWords as we are reusing patterns even if nWords has changed
       vValues.resize(nWords * pNtk->GetNumNodes());
     }
+    target = -1;
+    fUpdate = false;
+    sUpdates.clear();
     Simulate();
     fInitialized = true;
   }

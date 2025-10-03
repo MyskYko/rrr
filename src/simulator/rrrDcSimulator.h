@@ -817,6 +817,7 @@ namespace rrr {
     pNtk->ForEachPo([&](int id) {
       vvCs[id].resize(nWords);
     });
+    // TODO: maybe reset updates and others as well
     fInitialized = true;
   }
 

@@ -409,6 +409,7 @@ namespace rrr {
 #ifdef ABC_USE_PTHREADS
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
+    Abc_Start();
     Opt opt(pPar, CostFunction);
     while(true) {
       Job *pJob = NULL;
@@ -419,6 +420,7 @@ namespace rrr {
         }
         if(fTerminate) {
           assert(qPendingJobs.empty());
+          Abc_Stop();
           return;
         }
         pJob = qPendingJobs.front();
@@ -498,6 +500,7 @@ namespace rrr {
 #endif
     assert(!fMultiThreading);
     pOpt = new Opt(pPar, CostFunction);
+    Abc_Start();
   }
 
   template <typename Ntk, typename Opt, typename Par>
@@ -516,6 +519,7 @@ namespace rrr {
     }
 #endif
     delete pOpt;
+    Abc_Stop();
   }
 
   /* }}} */

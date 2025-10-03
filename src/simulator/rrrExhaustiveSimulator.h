@@ -614,6 +614,7 @@ namespace rrr {
   void ExhaustiveSimulator<Ntk>::Initialize() {
     assert(fGenerated);
     vValues.resize(nWords * pNtk->GetNumNodes());
+    // TODO: maybe reset updates and others as well
     Simulate();
     fInitialized = true;
   }
