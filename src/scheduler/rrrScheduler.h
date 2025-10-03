@@ -258,7 +258,11 @@ namespace rrr {
       break;
     }
     case 2: { // deep
-      std::mt19937 rng(pJob->iSeed);
+      SimpleRNG rng;
+      for(int s = 0; s < 11; s++ ) {
+        rng(); // to align with ABC
+      }
+      std::mt19937 rng2(pJob->iSeed);
       int n = 0;
       double cost = pJob->costInitial;
       int slot = pJob->pNtk->Save();
@@ -297,8 +301,8 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Run(rng(), GetRemainingTime());
-          if(rng() & 1) {
+          opt.Run(rng2(), GetRemainingTime());
+          if(rng2() & 1) {
             CallAbc(pJob->pNtk, "&dc2");
           } else {
             CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; &get");
