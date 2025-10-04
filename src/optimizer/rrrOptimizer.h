@@ -1577,6 +1577,57 @@ namespace rrr {
     }
     case 4: {
       Reduce();
+      std::vector<int> vCands;
+      if(!nDistance) {
+        vCands = pNtk->GetPisInts();
+        std::shuffle(vCands.begin(), vCands.end(), rng);
+      }
+      Stats statsSingle;
+      int nTried = 0;
+      ApplyRandomlyStop([&](int id) {
+        statsLocal.Reset();
+        if(nDistance) {
+          vCands = pNtk->GetNeighbors(id, true, nDistance);
+          std::shuffle(vCands.begin(), vCands.end(), rng);
+        }
+        bool fChanged;
+        fChanged = SingleResubStop(id, vCands);
+        statsSingle += statsLocal;
+        nTried++;
+        return fChanged || nTried == nSamples;
+      });
+      stats["single"] += statsSingle;
+      Print(0, "single", ":", statsSingle.GetString());
+      break;
+    }
+    case 5: {
+      Reduce();
+      std::vector<int> vCands;
+      if(!nDistance) {
+        vCands = pNtk->GetPisInts();
+        std::shuffle(vCands.begin(), vCands.end(), rng);
+      }
+      Stats statsMulti;
+      int nTried = 0;
+      ApplyRandomlyStop([&](int id) {
+        statsLocal.Reset();
+        if(nDistance) {
+          vCands = pNtk->GetNeighbors(id, true, nDistance);
+          std::shuffle(vCands.begin(), vCands.end(), rng);
+        }
+        bool fChanged;
+        fChanged = MultiResubStop(id, vCands);
+        statsMulti += statsLocal;
+        nTried++;
+        return fChanged || nTried == nSamples;
+      });
+      stats["multi"] += statsMulti;
+      Print(0, "multi ", ":", statsMulti.GetString());
+      break;
+    }
+      /*
+    case 4: {
+      Reduce();
       statsLocal.Reset();
       ApplyMultisetSampledStop(nTargets, nSamples, [&](std::vector<int> const &vTargets) {
         return MultiTargetResub(vTargets, 1);
@@ -1609,7 +1660,7 @@ namespace rrr {
             std::shuffle(vCands.begin(), vCands.end(), rng);
           }
           bool fChanged;
-          if(/*rng() & 1*/true) {
+          if(rng() & 1) {
             fChanged = SingleResubStop(id, vCands);
             statsSingle += statsLocal;
           } else {
@@ -1624,6 +1675,7 @@ namespace rrr {
         Print(0, "multi ", ":", statsMulti.GetString());
       }
       break;
+*/
     default:
       assert(0);
     }

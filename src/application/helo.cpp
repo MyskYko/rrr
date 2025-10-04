@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     ("G,sort", "Fanin sorting method (-1 = random)", cxxopts::value<int>()->default_value("-1"))
     ("D,dist", "Maximum distance between node and new fanin (0 = no limit)", cxxopts::value<int>()->default_value("0"))
     ("F,sample", "number of target nodes to try (0 = no limit)", cxxopts::value<int>()->default_value("0"))
-    ("g,greedy", "Discard changes that increased the cost", cxxopts::value<bool>()->default_value("true"))
+    ("g,no-greedy", "Discard changes that increased the cost", cxxopts::value<bool>()->default_value("false"))
     ("a,isort", "Sort fanins before each run", cxxopts::value<bool>()->default_value("false"))
     ("b,nsort", "Soft fanins before reducing each node", cxxopts::value<bool>()->default_value("true"))
     ;
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
   Par.nReductionMethod = result["reduce"].as<int>();
   Par.nDistance = result["dist"].as<int>();
   Par.nSamples = result["sample"].as<int>();
-  Par.fGreedy = result["greedy"].as<bool>();
+  Par.fGreedy = !result["no-greedy"].as<bool>();
   Par.fSortInitial = result["isort"].as<bool>();
   Par.fSortPerNode = result["nsort"].as<bool>();
   
