@@ -1,0 +1,1552 @@
+#pragma once
+
+#include <map>
+#include <iterator>
+#include <random>
+#include <numeric>
+
+#include "misc/rrrParameter.h"
+#include "misc/rrrUtils.h"
+#include "io/rrrAig.h"
+
+namespace rrr {
+
+  // it is assumed that removing redundancy never degrades the cost in this optimizer
+  template <typename Ntk, typename Ana>
+  class CsoOptimizer {
+  private:
+    static constexpr int nSamples = 1000;
+    
+    // aliases
+    using itr = std::vector<int>::iterator;
+    using citr = std::vector<int>::const_iterator;
+    using ritr = std::vector<int>::reverse_iterator;
+    using critr = std::vector<int>::const_reverse_iterator;
+    
+    // pointer to network
+    Ntk *pNtk;
+    
+    // parameters
+    int nVerbose;
+    std::function<double(Ntk *)> CostFunction;
+    int nSortTypeOriginal;
+    int nSortType;
+    bool fSortInitial;
+    bool fSortPerNode;
+    int nFlow;
+    int nReductionMethod;
+    int nDistance;
+    bool fCompatible;
+    bool fGreedy;
+    std::string strTemporary;
+    int nModule;
+    seconds nTimeout; // assigned upon Run
+    std::function<void(std::string)> PrintLine;
+
+    int nTargets = 3;
+
+    // data
+    Ana ana;
+    std::mt19937 rng;
+    std::vector<int> vTmp;
+    std::map<int, std::set<int>> mapNewFanins;
+    time_point start;
+    double dDelta;
+    int nTemporary;
+
+    // fanin sorting data
+    std::vector<int> vRandPiOrder;
+    std::vector<double> vRandCosts;
+
+    // marks
+    int target;
+    std::vector<bool> vTfoMarks;
+
+    // statistics
+    struct Stats;
+    std::map<std::string, Stats> stats;
+    Stats statsLocal;
+
+    // print
+    template<typename... Args>
+    void Print(int nVerboseLevel, Args... args);
+    
+    // callback
+    void ActionCallback(Action const &action);
+
+    // topology
+    void MarkTfo(int id);
+
+    // time
+    bool Timeout();
+
+    // sort fanins
+    void SetRandPiOrder();
+    void SetRandCosts();
+    void SortFanins(int id);
+    void SortFanins();
+
+    // remove fanins
+    bool RemoveRedundantFanins(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsRandom(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsOne(int id, bool fRemoveUnused = false);
+    bool RemoveRedundantFaninsOneRandom(int id, bool fRemoveUnused = false);
+
+    // remove traversal
+    bool RemoveRedundancyOneTraversal(bool fSubRoutine = false);
+    void ReduceRandom();
+
+    // remove redundancy
+    bool RemoveRedundancy();
+    bool RemoveRedundancyLegacy();
+    bool RemoveRedundancyRandom();
+
+    // reduce
+    bool Reduce();
+
+    // addition
+    template <typename T>
+    T SingleAdd(int id, T begin, T end);
+    int  MultiAdd(int id, std::vector<int> const &vCands, int nMax = 0);
+    void Undo();
+
+    // resub
+    void SingleResub(int id, std::vector<int> const &vCands);
+    void MultiResub(int id, std::vector<int> const &vCands, int nMax = 0);
+
+    // resub stop
+    bool SingleResubStop(int id, std::vector<int> const &vCands);
+    bool MultiResubStop(int id, std::vector<int> const &vCands, int nMax = 0);
+
+    // multi-target resub
+    bool MultiTargetResub(std::vector<int> vTargets, int nMax = 0);
+    
+    // apply
+    void ApplyReverseTopologically(std::function<void(int)> const &func);
+    void ApplyRandomlyStop(std::function<bool(int)> const &func);
+    void ApplySampled(int n, std::function<void(int)> const &func);
+    void ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
+    void ApplyMultisetSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func);
+    
+  public:
+    // constructors
+    CsoOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
+    void AssignNetwork(Ntk *pNtk_, int nModule_, bool fReuse = false);
+    void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
+
+    // run
+    bool Run(int iSeed = 0, seconds nTimeout_ = 0);
+    void SetNumTemporary(int nTemporary_);
+    int GetNumTemporary();
+    void SetBias(std::vector<std::vector<int>> const &vBias);
+    std::vector<std::vector<int>> GetOutputs();
+    double GetMinimum();
+    void RemoveMinimum();
+    double GetLoss();
+    void SetThreshold(double dThreshold);
+    void SetDelta(double dDelta_);
+    void SetNumTargets(int nTargets_);
+
+    // summary
+    void ResetSummary();
+    summary<int> GetStatsSummary() const;
+    summary<double> GetTimesSummary() const;
+  };
+
+  /* {{{ Stats */
+  
+  template <typename Ntk, typename Ana>
+  struct CsoOptimizer<Ntk, Ana>::Stats {
+    int nTriedFis = 0;
+    int nAddedFis = 0;
+    int nTried = 0;
+    int nAdded = 0;
+    int nChanged = 0;
+    int nUps = 0;
+    int nEqs = 0;
+    int nDowns = 0;
+    double durationAdd = 0;
+    double durationReduce = 0;
+
+    void Reset() {
+      nTriedFis = 0;
+      nAddedFis = 0;
+      nTried = 0;
+      nAdded = 0;
+      nChanged = 0;
+      nUps = 0;
+      nEqs = 0;
+      nDowns = 0;
+      durationAdd = 0;
+      durationReduce = 0;
+    }
+
+    Stats& operator+=(Stats const &other) {
+      this->nTriedFis += other.nTriedFis;
+      this->nAddedFis += other.nAddedFis;
+      this->nTried    += other.nTried;
+      this->nAdded    += other.nAdded;
+      this->nChanged  += other.nChanged;
+      this->nUps      += other.nUps;
+      this->nEqs      += other.nEqs;
+      this->nDowns    += other.nDowns;
+      this->durationAdd    += other.durationAdd;
+      this->durationReduce += other.durationReduce;
+      return *this;
+    }
+
+    std::string GetString() const {
+      std::stringstream ss;
+      PrintNext(ss, "tried node/fanin", "=", nTried, "/", nTriedFis, ",", "added node/fanin", "=", nAdded, "/", nAddedFis, ",", "changed", "=", nChanged, ",", "up/eq/dn", "=", nUps, "/", nEqs, "/", nDowns);
+      return ss.str();
+    }
+  };
+  
+  /* }}} */
+
+  /* {{{ Print */
+
+  template <typename Ntk, typename Ana>
+  template <typename... Args>
+  inline void CsoOptimizer<Ntk, Ana>::Print(int nVerboseLevel, Args... args) {
+    if(nVerbose > nVerboseLevel) {
+      std::stringstream ss;
+      for(int i = 0; i < nVerboseLevel; i++) {
+        ss << "\t";
+      }
+      PrintNext(ss, args...);
+      PrintLine(ss.str());
+    }
+  }
+  
+  /* }}} */
+
+  /* {{{ Callback */
+  
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ActionCallback(Action const &action) {
+    if(nVerbose > 4) {
+      std::stringstream ss = GetActionDescription(action);
+      std::string str;
+      std::getline(ss, str);
+      Print(4, str);
+      while(std::getline(ss, str)) {
+        Print(5, str);
+      }
+    }
+    switch(action.type) {
+    case REMOVE_FANIN:
+      if(action.id != target) {
+        target = -1;
+      }
+      break;
+    case REMOVE_UNUSED:
+      break;
+    case REMOVE_BUFFER:
+    case REMOVE_CONST:
+      if(action.id == target) {
+        target = -1;
+      }
+      break;
+    case ADD_FANIN:
+      if(action.id != target) {
+        target = -1;
+      }
+      break;
+    case TRIVIAL_COLLAPSE:
+      break;
+    case TRIVIAL_DECOMPOSE:
+      target = -1;
+      break;
+    case SORT_FANINS:
+      break;
+    case READ:
+      target = -1;
+      break;
+    case SAVE:
+      break;
+    case LOAD:
+      //target = -1; // this is not always needed, so do it manually
+      break;
+    case POP_BACK:
+      break;
+    default:
+      assert(0);
+    }
+  }
+
+  /* }}} */
+
+  /* {{{ Topology */
+  
+  template <typename Ntk, typename Ana>
+  inline void CsoOptimizer<Ntk, Ana>::MarkTfo(int id) {
+    // includes id itself
+    if(id == target) {
+      return;
+    }
+    target = id;
+    vTfoMarks.clear();
+    vTfoMarks.resize(pNtk->GetNumNodes());
+    vTfoMarks[id] = true;
+    pNtk->ForEachTfo(id, false, [&](int fo) {
+      vTfoMarks[fo] = true;
+    });
+  }
+
+  /* }}} */
+
+  /* {{{ Time */
+  
+  template <typename Ntk, typename Ana>
+  inline bool CsoOptimizer<Ntk, Ana>::Timeout() {
+    if(nTimeout) {
+      time_point current = GetCurrentTime();
+      if(DurationInSeconds(start, current) > nTimeout) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* }}} */
+
+  /* {{{ Sort fanins */
+
+  template <typename Ntk, typename Ana>
+  inline void CsoOptimizer<Ntk, Ana>::SetRandPiOrder() {
+    if(int_size(vRandPiOrder) != pNtk->GetNumPis()) {
+      vRandPiOrder.clear();
+      vRandPiOrder.resize(pNtk->GetNumPis());
+      std::iota(vRandPiOrder.begin(), vRandPiOrder.end(), 0);
+      std::shuffle(vRandPiOrder.begin(), vRandPiOrder.end(), rng);      
+    }    
+  }
+
+  template <typename Ntk, typename Ana>
+  inline void CsoOptimizer<Ntk, Ana>::SetRandCosts() {
+    std::uniform_real_distribution<> dis(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max());
+    while(int_size(vRandCosts) < pNtk->GetNumNodes()) {
+      vRandCosts.push_back(dis(rng));
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  inline void CsoOptimizer<Ntk, Ana>::SortFanins(int id) {
+    switch(nSortType) {
+    case 0: // no sorting
+      break;
+    case 1: // prioritize internals
+      pNtk->SortFanins(id, [&](int i, int j) {
+        return !pNtk->IsPi(i) && pNtk->IsPi(j);
+      });
+      break;
+    case 2: // prioritize internals with (reversely) sorted PIs
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return pNtk->GetPiIndex(i) > pNtk->GetPiIndex(j);
+        }
+        return pNtk->IsPi(j);
+      });
+      break;
+    case 3: // prioritize internals with random PI order
+      SetRandPiOrder();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return vRandPiOrder[pNtk->GetPiIndex(i)] > vRandPiOrder[pNtk->GetPiIndex(j)];
+        }
+        return pNtk->IsPi(j);
+      });
+      break;
+    case 4: // smaller fanout takes larger cost
+      pNtk->SortFanins(id, [&](int i, int j) {
+        return pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j);
+      });
+      break;
+    case 5: // fanout + PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && !pNtk->IsPi(j)) {
+          return false;
+        }
+        if(!pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j);
+      });
+      break;
+    case 6: // fanout + sorted PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return pNtk->GetPiIndex(i) > pNtk->GetPiIndex(j);
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j);
+      });
+      break;
+    case 7: // fanout + random PI
+      SetRandPiOrder();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return vRandPiOrder[pNtk->GetPiIndex(i)] > vRandPiOrder[pNtk->GetPiIndex(j)];
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j);
+      });
+      break;
+    case 8: // reverse topological order + PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return false;
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 9: // reverse topological order + sorted PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return pNtk->GetPiIndex(i) > pNtk->GetPiIndex(j);
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 10: // reverse topological order + random PI
+      SetRandPiOrder();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return vRandPiOrder[pNtk->GetPiIndex(i)] > vRandPiOrder[pNtk->GetPiIndex(j)];
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 11: // topo + fanout + PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && !pNtk->IsPi(j)) {
+          return false;
+        }
+        if(!pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return true;
+        }
+        if(pNtk->GetNumFanouts(i) > pNtk->GetNumFanouts(j)) {
+          return false;
+        }
+        if(pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j)) {
+          return true;
+        }
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return false;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 12: // topo + fanout + sorted PI
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return pNtk->GetPiIndex(i) > pNtk->GetPiIndex(j);
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        if(pNtk->GetNumFanouts(i) > pNtk->GetNumFanouts(j)) {
+          return false;
+        }
+        if(pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j)) {
+          return true;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 13: // topo + fanout + random PI
+      SetRandPiOrder();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return vRandPiOrder[pNtk->GetPiIndex(i)] > vRandPiOrder[pNtk->GetPiIndex(j)];
+        }
+        if(pNtk->IsPi(i)) {
+          return false;
+        }
+        if(pNtk->IsPi(j)) {
+          return true;
+        }
+        if(pNtk->GetNumFanouts(i) > pNtk->GetNumFanouts(j)) {
+          return false;
+        }
+        if(pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j)) {
+          return true;
+        }
+        return pNtk->GetIntIndex(i) > pNtk->GetIntIndex(j);
+      });
+      break;
+    case 14: // random order
+      SetRandCosts();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        return vRandCosts[i] > vRandCosts[j];
+      });
+      break;
+    case 15: // random + PI
+      SetRandCosts();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && !pNtk->IsPi(j)) {
+          return false;
+        }
+        if(!pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return true;
+        }
+        return vRandCosts[i] > vRandCosts[j];
+      });
+      break;
+    case 16: // random + fanout
+      SetRandCosts();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->GetNumFanouts(i) > pNtk->GetNumFanouts(j)) {
+          return false;
+        }
+        if(pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j)) {
+          return true;
+        }
+        return vRandCosts[i] > vRandCosts[j];
+      });
+      break;
+    case 17: // random + fanout + PI
+      SetRandCosts();
+      pNtk->SortFanins(id, [&](int i, int j) {
+        if(pNtk->IsPi(i) && !pNtk->IsPi(j)) {
+          return false;
+        }
+        if(!pNtk->IsPi(i) && pNtk->IsPi(j)) {
+          return true;
+        }
+        if(pNtk->GetNumFanouts(i) > pNtk->GetNumFanouts(j)) {
+          return false;
+        }
+        if(pNtk->GetNumFanouts(i) < pNtk->GetNumFanouts(j)) {
+          return true;
+        }
+        return vRandCosts[i] > vRandCosts[j];
+      });
+      break;
+    default:
+      assert(0);
+    }
+  }
+  
+  template <typename Ntk, typename Ana>
+  inline void CsoOptimizer<Ntk, Ana>::SortFanins() {
+    pNtk->ForEachInt([&](int id) {
+      SortFanins(id);
+    });
+  }
+  
+  /* }}} */
+  
+  /* {{{ Remove fanins */
+  
+  template <typename Ntk, typename Ana>
+  inline bool CsoOptimizer<Ntk, Ana>::RemoveRedundantFanins(int id, bool fRemoveUnused) {
+    assert(pNtk->GetNumFanouts(id) > 0);
+    bool fReduced = false;
+    for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
+      // skip fanins that were just added
+      if(mapNewFanins.count(id)) {
+        int fi = pNtk->GetFanin(id, idx);
+        if(mapNewFanins[id].count(fi)) {
+          continue;
+        }
+      }
+      // reduce
+      if(ana.CheckRedundancy(id, idx)) {
+        int fi = pNtk->GetFanin(id, idx);
+        pNtk->RemoveFanin(id, idx);
+        fReduced = true;
+        idx--;
+        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
+          pNtk->RemoveUnused(fi, true);
+        }
+      }
+    }
+    return fReduced;
+  }
+
+  template <typename Ntk, typename Ana>
+  inline bool CsoOptimizer<Ntk, Ana>::RemoveRedundantFaninsRandom(int id, bool fRemoveUnused) {
+    assert(pNtk->GetNumFanouts(id) > 0);
+    bool fReduced = false;
+    // generate random order
+    vTmp.resize(pNtk->GetNumFanins(id));
+    std::iota(vTmp.begin(), vTmp.end(), 0);
+    std::shuffle(vTmp.begin(), vTmp.end(), rng);
+    for(int i = 0; i < int_size(vTmp); i++) {
+      int idx = vTmp[i];
+      // skip fanins that were just added
+      if(mapNewFanins.count(id)) {
+        int fi = pNtk->GetFanin(id, idx);
+        if(mapNewFanins[id].count(fi)) {
+          continue;
+        }
+      }
+      // reduce
+      if(ana.CheckRedundancy(id, idx)) {
+        int fi = pNtk->GetFanin(id, idx);
+        pNtk->RemoveFanin(id, idx);
+        fReduced = true;
+        for(int j = i + 1; j < int_size(vTmp); j++) {
+          if(vTmp[j] > idx) {
+            vTmp[j]--;
+          }
+        }
+        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
+          pNtk->RemoveUnused(fi, true);
+        }
+      }
+    }
+    return fReduced;
+  }
+  
+  /* }}} */
+  
+  /* {{{ Remove traversal */
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::RemoveRedundancyOneTraversal(bool fSubRoutine) {
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      if(pNtk->GetNumFanouts(*it) == 0) {
+        pNtk->RemoveUnused(*it);
+        continue;
+      }
+      if(fSortPerNode) {
+        SortFanins(*it);
+      }
+      bool fReduced_ = RemoveRedundantFanins(*it);
+      fReduced |= fReduced_;
+      if(pNtk->GetNumFanins(*it) <= 1) {
+        pNtk->Propagate(*it);
+      }
+      if(fReduced_) {
+        if(!strTemporary.empty()) {
+          Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk));
+          std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
+          DumpAig(str, pNtk);
+        }
+      }
+    }
+    if(!fSubRoutine) {
+      time_point timeEnd = GetCurrentTime();
+      statsLocal.durationReduce += Duration(timeStart, timeEnd);
+    }
+    return fReduced;
+  }
+
+  /* }}} */
+
+  /* {{{ Redundancy removal */
+  
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::RemoveRedundancy() {
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    while(RemoveRedundancyOneTraversal(true)) {
+      fReduced = true;
+      if(!fSortPerNode) {
+        SortFanins();
+      }
+    }
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationReduce += Duration(timeStart, timeEnd);
+    return fReduced;
+  }
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::RemoveRedundancyLegacy() {
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend();) {
+      if(!pNtk->IsInt(*it)) {
+        it++;
+        continue;
+      }
+      if(pNtk->GetNumFanouts(*it) == 0) {
+        pNtk->RemoveUnused(*it);
+        it++;
+        continue;
+      }
+      if(fSortPerNode) {
+        SortFanins(*it);
+      }
+      bool fReduced_ = RemoveRedundantFanins(*it);
+      // design choice: we could stop at one removal and start over
+      fReduced |= fReduced_;
+      if(pNtk->GetNumFanins(*it) <= 1) {
+        pNtk->Propagate(*it);
+      }
+      if(fReduced_) {
+        it = vInts.rbegin();
+        if(!fSortPerNode) {
+          SortFanins();
+        }
+      } else {
+        it++;
+      }
+    }
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationReduce += Duration(timeStart, timeEnd);
+    return fReduced;
+  }
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::RemoveRedundancyRandom() {
+    // TODO: compatible dc?
+    time_point timeStart = GetCurrentTime();
+    bool fReduced = false;
+    //pNtk->Sweep(false);
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    for(citr it = vInts.begin(); it != vInts.end();) {
+      if(!pNtk->IsInt(*it)) {
+        it++;
+        continue;
+      }
+      if(pNtk->GetNumFanouts(*it) == 0) {
+        pNtk->RemoveUnused(*it);
+        it++;
+        continue;
+      }
+      bool fReduced_ = RemoveRedundantFaninsRandom(*it, true);
+      // design choice: we could stop at one removal and start over
+      fReduced |= fReduced_;
+      if(pNtk->GetNumFanins(*it) <= 1) {
+        pNtk->Propagate(*it);
+      }
+      if(fReduced_) {
+        std::shuffle(vInts.begin(), vInts.end(), rng);
+        it = vInts.begin();
+      } else {
+        it++;
+      }
+    }
+    return fReduced;
+  }
+
+  /* }}} */
+
+  /* {{{ Reduce */
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::Reduce() {
+    // Resub methods in this class assume this function removes all redundancies (all detectable ones, in case of compatible don't care)
+    int r;
+    switch(nReductionMethod) {
+    case 0:
+      r = RemoveRedundancy();
+      break;
+    case 1:
+      r = RemoveRedundancyLegacy();
+      break;
+    case 2:
+      r = RemoveRedundancyRandom();
+      break;
+    default:
+      assert(0);
+    }
+    return r;
+  }
+
+  /* }}} */
+
+  /* {{{ Addition */
+
+  template <typename Ntk, typename Ana>
+  template <typename T>
+  T CsoOptimizer<Ntk, Ana>::SingleAdd(int id, T begin, T end) {
+    time_point timeStart = GetCurrentTime();
+    MarkTfo(id);
+    pNtk->ForEachFanin(id, [&](int fi) {
+      vTfoMarks[fi] = true;
+    });
+    T it = begin;
+    for(; it != end; it++) {
+      if(!pNtk->IsInt(*it) && !pNtk->IsPi(*it)) {
+        continue;
+      }
+      if(vTfoMarks[*it]) {
+        continue;
+      }
+      statsLocal.nTriedFis++;
+      if(ana.CheckFeasibility(id, *it, false)) {
+        pNtk->AddFanin(id, *it, false);
+        statsLocal.nAddedFis++;
+      } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, *it, true)) {
+        pNtk->AddFanin(id, *it, true);
+        statsLocal.nAddedFis++;
+      } else {
+        continue;
+      }
+      mapNewFanins[id].insert(*it);
+      break;
+    }
+    pNtk->ForEachFanin(id, [&](int fi) {
+      vTfoMarks[fi] = false;
+    });
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationAdd += Duration(timeStart, timeEnd);
+    return it;
+  }
+
+  template <typename Ntk, typename Ana>
+  int CsoOptimizer<Ntk, Ana>::MultiAdd(int id, std::vector<int> const &vCands, int nMax) {
+    time_point timeStart = GetCurrentTime();
+    MarkTfo(id);
+    pNtk->ForEachFanin(id, [&](int fi) {
+      vTfoMarks[fi] = true;
+    });
+    int nAddedFis_ = 0;
+    for(int cand: vCands) {
+      if(!pNtk->IsInt(cand) && !pNtk->IsPi(cand)) {
+        continue;
+      }
+      if(vTfoMarks[cand]) {
+        continue;
+      }
+      statsLocal.nTriedFis++;
+      if(ana.CheckFeasibility(id, cand, false)) {
+        pNtk->AddFanin(id, cand, false);
+        statsLocal.nAddedFis++;
+      } else if(pNtk->UseComplementedEdges() && ana.CheckFeasibility(id, cand, true)) {
+        pNtk->AddFanin(id, cand, true);
+        statsLocal.nAddedFis++;
+      } else {
+        continue;
+      }
+      mapNewFanins[id].insert(cand);
+      nAddedFis_++;
+      if(nAddedFis_ == nMax) {
+        break;
+      }
+    }
+    pNtk->ForEachFanin(id, [&](int fi) {
+      vTfoMarks[fi] = false;
+    });
+    time_point timeEnd = GetCurrentTime();
+    statsLocal.durationAdd += Duration(timeStart, timeEnd);
+    return nAddedFis_;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::Undo() {
+    for(auto const &entry: mapNewFanins) {
+      int id = entry.first;
+      for(int fi: entry.second) {
+        int idx = pNtk->FindFanin(id, fi);
+        pNtk->RemoveFanin(id, idx);
+      }
+    }
+  }
+
+  /* }}} */
+  
+  /* {{{ Resub */
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SingleResub(int id, std::vector<int> const &vCands) {
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // save if wanted
+    int slot = -2;
+    if(fGreedy || fCompatible) {
+      slot = pNtk->Save();
+    }
+    // main loop
+    double cost = CostFunction(pNtk);
+    bool fTried = false, fAdded = false;
+    for(citr it = vCands.begin(); it != vCands.end(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(id)) {
+        break;
+      }
+      fTried = true;
+      it = SingleAdd<citr>(id, it, vCands.end());
+      if(it == vCands.end()) {
+        break;
+      }
+      fAdded = true;
+      Print(2, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
+      if(Reduce()) {
+        double costNew = CostFunction(pNtk);
+        // stats
+        statsLocal.nChanged++;
+        if(costNew < cost) {
+          statsLocal.nDowns++;
+        } else if (costNew == cost) {
+          statsLocal.nEqs++;
+        } else {
+          statsLocal.nUps++;
+        }
+        // greedy
+        if(fGreedy) {
+          if(costNew <= cost) {
+            pNtk->Save(slot);
+            cost = costNew;
+          } else {
+            pNtk->Load(slot);
+          }
+        } else {
+          cost = costNew;
+        }
+      } else {
+        // assuming addition only always increases cost
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
+      }
+      mapNewFanins.clear();
+    }
+    if(pNtk->IsInt(id)) {
+      pNtk->TrivialDecompose(id);
+      SortFanins();
+      if(fCompatible) {
+        Reduce();
+      }
+    }
+    if(fGreedy || fCompatible) {
+      pNtk->PopBack();
+    }
+    if(fTried) {
+      statsLocal.nTried++;
+    }
+    if(fAdded) {
+      statsLocal.nAdded++;
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::MultiResub(int id, std::vector<int> const &vCands, int nMax) {
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    statsLocal.nTried++;
+    // save if wanted
+    int slot = -2;
+    if(fGreedy || fCompatible) {
+      slot = pNtk->Save();
+    }
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // resub
+    double cost = CostFunction(pNtk);
+    if(MultiAdd(id, vCands, nMax)) {
+      statsLocal.nAdded++;
+      if(Reduce()) {
+        mapNewFanins.clear();
+        Reduce();
+        double costNew = CostFunction(pNtk);
+        // stats
+        statsLocal.nChanged++;
+        if(costNew < cost) {
+          statsLocal.nDowns++;
+        } else if (costNew == cost) {
+          statsLocal.nEqs++;
+        } else {
+          statsLocal.nUps++;
+        }
+        // greedy
+        if(fGreedy && costNew > cost) {
+          pNtk->Load(slot);
+        }
+      } else {
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
+        mapNewFanins.clear();
+      }
+    }
+    if(pNtk->IsInt(id)) {
+      pNtk->TrivialDecompose(id);
+      SortFanins();
+      if(fCompatible) {
+        Reduce();
+      }
+    }
+    if(fGreedy || fCompatible) {
+      pNtk->PopBack();
+    }
+  }
+  
+  /* }}} */
+
+  /* {{{ Resub stop */
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::SingleResubStop(int id, std::vector<int> const &vCands) {
+    // stop whenever structure has changed without increasing cost and return true
+    // return false if no candidates are effective
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    Print(2, "method", "=", "single");
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // save
+    int slot = pNtk->Save();
+    // remember fanins
+    std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+    Print(3, "extended fanins", ":", sFanins);
+    // main loop
+    bool fChanged = false;
+    double cost = CostFunction(pNtk);
+    bool fTried = false, fAdded = false;
+    for(citr it = vCands.begin(); it != vCands.end(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      assert(pNtk->IsInt(id));
+      fTried = true;
+      it = SingleAdd<citr>(id, it, vCands.end());
+      if(it == vCands.end()) {
+        break;
+      }
+      fAdded = true;
+      Print(3, "cand", *it, "(", int_distance(vCands.begin(), it) + 1, "/", int_size(vCands), ")", ":", "cost", "=", cost);
+      if(Reduce()) {
+        mapNewFanins.clear();
+        double costNew = CostFunction(pNtk);
+        if(costNew <= cost) {
+          fChanged = false;
+          if(costNew < cost || !pNtk->IsInt(id)) {
+            fChanged = true;
+          } else {
+            std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+            Print(3, "new extended fanins", ":", sNewFanins);
+            if(sFanins != sNewFanins) {
+              fChanged = true;
+            }
+          }
+          if(fChanged) {
+            statsLocal.nChanged++;
+            if(costNew < cost) {
+              statsLocal.nDowns++;
+            } else if (costNew == cost) {
+              statsLocal.nEqs++;
+            } else {
+              statsLocal.nUps++;
+            }
+            break;
+          }
+        }
+        pNtk->Load(slot);
+      } else {
+        if(fCompatible) {
+          pNtk->Load(slot);
+        } else {
+          Undo();
+        }
+        mapNewFanins.clear();
+      }
+    }
+    if(pNtk->IsInt(id)) {
+      pNtk->TrivialDecompose(id);
+    }
+    pNtk->PopBack();
+    if(fTried) {
+      statsLocal.nTried++;
+    }
+    if(fAdded) {
+      statsLocal.nAdded++;
+    }
+    return fChanged;
+  }
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::MultiResubStop(int id, std::vector<int> const &vCands, int nMax) {
+    // if structure has changed without increasing cost, return true
+    // otherwise, return false
+    // NOTE: this assumes trivial collapse/decompose does not change cost
+    // let us assume the node is not trivially redundant for now
+    assert(pNtk->GetNumFanouts(id) != 0);
+    assert(pNtk->GetNumFanins(id) > 1);
+    Print(2, "method", "=", "multi");
+    statsLocal.nTried++;
+    // save
+    int slot = pNtk->Save();
+    // remember fanins
+    std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+    Print(3, "extended fanins", ":", sFanins);
+    // collapse
+    pNtk->TrivialCollapse(id);
+    // resub
+    bool fChanged = false;
+    double cost = CostFunction(pNtk);
+    if(MultiAdd(id, vCands, nMax)) {
+      statsLocal.nAdded++;
+      if(Reduce()) {
+        mapNewFanins.clear();
+        Reduce();
+        double costNew = CostFunction(pNtk);
+        if(!fGreedy || costNew <= cost) {
+          fChanged = false;
+          if(costNew < cost || !pNtk->IsInt(id)) {
+            fChanged = true;
+          } else {
+            std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+            Print(3, "new extended fanins", ":", sNewFanins);
+            if(sFanins != sNewFanins) {
+              fChanged = true;
+            }
+          }
+          if(fChanged) {
+            statsLocal.nChanged++;
+            if(costNew < cost) {
+              statsLocal.nDowns++;
+            } else if (costNew == cost) {
+              statsLocal.nEqs++;
+            } else {
+              statsLocal.nUps++;
+            }
+          }
+        }
+      } else {
+        mapNewFanins.clear();
+      }
+    }
+    if(fChanged) {
+      if(pNtk->IsInt(id)) {
+        pNtk->TrivialDecompose(id);
+      }
+    } else {
+      pNtk->Load(slot);
+    }
+    pNtk->PopBack();
+    return fChanged;
+  }
+  
+  /* }}} */
+
+  /* {{{ Multi-target resub */
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::MultiTargetResub(std::vector<int> vTargets, int nMax) {
+    statsLocal.nTried++;
+    // save
+    int slot = pNtk->Save();
+    double cost = CostFunction(pNtk);
+    // remove targets that are trivially collapsed together
+    for(int id: vTargets) {
+      if(pNtk->IsInt(id)) {
+        pNtk->TrivialCollapse(id);
+      }
+    }
+    for(itr it = vTargets.begin(); it != vTargets.end();) {
+      if(!pNtk->IsInt(*it)) {
+        it = vTargets.erase(it);
+      } else {
+        it++;
+      }
+    }
+    // remember extended fanins
+    Print(2, "targets", ":", vTargets);
+    std::set<int> sTargets(vTargets.begin(), vTargets.end());
+    std::map<int, std::set<int>> msFanins;
+    for(int id: sTargets) {
+      // remember fanins
+      std::set<int> sFanins = pNtk->GetExtendedFanins(id);
+      Print(3, "extended fanins", id, ":", sFanins);
+      msFanins[id] = std::move(sFanins);
+    }    
+    // add
+    bool fAdded = false;
+    for(int id: vTargets) {
+      // get candidates
+      std::vector<int> vCands;
+      if(nDistance) {
+        vCands = pNtk->GetNeighbors(id, true, nDistance);
+      } else {
+        vCands = pNtk->GetPisInts();
+      }
+      std::shuffle(vCands.begin(), vCands.end(), rng);
+      // add
+      fAdded |= MultiAdd(id, vCands, nMax);
+    }
+    // reduce
+    bool fChanged = false;
+    if(fAdded) {
+      statsLocal.nAdded++;
+      if(Reduce()) {
+        mapNewFanins.clear();
+        Reduce();
+        double costNew = CostFunction(pNtk);
+        if(!fGreedy || costNew <= cost) {
+          if(costNew < cost) {
+            fChanged = true;
+          } else {
+            for(int id: sTargets) {
+              if(!pNtk->IsInt(id)) {
+                fChanged = true;
+                break;
+              }
+            }
+            if(!fChanged) {
+              for(int id: sTargets) {
+                std::set<int> sNewFanins = pNtk->GetExtendedFanins(id);
+                Print(3, "new extended fanins", id, ":", sNewFanins);
+                if(msFanins[id] != sNewFanins) {
+                  fChanged = true;
+                  break;
+                }
+              }
+            }
+          }
+          if(fChanged) {
+            statsLocal.nChanged++;
+            if(costNew < cost) {
+              statsLocal.nDowns++;
+            } else if (costNew == cost) {
+              statsLocal.nEqs++;
+            } else {
+              statsLocal.nUps++;
+            }
+          }
+        }
+      } else {
+        mapNewFanins.clear();
+      }
+    }
+    if(fChanged) {
+      for(int id: sTargets) {
+        if(pNtk->IsInt(id)) {
+          pNtk->TrivialDecompose(id);
+        }
+      }
+    } else {
+      pNtk->Load(slot);
+      target = -1;
+    }
+    pNtk->PopBack();
+    return fChanged;
+  }
+    
+  /* }}} */
+  
+  /* {{{ Apply */
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplyReverseTopologically(std::function<void(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      Print(1, "node", *it, "(", int_distance(vInts.crbegin(), it) + 1, "/", int_size(vInts), ")", ":", "cost", "=", CostFunction(pNtk));
+      func(*it);
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplyRandomlyStop(std::function<bool(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    for(citr it = vInts.begin(); it != vInts.end(); it++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      Print(1, "node", *it, "(", int_distance(vInts.cbegin(), it) + 1, "/", int_size(vInts), ")", ":", "cost", "=", CostFunction(pNtk));
+      if(func(*it)) {
+        break;
+      }
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplySampled(int n, std::function<void(int)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng);
+    int i = 0;
+    for(citr it = vInts.begin(); it != vInts.end() && i < n; it++, i++) {
+      if(Timeout()) {
+        break;
+      }
+      if(!pNtk->IsInt(*it)) {
+        continue;
+      }
+      Print(1, "node", *it, "(", int_distance(vInts.cbegin(), it) + 1, "/", std::min(n, int_size(vInts)), ")", ":", "cost", "=", CostFunction(pNtk));
+      func(*it);
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplyCombinationRandomlyStop(int k, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    std::shuffle(vInts.begin(), vInts.end(), rng); // order is decided here, so it's not truely exhaustive
+    int nTried_ = 0;
+    int nCombs = k * (k - 1) / 2;
+    ForEachCombinationStop(int_size(vInts), k, [&](std::vector<int> const &vIdxs) {
+      Print(1, "comb", vIdxs, "(", ++nTried_, "/", nCombs, ")");
+      assert(int_size(vIdxs) == k);
+      if(Timeout()) {
+        return true;
+      }
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      return func(vTargets);
+    });
+  }
+  
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplyCombinationSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(int i = 0; i < n; i++) {
+      if(Timeout()) {
+        break;
+      }
+      std::set<int> sIdxs;
+      while(int_size(sIdxs) < k) {
+        int idx = rng() % pNtk->GetNumInts();
+        sIdxs.insert(idx);
+      }
+      std::vector<int> vIdxs(sIdxs.begin(), sIdxs.end());
+      std::shuffle(vIdxs.begin(), vIdxs.end(), rng);
+      Print(1, "comb", vIdxs, "(", i + 1, "/", n, ")");
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      if(func(vTargets)) {
+        break;
+      }
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ApplyMultisetSampledStop(int k, int n, std::function<bool(std::vector<int> const &)> const &func) {
+    std::vector<int> vInts = pNtk->GetInts();
+    for(int i = 0; i < n; i++) {
+      if(Timeout()) {
+        break;
+      }
+      std::vector<int> vIdxs;
+      for(int j = 0; j < k; j++) {
+        int idx = rng() % pNtk->GetNumInts();
+        vIdxs.push_back(idx);
+      }
+      Print(1, "comb", vIdxs, "(", i + 1, "/", n, ")");
+      std::vector<int> vTargets(k);
+      for(int i = 0; i < k; i++) {
+        vTargets[i] = vInts[vIdxs[i]];
+      }
+      if(func(vTargets)) {
+        break;
+      }
+    }
+  }
+
+  /* }}} */
+  
+  /* {{{ Constructors */
+  
+  template <typename Ntk, typename Ana>
+  CsoOptimizer<Ntk, Ana>::CsoOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
+    pNtk(NULL),
+    nVerbose(pPar->nOptimizerVerbose),
+    CostFunction(CostFunction),
+    nSortTypeOriginal(pPar->nSortType),
+    nSortType(pPar->nSortType),
+    fSortInitial(pPar->fSortInitial),
+    fSortPerNode(pPar->fSortPerNode),
+    nFlow(pPar->nOptimizerFlow),
+    nReductionMethod(pPar->nReductionMethod),
+    nDistance(pPar->nDistance),
+    fCompatible(pPar->fUseBddCspf),
+    fGreedy(pPar->fGreedy),
+    strTemporary(pPar->strTemporary),
+    ana(pPar),
+    dDelta(0),
+    nTemporary(0),
+    target(-1) {
+  }
+  
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, int nModule_, bool fReuse) {
+    pNtk = pNtk_;
+    nModule = nModule_;
+    dDelta = 0;
+    target = -1;
+    pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
+    ana.AssignNetwork(pNtk, fReuse);
+  }
+  
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetPrintLine(std::function<void(std::string)> const &PrintLine_) {
+    PrintLine = PrintLine_;
+  }
+  
+  /* }}} */
+
+  /* {{{ Run */
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::Run(int iSeed, seconds nTimeout_) {
+    rng.seed(iSeed);
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+    if(nSortTypeOriginal < 0) {
+      nSortType = rng() % 18;
+      Print(0, "fanin cost function =", nSortType);
+    }
+    nTimeout = nTimeout_;
+    start = GetCurrentTime();
+    if(fSortInitial) {
+      SortFanins();
+    }
+    return RemoveRedundancyOneTraversal();
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetNumTemporary(int nTemporary_) {
+    nTemporary = nTemporary_;
+  }
+  
+  template <typename Ntk, typename Ana>
+  int CsoOptimizer<Ntk, Ana>::GetNumTemporary() {
+    return nTemporary;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetBias(std::vector<std::vector<int>> const &vBias) {
+    ana.SetBias(vBias);
+  }
+
+  template <typename Ntk, typename Ana>
+  std::vector<std::vector<int>> CsoOptimizer<Ntk, Ana>::GetOutputs() {
+    return ana.GetOutputs();
+  }
+
+  template <typename Ntk, typename Ana>
+  double CsoOptimizer<Ntk, Ana>::GetMinimum() {
+    return ana.GetMinimum();
+  }
+  
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::RemoveMinimum() {
+    auto p = ana.GetMinimumPair();
+    pNtk->RemoveFanin(p.first, p.second);
+    assert(ana.GetMinimum() == ana.GetLoss());
+  }
+  
+  template <typename Ntk, typename Ana>
+  double CsoOptimizer<Ntk, Ana>::GetLoss() {
+    return ana.GetLoss();
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetThreshold(double dThreshold) {
+    ana.SetThreshold(dThreshold);
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetDelta(double dDelta_) {
+    dDelta = dDelta_;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetNumTargets(int nTargets_) {
+    nTargets = nTargets_;
+  }
+
+  /* }}} */
+
+  /* {{{ Summary */
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::ResetSummary() {
+    stats.clear();
+    ana.ResetSummary();
+  }
+  
+  template <typename Ntk, typename Ana>
+  summary<int> CsoOptimizer<Ntk, Ana>::GetStatsSummary() const {
+    summary<int> v;
+    for(auto const &entry: stats) {
+      v.emplace_back("opt " + entry.first + " tried node", entry.second.nTried);
+      v.emplace_back("opt " + entry.first + " tried fanin", entry.second.nTriedFis);
+      v.emplace_back("opt " + entry.first + " added node", entry.second.nAdded);
+      v.emplace_back("opt " + entry.first + " added fanin", entry.second.nAddedFis);
+      v.emplace_back("opt " + entry.first + " changed", entry.second.nChanged);
+      v.emplace_back("opt " + entry.first + " up", entry.second.nUps);
+      v.emplace_back("opt " + entry.first + " eq", entry.second.nEqs);
+      v.emplace_back("opt " + entry.first + " dn", entry.second.nDowns);
+    }
+    summary<int> v2 = ana.GetStatsSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
+    return v;
+  }
+
+  template <typename Ntk, typename Ana>
+  summary<double> CsoOptimizer<Ntk, Ana>::GetTimesSummary() const {
+    summary<double> v;
+    for(auto const &entry: stats) {
+      v.emplace_back("opt " + entry.first + " add", entry.second.durationAdd);
+      v.emplace_back("opt " + entry.first + " reduce", entry.second.durationReduce);
+    }
+    summary<double> v2 = ana.GetTimesSummary();
+    v.insert(v.end(), v2.begin(), v2.end());
+    return v;
+  }
+  
+  /* }}} */
+  
+}
