@@ -1483,9 +1483,23 @@ namespace rrr {
         action.c = c;
         std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
         it = vvFaninEdges[id].erase(it);
-        vvFaninEdges[id].insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
-        ForEachFanin(fi, [&](int fi) {
-          action.vFanins.push_back(fi);
+        ForEachFaninIdx(fi, [&](int idx2, int fi2, bool c2) {
+          int idx3 = FindFanin(id, fi2);
+          if(idx3 == -1) {
+            // no duplication
+            it = vvFaninEdges[id].insert(it, Node2Edge(fi2, c2));
+            it++;
+            action.vFanins.push_back(fi2);
+            action.vIndices.push_back(idx2);
+          } else if(c2 != GetCompl(id, idx3)) {
+            // duplication with differnt polarity, add const-0
+            vRefs[fi2]--;
+            vRefs[GetConst0()]++;
+            it = vvFaninEdges[id].insert(it, Node2Edge(GetConst0(), 0));
+            it++;
+            action.vFanins.push_back(GetConst0());
+            action.vIndices.push_back(idx2);
+          }
         });
         // remove collapsed fanin
         vRefs[fi] = 0;

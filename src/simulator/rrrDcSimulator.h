@@ -329,7 +329,10 @@ namespace rrr {
         }
         itr it = vvCs[action.id].begin() + action.idx * nWords;
         it = vvCs[action.id].erase(it, it + nWords);
-        vvCs[action.id].insert(it,  vvCs[action.fi].begin(), vvCs[action.fi].end());
+        for(int idx: action.vIndices) {
+          it = vvCs[action.id].insert(it,  vvCs[action.fi].begin() + idx * nWords, vvCs[action.fi].begin() + (idx + 1) * nWords);
+          it += nWords;
+        }
         vvCs[action.fi].clear();
         Clear(nWords, vFs.begin() + action.fi * nWords);
         Clear(nWords, vGs.begin() + action.fi * nWords);

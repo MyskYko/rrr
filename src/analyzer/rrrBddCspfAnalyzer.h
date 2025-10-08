@@ -250,8 +250,12 @@ namespace rrr {
         std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
         DecRef(*it);
         it = vvCs[action.id].erase(it);
-        vvCs[action.id].insert(it,  vvCs[action.fi].begin(), vvCs[action.fi].end());
-        vvCs[action.fi].clear();
+        for(int idx: action.vIndices) {
+          it = vvCs[action.id].insert(it,  vvCs[action.fi][idx]);
+          IncRef(*it);
+          it++;
+        }
+        DelVec(vvCs[action.fi]);
         Assign(vFs[action.fi], LitMax);
         Assign(vGs[action.fi], LitMax);
       }
