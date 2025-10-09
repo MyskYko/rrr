@@ -69,7 +69,6 @@ namespace rrr {
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
     bool IsZero(int n, citr x, word mask) const;
     int  FindOne(int n, citr x, word mask) const;
-    int  FindOneBit(word x) const;
     bool IsEq(int n, citr x, citr y, bool c, word mask) const;
     void Print(int n, citr x) const;
 
@@ -105,13 +104,13 @@ namespace rrr {
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // checks
-    bool CheckRedundancy(int id, int idx);
-    bool CheckFeasibility(int id, int fi, bool c);
+    int CheckRedundancy(int id, int idx);
+    int CheckFeasibility(int id, int fi, bool c);
 
     // others
     int GetDefaultThreshold();
     void DropLastPattern();
-
+ 
     // summary
     void ResetSummary();
     summary<int> GetStatsSummary() const;
@@ -233,26 +232,21 @@ namespace rrr {
     if(mask == one) {
       for(int i = 0; i < n; i++, x++) {
         if(*x) {
-          return i;
+          return i * 64 + __builtin_clzll(*x);
         }
       }
+      return n * 64;
     } else {
       for(int i = 0; i < n - 1; i++, x++) {
         if(*x) {
-          return i;
+          return i * 64 + __builtin_clzll(*x);
         }
       }
       if(*x & mask) {
-        return n - 1;
+        return (n - 1) * 64 + __builtin_clzll(*x);
       }
+        return (n - 1) * 64 + __builtin_clzll(~mask);
     }
-    return -1;
-  }
-
-  template <typename Ntk>
-  inline int CsoSimulator<Ntk>::FindOneBit(word x) const {
-    assert(x);
-    return __builtin_clzll(x);
   }
   
   template <typename Ntk>
@@ -775,7 +769,7 @@ namespace rrr {
   /* {{{ Checks */
   
   template <typename Ntk>
-  bool CsoSimulator<Ntk>::CheckRedundancy(int id, int idx) {
+  int CsoSimulator<Ntk>::CheckRedundancy(int id, int idx) {
     if(!fInitialized) {
       Initialize();
     }
@@ -806,8 +800,7 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       And(nWords - nMaskedWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
-      // TODO: shall we keep track where was the last xor (minimum patterns to drop to remove at least one), probably modify analyzer...
-      return IsZero(nWords - nMaskedWords, tmp.begin(), wLastMask);
+      return FindOne(nWords - nMaskedWords, tmp.begin(), wLastMask);
     }
     default:
       assert(0);
@@ -816,7 +809,8 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  bool CsoSimulator<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  int CsoSimulator<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+    assert(0);
     if(!fInitialized) {
       Initialize();
     }
@@ -856,7 +850,11 @@ namespace rrr {
 
   template <typename Ntk>
   int CsoSimulator<Ntk>::GetDefaultThreshold() {
-    return nWords * 64 + nRemainder;
+    if(nRemainder) {
+      return (nWords - 1) * 64 + nRemainder;
+    } else {
+      return nWords * 64;
+    }
   }
   
   template <typename Ntk>

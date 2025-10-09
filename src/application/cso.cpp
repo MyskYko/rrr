@@ -5,7 +5,7 @@
 #include "network/rrrAndNetwork.h"
 #include "scheduler/rrrCsoScheduler.h"
 #include "optimizer/rrrCsoOptimizer.h"
-#include "analyzer/rrrTtAnalyzer.h"
+#include "analyzer/rrrThresholdAnalyzer.h"
 #include "simulator/rrrCsoSimulator.h"
 #include "partitioner/rrrPartitioner.h"
 #include "partitioner/rrrLevelBasePartitioner.h"
@@ -25,7 +25,7 @@ namespace rrr {
     }
     assert(!pPar->fUseBddCspf && !pPar->fUseBddMspf);
     assert(pPar->nPartitionType == 0);
-    CsoScheduler<Ntk, CsoOptimizer<Ntk, TtAnalyzer<Ntk, CsoSimulator<Ntk>>>, Partitioner<Ntk>> sch(vNtks, pPar);
+    CsoScheduler<Ntk, CsoOptimizer<Ntk, ThresholdAnalyzer<Ntk, CsoSimulator<Ntk>, int, false>>, Partitioner<Ntk>> sch(vNtks, pPar);
     sch.Run();
     if(pPat) {
       delete pPat;
