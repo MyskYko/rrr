@@ -12,7 +12,7 @@ namespace rrr {
 
     int nWords = 0;
     int nRemainder = 0;
-    word last_mask = 0xffffffffffffffff;
+    word wLastMask = 0xffffffffffffffff;
     std::vector<std::vector<word>> data;
     std::vector<std::vector<word>> data_out;
     std::vector<std::vector<word>> data_other;
@@ -51,6 +51,7 @@ namespace rrr {
     data.resize(nInputs);
     char c;
     nRemainder = nSize % 8;
+    wLastMask = 0xffffffffffffffff;
     for(int j = 0; j < nInputs; j++) {
       data[j].resize(nWords);
       int i = 0;
@@ -74,7 +75,7 @@ namespace rrr {
       }
     }
     for(int k = 0; k < nRemainder; k++) {
-      last_mask = last_mask << 8;
+      wLastMask = wLastMask << 8;
     }
     nRemainder *= 8;
   }
@@ -213,7 +214,7 @@ namespace rrr {
   }
 
   inline unsigned long long Pattern::GetLastMask() const {
-    return last_mask;
+    return wLastMask;
   }
 
   inline int Pattern::GetNumRemainder() const {
