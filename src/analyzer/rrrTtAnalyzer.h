@@ -27,6 +27,9 @@ namespace rrr {
     bool CheckRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
 
+    // others
+    void DropLastPattern();
+
     // summary
     void ResetSummary();
     summary<int> GetStatsSummary() const;
@@ -64,6 +67,15 @@ namespace rrr {
 
   /* }}} */
 
+  /* {{{ Others */
+
+  template <typename Ntk, typename Sim>
+  void TtAnalyzer<Ntk, Sim>::DropLastPattern() {
+    sim.DropLastPattern();
+  }
+  
+  /* }}} */
+  
   /* {{{ Summary */
   
   template <typename Ntk, typename Sim>

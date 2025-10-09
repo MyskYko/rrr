@@ -139,13 +139,7 @@ namespace rrr {
     bool Run(int iSeed = 0, seconds nTimeout_ = 0);
     void SetNumTemporary(int nTemporary_);
     int GetNumTemporary();
-    void SetBias(std::vector<std::vector<int>> const &vBias);
-    std::vector<std::vector<int>> GetOutputs();
-    double GetMinimum();
-    void RemoveMinimum();
-    double GetLoss();
-    void SetThreshold(double dThreshold);
-    void SetDelta(double dDelta_);
+    void DropLastPattern();
     void SetNumTargets(int nTargets_);
 
     // summary
@@ -1466,40 +1460,8 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::SetBias(std::vector<std::vector<int>> const &vBias) {
-    ana.SetBias(vBias);
-  }
-
-  template <typename Ntk, typename Ana>
-  std::vector<std::vector<int>> CsoOptimizer<Ntk, Ana>::GetOutputs() {
-    return ana.GetOutputs();
-  }
-
-  template <typename Ntk, typename Ana>
-  double CsoOptimizer<Ntk, Ana>::GetMinimum() {
-    return ana.GetMinimum();
-  }
-  
-  template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::RemoveMinimum() {
-    auto p = ana.GetMinimumPair();
-    pNtk->RemoveFanin(p.first, p.second);
-    assert(ana.GetMinimum() == ana.GetLoss());
-  }
-  
-  template <typename Ntk, typename Ana>
-  double CsoOptimizer<Ntk, Ana>::GetLoss() {
-    return ana.GetLoss();
-  }
-
-  template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::SetThreshold(double dThreshold) {
-    ana.SetThreshold(dThreshold);
-  }
-
-  template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::SetDelta(double dDelta_) {
-    dDelta = dDelta_;
+  void CsoOptimizer<Ntk, Ana>::DropLastPattern() {
+    ana.DropLastPattern();
   }
 
   template <typename Ntk, typename Ana>
