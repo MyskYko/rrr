@@ -35,8 +35,8 @@ namespace rrr {
     bool fGenerated;
     bool fInitialized;
     int nWords;
-    int nRemainder;
     word wLastMask;
+    int nMaskedWords;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
@@ -67,6 +67,8 @@ namespace rrr {
     void Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
     bool IsZero(int n, citr x, word mask) const;
+    int  FindOne(int n, citr x, word mask) const;
+    int  FindOneBit(word x) const;
     bool IsEq(int n, citr x, citr y, bool c, word mask) const;
     void Print(int n, citr x) const;
 
@@ -224,6 +226,33 @@ namespace rrr {
     return true;
   }
 
+  template <typename Ntk>
+  inline int CsoSimulator<Ntk>::FindOne(int n, citr x, word mask) const {
+    if(mask == one) {
+      for(int i = 0; i < n; i++, x++) {
+        if(*x) {
+          return i;
+        }
+      }
+    } else {
+      for(int i = 0; i < n - 1; i++, x++) {
+        if(*x) {
+          return i;
+        }
+      }
+      if(*x & mask) {
+        return n - 1;
+      }
+    }
+    return -1;
+  }
+
+  template <typename Ntk>
+  inline int CsoSimulator<Ntk>::FindOneBit(word x) const {
+    assert(x);
+    return __builtin_clzll(x);
+  }
+  
   template <typename Ntk>
   inline bool CsoSimulator<Ntk>::IsEq(int n, citr x, citr y, bool c, word mask) const {
     if(!c) {
@@ -399,15 +428,15 @@ namespace rrr {
           x = v.begin() + fi * nWords;
           cx = c;
         } else {
-          And(nWords, y, x, v.begin() + fi * nWords, cx, c);
+          And(nWords - nMaskedWords, y, x, v.begin() + fi * nWords, cx, c);
           x = y;
           cx = false;
         }
       });
       if(x == v.end()) {
-        Fill(nWords, y);
+        Fill(nWords - nMaskedWords, y);
       } else if(x != y) {
-        Copy(nWords, y, x, cx);
+        Copy(nWords - nMaskedWords, y, x, cx);
       }
       break;
     default:
@@ -426,25 +455,25 @@ namespace rrr {
           x = v.begin() + fi * nWords;
           cx = c;
         } else {
-          And(nWords, tmp.begin(), x, v.begin() + fi * nWords, cx, c);
+          And(nWords - nMaskedWords, tmp.begin(), x, v.begin() + fi * nWords, cx, c);
           x = tmp.begin();
           cx = false;
         }
       });
       if(x == v.end()) {
-        Fill(nWords, tmp.begin());
+        Fill(nWords - nMaskedWords, tmp.begin());
       } else if(x != tmp.begin()) {
-        Copy(nWords, tmp.begin(), x, cx);
+        Copy(nWords - nMaskedWords, tmp.begin(), x, cx);
       }
       break;
     default:
       assert(0);
     }
     itr y = v.begin() + id * nWords;
-    if(IsEq(nWords, y, tmp.begin(), false, wLastMask)) {
+    if(IsEq(nWords - nMaskedWords, y, tmp.begin(), false, wLastMask)) {
       return false;
     }
-    Copy(nWords, y, tmp.begin(), false);
+    Copy(nWords - nMaskedWords, y, tmp.begin(), false);
     return true;
   }
   
@@ -458,7 +487,7 @@ namespace rrr {
       SimulateNode(pNtk, vValues, id);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
-        Print(nWords, vValues.begin() + id * nWords);
+        Print(nWords - nMaskedWords, vValues.begin() + id * nWords);
         std::cout << std::endl;
       }
     });
@@ -467,7 +496,7 @@ namespace rrr {
     int index = 0;
     pNtk->ForEachPoDriver([&](int fi, bool c) {
       vPoValues[index].resize(nWords);
-      Copy(nWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c);
+      Copy(nWords - nMaskedWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c);
       index++;
     });
     */
@@ -484,7 +513,7 @@ namespace rrr {
       bool fUpdated = ResimulateNode(pNtk, vValues, fo);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
-        Print(nWords, vValues.begin() + fo * nWords);
+        Print(nWords - nMaskedWords, vValues.begin() + fo * nWords);
         std::cout << std::endl;
       }
       return fUpdated;
@@ -494,7 +523,7 @@ namespace rrr {
       SimulateNode(vValues, fo);
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << fo << ": ";
-        Print(nWords, vValues.begin() + fo * nWords);
+        Print(nWords - nMaskedWords, vValues.begin() + fo * nWords);
         std::cout << std::endl;
       }
     });
@@ -502,7 +531,7 @@ namespace rrr {
     /*
     int index = 0;
     pNtk->ForEachPoDriver([&](int fi, bool c){
-      assert(IsEq(nWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c));
+      assert(IsEq(nWords - nMaskedWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c));
       index++;
     });
     */
@@ -520,8 +549,8 @@ namespace rrr {
     pNtk->ForEachPiIdx([&](int index, int id) {
       Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
     });
-    nRemainder = pPat->GetNumRemainder();
     wLastMask = pPat->GetLastMask();
+    nMaskedWords = 0;
     fGenerated = true;
   }
   
@@ -548,10 +577,10 @@ namespace rrr {
       std::cout << "computing careset of " << target << std::endl;
     }
     if(pNtk->IsPoDriver(target)) {
-      Fill(nWords, care.begin());
+      Fill(nWords - nMaskedWords, care.begin());
       if(nVerbose) {
         std::cout << "care " << std::setw(3) << target << ": ";
-        Print(nWords, care.begin());
+        Print(nWords - nMaskedWords, care.begin());
         std::cout << std::endl;
       }
       durationCare += Duration(timeStart, GetCurrentTime());
@@ -559,7 +588,7 @@ namespace rrr {
     }
     vValues2.resize(nWords * pNtk->GetNumNodes());
     StartTraversal();
-    Copy(nWords, vValues2.begin() + target * nWords, vValues.begin() + target * nWords, true);
+    Copy(nWords - nMaskedWords, vValues2.begin() + target * nWords, vValues.begin() + target * nWords, true);
     vTrav[target] = iTrav;
     pNtk->ForEachTfo(target, false, [&](int id) {
       itr x = vValues2.end();
@@ -577,18 +606,18 @@ namespace rrr {
             cx = c;
           } else {
             if(vTrav[fi] != iTrav) {
-              And(nWords, y, x, vValues.begin() + fi * nWords, cx, c);
+              And(nWords - nMaskedWords, y, x, vValues.begin() + fi * nWords, cx, c);
             } else {
-              And(nWords, y, x, vValues2.begin() + fi * nWords, cx, c);
+              And(nWords - nMaskedWords, y, x, vValues2.begin() + fi * nWords, cx, c);
             }
             x = y;
             cx = false;
           }
         });
         if(x == vValues2.end()) {
-          Fill(nWords, y);
+          Fill(nWords - nMaskedWords, y);
         } else if(x != y) {
-          Copy(nWords, y, x, cx);
+          Copy(nWords - nMaskedWords, y, x, cx);
         }
       break;
       default:
@@ -597,22 +626,22 @@ namespace rrr {
       vTrav[id] = iTrav;
       if(nVerbose) {
         std::cout << "node " << std::setw(3) << id << ": ";
-        Print(nWords, vValues2.begin() + id * nWords);
+        Print(nWords - nMaskedWords, vValues2.begin() + id * nWords);
         std::cout << std::endl;
       }
     });
-    Clear(nWords, care.begin());
+    Clear(nWords - nMaskedWords, care.begin());
     pNtk->ForEachPoDriver([&](int fi) {
       assert(fi != target);
       if(vTrav[fi] == iTrav) { // skip unaffected POs
-        for(int i = 0; i < nWords; i++) {
+        for(int i = 0; i < nWords - nMaskedWords; i++) {
           care[i] = care[i] | (vValues[fi * nWords + i] ^ vValues2[fi * nWords + i]);
         }
       }
     });
     if(nVerbose) {
       std::cout << "care " << std::setw(3) << target << ": ";
-      Print(nWords, care.begin());
+      Print(nWords - nMaskedWords, care.begin());
       std::cout << std::endl;
     }
     durationCare += Duration(timeStart, GetCurrentTime());
@@ -690,8 +719,8 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
-    nRemainder(0),
     wLastMask(one),
+    nMaskedWords(0),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -706,8 +735,8 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
-    nRemainder(0),
     wLastMask(one),
+    nMaskedWords(0),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -758,7 +787,7 @@ namespace rrr {
           x = vValues.begin() + fi * nWords;
           cx = c;
         } else {
-          And(nWords, tmp.begin(), x, vValues.begin() + fi * nWords, cx, c);
+          And(nWords - nMaskedWords, tmp.begin(), x, vValues.begin() + fi * nWords, cx, c);
           x = tmp.begin();
           cx = false;
         }
@@ -766,13 +795,14 @@ namespace rrr {
       if(x == vValues.end()) {
         x = care.begin();
       } else {
-        And(nWords, tmp.begin(), x, care.begin(), cx, false);
+        And(nWords - nMaskedWords, tmp.begin(), x, care.begin(), cx, false);
         x = tmp.begin();
       }
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
-      And(nWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
-      return IsZero(nWords, tmp.begin(), wLastMask);
+      And(nWords - nMaskedWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
+      // TODO: shall we keep track where was the last xor (minimum patterns to drop to remove at least one), probably modify analyzer...
+      return IsZero(nWords - nMaskedWords, tmp.begin(), wLastMask);
     }
     default:
       assert(0);
@@ -795,7 +825,7 @@ namespace rrr {
           x = vValues.begin() + fi * nWords;
           cx = c;
         } else {
-          And(nWords, tmp.begin(), x, vValues.begin() + fi * nWords, cx, c);
+          And(nWords - nMaskedWords, tmp.begin(), x, vValues.begin() + fi * nWords, cx, c);
           x = tmp.begin();
           cx = false;
         }
@@ -803,11 +833,11 @@ namespace rrr {
       if(x == vValues.end()) {
         x = care.begin();
       } else {
-        And(nWords, tmp.begin(), x, care.begin(), cx, false);
+        And(nWords - nMaskedWords, tmp.begin(), x, care.begin(), cx, false);
         x = tmp.begin();
       }
-      And(nWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
-      return IsZero(nWords, tmp.begin());
+      And(nWords - nMaskedWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
+      return IsZero(nWords - nMaskedWords, tmp.begin(), wLastMask);
     }
     default:
       assert(0);
@@ -824,7 +854,7 @@ namespace rrr {
     wLastMask <<= 1;
     if(!wLastMask) {
       wLastMask = one;
-      nWords--; // TODO: this is going to break everything
+      nMaskedWords++;
     }
     assert(0);
   }
