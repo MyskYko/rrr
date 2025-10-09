@@ -29,18 +29,20 @@ namespace rrr {
     
     // parameters
     int nVerbose;
-    int nWords;
     bool fSave;
 
     // data
     bool fGenerated;
     bool fInitialized;
+    int nWords;
+    int nRemainders;
+    word wLastMask;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
     std::vector<word> care; // careset
     std::vector<word> tmp;
-
+    
     // backups
     std::vector<CsoSimulator> vBackups;
 
@@ -64,8 +66,8 @@ namespace rrr {
     void And(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Or(int n, itr dst, citr src0, citr src1, bool c0, bool c1) const;
     void Xor(int n, itr dst, citr src0, citr src1, bool c) const;
-    bool IsZero(int n, citr x) const;
-    bool IsEq(int n, citr x, citr y, bool c) const;
+    bool IsZero(int n, citr x, word mask) const;
+    bool IsEq(int n, citr x, citr y, bool c, word mask) const;
     void Print(int n, citr x) const;
 
     // callback
@@ -81,7 +83,7 @@ namespace rrr {
     void Resimulate();
 
     // generate stimuli
-    void GenerateExhaustiveStimuli();
+    void ReadStimuli(Pattern *pPat);
 
     // careset computation
     void ComputeCare(int id);
@@ -202,9 +204,20 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline bool CsoSimulator<Ntk>::IsZero(int n, citr x) const {
-    for(int i = 0; i < n; i++, x++) {
-      if(*x) {
+  inline bool CsoSimulator<Ntk>::IsZero(int n, citr x, word mask) const {
+    if(mask == one) {
+      for(int i = 0; i < n; i++, x++) {
+        if(*x) {
+          return false;
+        }
+      }
+    } else {
+      for(int i = 0; i < n - 1; i++, x++) {
+        if(*x) {
+          return false;
+        }
+      }
+      if(*x & mask) {
         return false;
       }
     }
@@ -212,18 +225,40 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  inline bool CsoSimulator<Ntk>::IsEq(int n, citr x, citr y, bool c) const {
+  inline bool CsoSimulator<Ntk>::IsEq(int n, citr x, citr y, bool c, word mask) const {
     if(!c) {
-      for(int i = 0; i < n; i++, x++, y++) {
-	if(*x != *y) {
-	  return false;
-	}
+      if(mask == one) {
+        for(int i = 0; i < n; i++, x++, y++) {
+          if(*x != *y) {
+            return false;
+          }
+        }
+      } else {
+        for(int i = 0; i < n - 1; i++, x++, y++) {
+          if(*x != *y) {
+            return false;
+          }
+        }
+        if((*x ^ *y) & mask) {
+          return false;
+        }
       }
     } else {
-      for(int i = 0; i < n; i++, x++, y++) {
-	if(*x != ~*y) {
-	  return false;
-	}
+      if(mask == one) {
+        for(int i = 0; i < n; i++, x++, y++) {
+          if(*x != ~*y) {
+            return false;
+          }
+        }
+      } else {
+        for(int i = 0; i < n - 1; i++, x++, y++) {
+          if(*x != ~*y) {
+            return false;
+          }
+        }
+        if((*x ^ ~*y) & mask) {
+          return false;
+        }
       }
     }
     return true;
@@ -406,7 +441,7 @@ namespace rrr {
       assert(0);
     }
     itr y = v.begin() + id * nWords;
-    if(IsEq(nWords, y, tmp.begin(), false)) {
+    if(IsEq(nWords, y, tmp.begin(), false, wLastMask)) {
       return false;
     }
     Copy(nWords, y, tmp.begin(), false);
@@ -479,40 +514,14 @@ namespace rrr {
   /* {{{ Stimuli */
   
   template <typename Ntk>
-  void CsoSimulator<Ntk>::GenerateExhaustiveStimuli() {
-    if(nVerbose) {
-      std::cout << "generating exhaustive stimuli" << std::endl;
-    }
-    assert(pNtk->GetNumPis() < 30);
-    if(pNtk->GetNumPis() <= 6) {
-      nWords = 1;
-    } else {
-      nWords = 1 << (pNtk->GetNumPis() - 6);
-    }
+  void CsoSimulator<Ntk>::ReadStimuli(Pattern *pPat) {
+    nWords = pPat->GetNumWords();
     vValues.resize(nWords * pNtk->GetNumNodes());
     pNtk->ForEachPiIdx([&](int index, int id) {
-      if(index < 6) {
-        itr it = vValues.begin() + id * nWords;
-        for(int i = 0; i < nWords; i++, it++) {
-          *it = basepats[index];
-        }
-      } else {
-        itr it = vValues.begin() + id * nWords;
-        for(int i = 0; i < nWords;) {
-          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
-            *it = 0;
-          }
-          for(int j = 0; j < (1 << (index - 6)); i++, j++, it++) {
-            *it = 0xffffffffffffffffull;
-          }
-        }
-      }
-      if(nVerbose) {
-        std::cout << "node " << std::setw(3) << id << ": ";
-        Print(nWords, vValues.begin() + id * nWords);
-        std::cout << std::endl;
-      }
+      Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
     });
+    nRemainders = pPat->GetNumRemainder();
+    wLastMask = pPat->GetLastMask();
     fGenerated = true;
   }
   
@@ -677,10 +686,12 @@ namespace rrr {
   CsoSimulator<Ntk>::CsoSimulator() :
     pNtk(NULL),
     nVerbose(0),
-    nWords(0),
     fSave(false),
     fGenerated(false),
     fInitialized(false),
+    nWords(0),
+    nRemainders(0),
+    wLastMask(one),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -691,10 +702,12 @@ namespace rrr {
   CsoSimulator<Ntk>::CsoSimulator(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nSimulatorVerbose),
-    nWords(0),
     fSave(pPar->fSave),
     fGenerated(false),
     fInitialized(false),
+    nWords(0),
+    nRemainders(0),
+    wLastMask(one),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -715,7 +728,9 @@ namespace rrr {
     pNtk = pNtk_;
     pNtk->AddCallback(std::bind(&CsoSimulator<Ntk>::ActionCallback, this, std::placeholders::_1));
     if(!fGenerated) {
-      GenerateExhaustiveStimuli();
+      Pattern *pPat = pNtk->GetPattern();
+      assert(pPat);
+      ReadStimuli(pPat);
       care.resize(nWords);
       tmp.resize(nWords);
     }
@@ -757,7 +772,7 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       And(nWords, tmp.begin(), x, vValues.begin() + fi * nWords, false, !c);
-      return IsZero(nWords, tmp.begin());
+      return IsZero(nWords, tmp.begin(), wLastMask);
     }
     default:
       assert(0);
@@ -806,7 +821,7 @@ namespace rrr {
 
   template <typename Ntk>
   void CsoSimulator<Ntk>::DropLastPattern() {
-    
+    assert(0);
   }
   
   /* }}} */
