@@ -35,6 +35,7 @@ namespace rrr {
     bool fGenerated;
     bool fInitialized;
     int nWords;
+    int nRemainder;
     word wLastMask;
     int nMaskedWords;
     int target; // node for which the careset has been computed
@@ -108,6 +109,7 @@ namespace rrr {
     bool CheckFeasibility(int id, int fi, bool c);
 
     // others
+    int GetDefaultThreshold();
     void DropLastPattern();
 
     // summary
@@ -549,6 +551,7 @@ namespace rrr {
     pNtk->ForEachPiIdx([&](int index, int id) {
       Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
     });
+    nRemainder = pPat->GetNumRemainder();
     wLastMask = pPat->GetLastMask();
     nMaskedWords = 0;
     fGenerated = true;
@@ -719,6 +722,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
+    nRemainder(0),
     wLastMask(one),
     nMaskedWords(0),
     target(-1),
@@ -735,6 +739,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
+    nRemainder(0),
     wLastMask(one),
     nMaskedWords(0),
     target(-1),
@@ -849,6 +854,11 @@ namespace rrr {
 
   /* {{{ Others */
 
+  template <typename Ntk>
+  int CsoSimulator<Ntk>::GetDefaultThreshold() {
+    return nWords * 64 + nRemainder;
+  }
+  
   template <typename Ntk>
   void CsoSimulator<Ntk>::DropLastPattern() {
     wLastMask <<= 1;
