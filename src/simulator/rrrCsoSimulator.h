@@ -35,7 +35,7 @@ namespace rrr {
     bool fGenerated;
     bool fInitialized;
     int nWords;
-    int nRemainders;
+    int nRemainder;
     word wLastMask;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
@@ -520,7 +520,7 @@ namespace rrr {
     pNtk->ForEachPiIdx([&](int index, int id) {
       Copy(nWords, vValues.begin() + id * nWords, pPat->GetIterator(index), false);
     });
-    nRemainders = pPat->GetNumRemainder();
+    nRemainder = pPat->GetNumRemainder();
     wLastMask = pPat->GetLastMask();
     fGenerated = true;
   }
@@ -690,7 +690,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
-    nRemainders(0),
+    nRemainder(0),
     wLastMask(one),
     target(-1),
     iTrav(0),
@@ -706,7 +706,7 @@ namespace rrr {
     fGenerated(false),
     fInitialized(false),
     nWords(0),
-    nRemainders(0),
+    nRemainder(0),
     wLastMask(one),
     target(-1),
     iTrav(0),
@@ -821,6 +821,11 @@ namespace rrr {
 
   template <typename Ntk>
   void CsoSimulator<Ntk>::DropLastPattern() {
+    wLastMask <<= 1;
+    if(!wLastMask) {
+      wLastMask = one;
+      nWords--; // TODO: this is going to break everything
+    }
     assert(0);
   }
   
