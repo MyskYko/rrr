@@ -50,7 +50,6 @@ namespace rrr {
     std::vector<int> vTmp;
     time_point start;
     double dDelta;
-    int nTemporary;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -92,7 +91,6 @@ namespace rrr {
     bool RemoveRedundantFanins(int id, bool fRemoveUnused = false);
     bool RemoveRedundancyOneTraversal(bool fSubRoutine);
     bool RemoveRedundancy();
-    bool RemoveRedundancyNew();
     
   public:
     // constructors
@@ -102,8 +100,6 @@ namespace rrr {
 
     // run
     bool Run(int iSeed = 0, seconds nTimeout_ = 0);
-    void SetNumTemporary(int nTemporary_);
-    int GetNumTemporary();
     void SetThreshold(int t);
     int GetNext(); // TODO: typname T?
     void SetNumTargets(int nTargets_);
@@ -199,11 +195,6 @@ namespace rrr {
     case REMOVE_FANIN:
       if(action.id != target) {
         target = -1;
-      }
-      if(!strTemporary.empty()) {
-        Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk));
-        std::string str = strTemporary + "_" +  std::to_string(nTemporary++) + ".aig";
-        DumpAig(str, pNtk);
       }
       break;
     case REMOVE_UNUSED:
@@ -565,11 +556,11 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
+        //TODO: relax threshold using delta here? use SetThreshold of optimize so temporary is saved
       }
     }
     return fReduced;
   }
-
 
   template <typename Ntk, typename Ana>
   bool CsoOptimizer<Ntk, Ana>::RemoveRedundancyOneTraversal(bool fSubRoutine) {
@@ -636,82 +627,6 @@ namespace rrr {
     statsLocal.durationReduce += Duration(timeStart, timeEnd);
     return fReduced;
   }
-  
-  template <typename Ntk, typename Ana>
-  bool CsoOptimizer<Ntk, Ana>::RemoveRedundancyNew() {
-    /*
-    time_point timeStart = GetCurrentTime();
-    std::pair<int, int> p = ana->GetNextPair();
-    if(p.first != -1) {
-      // reduce using next threshold
-      ana->SetThreshold(ana->GetNext());
-      // skip until next
-      std::vector<int> vInts = pNtk->GetInts();
-      critr it = vInts.rbegin();
-      while(*it != p.first) {
-        it++;
-        assert(it != vInts.rend());
-      }
-      // remove next
-      assert(pNtk->IsInt(*it));
-      assert(pNtk->GetNumFanouts(*it));
-      assert(ana.CheckRedundancy(p.first, p.second));
-      pNtk->RemoveFanin(p.first, p.second);
-      for(int idx = p.second idx < pNtk->GetNumFanins(id); idx++) {
-      }
-
-      
-      bool fReduced_ = RemoveRedundantFanins(*it);
-      fReduced |= fReduced_;
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-      }
-      if(fReduced_) {
-        if(!strTemporary.empty()) {
-          Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk));
-          std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
-          DumpAig(str, pNtk);
-        }
-      }
-      
-      for(; it != vInts.rend(); it++) {
-        if(!pNtk->IsInt(*it)) {
-          continue;
-        }
-      if(pNtk->GetNumFanouts(*it) == 0) {
-        pNtk->RemoveUnused(*it);
-        continue;
-      }
-      if(fSortPerNode) {
-        SortFanins(*it);
-      }
-      bool fReduced_ = RemoveRedundantFanins(*it);
-      fReduced |= fReduced_;
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
-      }
-      if(fReduced_) {
-        if(!strTemporary.empty()) {
-          Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk));
-          std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
-          DumpAig(str, pNtk);
-        }
-      }
-    }
-      
-    }
-    bool fReduced = false;
-    assert(fSortPerNode);
-    while(RemoveRedundancyOneTraversal(true)) {
-      fReduced = true;
-      ana.ResetNext();
-    }
-    time_point timeEnd = GetCurrentTime();
-    statsLocal.durationReduce += Duration(timeStart, timeEnd);
-    return fReduced;
-    */
-    return false;
-  }
 
   /* }}} */
   
@@ -734,7 +649,6 @@ namespace rrr {
     strTemporary(pPar->strTemporary),
     ana(pPar),
     dDelta(0),
-    nTemporary(0),
     target(-1),
     iTrav(0) {
   }
@@ -764,7 +678,7 @@ namespace rrr {
     vRandPiOrder.clear();
     vRandCosts.clear();
     if(nSortTypeOriginal < 0) {
-      nSortType = rng() % 18;
+      nSortType = (rng() + 1) % 18; // default to 9
       Print(0, "fanin cost function =", nSortType);
     }
     nTimeout = nTimeout_;
@@ -776,17 +690,12 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::SetNumTemporary(int nTemporary_) {
-    nTemporary = nTemporary_;
-  }
-  
-  template <typename Ntk, typename Ana>
-  int CsoOptimizer<Ntk, Ana>::GetNumTemporary() {
-    return nTemporary;
-  }
-
-  template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetThreshold(int t) {
+    if(!strTemporary.empty()) {
+      Print(0, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+      std::string str = strTemporary + "_" +  std::to_string(ana.GetThreshold()) + ".aig";
+      DumpAig(str, pNtk);
+    }
     ana.SetThreshold(t);
     StartTraversal();
   }
