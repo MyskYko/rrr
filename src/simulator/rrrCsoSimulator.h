@@ -109,7 +109,7 @@ namespace rrr {
 
     // others
     int GetDefaultThreshold();
-    void DropLastPattern();
+    void Drop(int from);
  
     // summary
     void ResetSummary();
@@ -858,13 +858,14 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void CsoSimulator<Ntk>::DropLastPattern() {
-    wLastMask <<= 1;
-    if(!wLastMask) {
+  void CsoSimulator<Ntk>::Drop(int from) {
+    int nUse = (from + 63) / 64;
+    nMaskedWords = nWords - nUse;
+    if(from % 64 == 0) {
       wLastMask = one;
-      nMaskedWords++;
+    } else {
+      wLastMask = one << (64 - (from % 64));
     }
-    assert(0);
   }
   
   /* }}} */

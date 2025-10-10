@@ -5,6 +5,11 @@
 
 namespace rrr {
 
+  template <typename T>
+  concept HasDrop = requires(T t, int x) {
+    { t.Drop(x) };
+  };
+
   template <typename Ntk, typename Sim, typename T, bool fAscending>
   class ThresholdAnalyzer {
   private:
@@ -134,6 +139,9 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename T, bool fAscending>
   void ThresholdAnalyzer<Ntk, Sim, T, fAscending>::SetThreshold(T tThreshold_) {
     tThreshold = tThreshold_;
+    if constexpr(HasDrop<Sim>) {
+      sim.Drop(tThreshold);
+    }
   }
 
   // template <typename Ntk, typename Sim, typename T, bool fAscending>
