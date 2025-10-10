@@ -1499,6 +1499,9 @@ namespace rrr {
             it++;
             action.vFanins.push_back(GetConst0());
             action.vIndices.push_back(idx2);
+          } else {
+            // duplication with the same polarity
+            vRefs[fi2]--;
           }
         });
         // remove collapsed fanin

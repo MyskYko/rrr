@@ -70,8 +70,6 @@ namespace rrr {
 
   template <typename Ntk>
   std::string CreateAig(Ntk *pNtk) {
-    std::stringstream ss;
-    ss << "aig " << pNtk->GetNumPis() + pNtk->GetNumInts() << " " << pNtk->GetNumPis() << " 0 " << pNtk->GetNumPos() << " " << pNtk->GetNumInts() << std::endl;
     std::vector<int> vValues(pNtk->GetNumNodes());
     int nNodes = 0;
     vValues[pNtk->GetConst0()] = nNodes++ << 1;
@@ -88,9 +86,7 @@ namespace rrr {
         nNodes += pNtk->GetNumFanins(id) - 1;
       }
     });
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
-      ss << (vValues[fi] ^ (int)c) << std::endl;
-    });
+    std::stringstream ss;
     pNtk->ForEachInt([&](int id) {
       if(pNtk->GetNumFanins(id) > 1) {
         int i = pNtk->GetNumFanins(id) - 1;
@@ -111,7 +107,12 @@ namespace rrr {
         }
       }
     });
-    return ss.str();
+    std::stringstream ss0;
+    ss0 << "aig " << nNodes - 1 << " " << pNtk->GetNumPis() << " 0 " << pNtk->GetNumPos() << " " << nNodes - pNtk->GetNumPis() - 1 << std::endl;
+    pNtk->ForEachPoDriver([&](int fi, bool c) {
+      ss0 << (vValues[fi] ^ (int)c) << std::endl;
+    });
+    return ss0.str() + ss.str();
   }
 
   template <typename Ntk>
