@@ -29,6 +29,7 @@ namespace rrr {
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
 
     // interface
+    T GetThreshold() const;
     void SetThreshold(T tThreshold_);
     //T GetCurrent();
     T GetNext() const;
@@ -125,6 +126,11 @@ namespace rrr {
   
   /* {{{ Interface */
 
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  T ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetThreshold() const {
+    return tThreshold;
+  }
+  
   template <typename Ntk, typename Sim, typename T, bool fAscending>
   void ThresholdAnalyzer<Ntk, Sim, T, fAscending>::SetThreshold(T tThreshold_) {
     tThreshold = tThreshold_;

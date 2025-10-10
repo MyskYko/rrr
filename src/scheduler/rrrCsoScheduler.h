@@ -23,7 +23,7 @@ namespace rrr {
     static constexpr char *pCompress2rs = "balance -l; resub -K 6 -l; rewrite -l; resub -K 6 -N 2 -l; refactor -l; resub -K 8 -l; balance -l; resub -K 8 -N 2 -l; rewrite -l; resub -K 10 -l; rewrite -z -l; resub -K 10 -N 2 -l; balance -l; resub -K 12 -l; refactor -z -l; resub -K 12 -N 2 -l; rewrite -z -l; balance -l";
     
     // pointer to network
-    std::vector<Ntk *> vNtks;
+    Ntk *pNtk;
 
     // parameters
     int nVerbose;
@@ -44,7 +44,7 @@ namespace rrr {
     int nFinishedJobs;
     time_point timeStart;
     Par par;
-    std::vector<Opt *> vOpts;
+    Opt *pOpt;
     std::vector<std::string> vStatsSummaryKeys;
     std::map<std::string, int> mStatsSummary;
     std::vector<std::string> vTimesSummaryKeys;
@@ -64,7 +64,7 @@ namespace rrr {
 
   public:
     // constructors
-    CsoScheduler(std::vector<Ntk *> vNtks, Parameter const *pPar);
+    CsoScheduler(Ntk *pNtk, Parameter const *pPar);
     ~CsoScheduler();
     
     // run
@@ -134,8 +134,8 @@ namespace rrr {
   /* {{{ Constructors */
 
   template <typename Ntk, typename Opt, typename Par>
-  CsoScheduler<Ntk, Opt, Par>::CsoScheduler(std::vector<Ntk *> vNtks, Parameter const *pPar) :
-    vNtks(vNtks),
+  CsoScheduler<Ntk, Opt, Par>::CsoScheduler(Ntk *pNtk, Parameter const *pPar) :
+    pNtk(pNtk),
     nVerbose(pPar->nSchedulerVerbose),
     iSeed(pPar->iSeed),
     nFlow(pPar->nSchedulerFlow),
@@ -159,16 +159,12 @@ namespace rrr {
       return nTwoInputSize;
     };
     assert(!fMultiThreading);
-    for(int i = 0; i < int_size(vNtks); i++) {
-      vOpts.push_back(new Opt(pPar, CostFunction));
-    }
+    pOpt = new Opt(pPar, CostFunction);
   }
 
   template <typename Ntk, typename Opt, typename Par>
   CsoScheduler<Ntk, Opt, Par>::~CsoScheduler() {
-    for(int i = 0; i < int_size(vOpts); i++) {
-      delete vOpts[i];
-    }
+    delete pOpt;
   }
 
   /* }}} */
@@ -178,70 +174,34 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void CsoScheduler<Ntk, Opt, Par>::Run() {
     timeStart = GetCurrentTime();
-    double costStart = 0;
-    for(Ntk *pNtk: vNtks) {
-      costStart += CostFunction(pNtk);
-    }
+    double costStart = CostFunction(pNtk);
 
-    for(int i = 0; i < int_size(vNtks); i++) {
-      vOpts[i]->AssignNetwork(vNtks[i], i);
-    }
+    pOpt->AssignNetwork(pNtk, 0); // TODO: remove second input
+    pOpt->SetPrintLine([&](std::string str) {
+      Print(-1, "", str);
+    });
 
-    int nTemporary = 0;
     double cost = costStart;
 
     // first round
     Print(0, "", "round", 0, ":", "cost", "=", cost);
-    for(int i = 0; i < int_size(vNtks); i++) {
-      Print(1, "", "module", i);
-      vOpts[i]->SetNumTemporary(nTemporary);
-      vOpts[i]->SetPrintLine([&](std::string str) {
-        Print(-1, "module " + std::to_string(i) + " : ", str);
-      });
-      vOpts[i]->Run();
-      nTemporary = vOpts[i]->GetNumTemporary();
-    }
-    cost = 0;
-    for(Ntk *pNtk: vNtks) {
-      cost += CostFunction(pNtk);
-    }
+    pOpt->Run();
+    cost = CostFunction(pNtk);
 
     // iterative threshold increase
     for(int k = 1; cost > 0; k++) {
-      Print(0, "", "round", k, ":", "cost", "=", cost);
-      int idx = -1;
-      int tBest = -1; // TODO: parameter? this is not fAscending
-      for(int i = 0; i < int_size(vNtks); i++) {
-        if(tBest < vOpts[i]->GetNext()) {
-          tBest = vOpts[i]->GetNext();
-          idx = i;
-        }
-      }
-      Print(1, "", "module", idx, ":", "next threshold", "=", tBest);
-      assert(tBest >= 0);
-      vOpts[idx]->SetNumTemporary(nTemporary);
-      vOpts[idx]->SetPrintLine([&](std::string str) {
-        Print(-1, "module " + std::to_string(idx) + " : ", str);
-      });
-      bool fReduced = vOpts[idx]->Run();
+      Print(0, "", "round", k, ":", "cost", "=", cost, "next threshold", "=", pOpt->GetNext());
+      pOpt->SetThreshold(pOpt->GetNext());
+      bool fReduced = pOpt->Run();
       assert(fReduced);
-      nTemporary = vOpts[idx]->GetNumTemporary();
-      cost = 0;
-      for(Ntk *pNtk: vNtks) {
-        cost += CostFunction(pNtk);
-      }
+      cost = CostFunction(pNtk);
     }
 
-    for(int i = 0; i < int_size(vNtks); i++) {
-      AddToSummary(vStatsSummaryKeys, mStatsSummary, vOpts[i]->GetStatsSummary());
-      AddToSummary(vTimesSummaryKeys, mTimesSummary, vOpts[i]->GetTimesSummary());
-      vOpts[i]->ResetSummary();
-    }
+    AddToSummary(vStatsSummaryKeys, mStatsSummary, pOpt->GetStatsSummary());
+    AddToSummary(vTimesSummaryKeys, mTimesSummary, pOpt->GetTimesSummary());
+    pOpt->ResetSummary();
     
-    cost = 0;
-    for(Ntk *pNtk: vNtks) {
-      cost += CostFunction(pNtk);
-    }
+    cost = CostFunction(pNtk);
     double duration = GetElapsedTime();
     Print(0, "\n", "stats summary", ":");
     for(std::string key: vStatsSummaryKeys) {

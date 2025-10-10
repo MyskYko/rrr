@@ -12,26 +12,24 @@
 #include "io/rrrAig.h"
 
 namespace rrr {
-  
+
   template <typename Ntk>
-  void PerformCso(std::vector<Ntk *> &vNtks, Parameter const *pPar) {
+  void PerformCso(Ntk *pNtk, Parameter const *pPar) {
     Pattern *pPat = NULL;
     if(!pPar->strPattern.empty()) {
       pPat = new Pattern;
-      pPat->Read(pPar->strPattern, vNtks[0]->GetNumPis());
-      for(Ntk *pNtk: vNtks) {
-        pNtk->RegisterPattern(pPat);
-      }
+      pPat->Read(pPar->strPattern, pNtk->GetNumPis());
+      pNtk->RegisterPattern(pPat);
     }
     assert(!pPar->fUseBddCspf && !pPar->fUseBddMspf);
     assert(pPar->nPartitionType == 0);
-    CsoScheduler<Ntk, CsoOptimizer<Ntk, ThresholdAnalyzer<Ntk, CsoSimulator<Ntk>, int, false>>, Partitioner<Ntk>> sch(vNtks, pPar);
+    CsoScheduler<Ntk, CsoOptimizer<Ntk, ThresholdAnalyzer<Ntk, CsoSimulator<Ntk>, int, false>>, Partitioner<Ntk>> sch(pNtk, pPar);
     sch.Run();
     if(pPat) {
       delete pPat;
     }
   }
-
+  
 }
 
 int main(int argc, char **argv) {
@@ -40,7 +38,7 @@ int main(int argc, char **argv) {
   options.set_width(100);
   
   options.add_options()
-    ("inputs", "Input file names", cxxopts::value<std::vector<std::string>>())
+    ("input", "Input file names", cxxopts::value<std::string>())
     ("o,output", "Output file name", cxxopts::value<std::string>())
     ("l,log", "Directory name to dump log files", cxxopts::value<std::string>())
     ("R,seed", "Random seed integer", cxxopts::value<int>()->default_value("0"))
@@ -101,8 +99,8 @@ int main(int argc, char **argv) {
     ("W,word", "Number of simualtion words", cxxopts::value<int>()->default_value("10"))
     ;
   
-  options.parse_positional({"inputs"});
-  options.positional_help("<inputs>")
+  options.parse_positional({"input"});
+  options.positional_help("<input>")
     .show_positional_help();
 
   auto result = options.parse(argc, argv);
@@ -112,7 +110,7 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  std::vector<std::string> input_filenames = result["inputs"].as<std::vector<std::string>>();
+  std::string input_filename = result["input"].as<std::string>();
   std::string output_filename;
   if(result.count("output")) {
     output_filename = result["output"].as<std::string>();
@@ -194,20 +192,13 @@ int main(int argc, char **argv) {
   }
   */
 
-  std::vector<rrr::AndNetwork *> vNtks;
-  for(int i = 0; i < rrr::int_size(input_filenames); i++) {
-    vNtks.push_back(new rrr::AndNetwork);
-    vNtks[i]->Read(input_filenames[i], rrr::AigFileReader<rrr::AndNetwork>);
-  }
+  rrr::AndNetwork ntk;
+  ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformCso(vNtks, &Par);
+  rrr::PerformCso(&ntk, &Par);
 
-  // if(!output_filename.empty()) {
-  //   rrr::DumpAig(output_filename, &ntk);
-  // }
-  
-  for(int i = 0; i < int_size(vNtks); i++) {
-    delete vNtks[i];
+  if(!output_filename.empty()) {
+    rrr::DumpAig(output_filename, &ntk);
   }
 
   return 0;

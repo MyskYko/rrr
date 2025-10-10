@@ -39,7 +39,6 @@ namespace rrr {
     bool fCompatible;
     bool fGreedy;
     std::string strTemporary;
-    int nModule;
     seconds nTimeout; // assigned upon Run
     std::function<void(std::string)> PrintLine;
 
@@ -98,13 +97,14 @@ namespace rrr {
   public:
     // constructors
     CsoOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
-    void AssignNetwork(Ntk *pNtk_, int nModule_, bool fReuse = false);
+    void AssignNetwork(Ntk *pNtk_, bool fReuse = false);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
 
     // run
     bool Run(int iSeed = 0, seconds nTimeout_ = 0);
     void SetNumTemporary(int nTemporary_);
     int GetNumTemporary();
+    void SetThreshold(int t);
     int GetNext(); // TODO: typname T?
     void SetNumTargets(int nTargets_);
 
@@ -202,7 +202,7 @@ namespace rrr {
       }
       if(!strTemporary.empty()) {
         Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk));
-        std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
+        std::string str = strTemporary + "_" +  std::to_string(nTemporary++) + ".aig";
         DumpAig(str, pNtk);
       }
       break;
@@ -716,9 +716,8 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, int nModule_, bool fReuse) {
+  void CsoOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
-    nModule = nModule_;
     dDelta = 0;
     target = -1;
     pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
@@ -765,6 +764,11 @@ namespace rrr {
     return nTemporary;
   }
 
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetThreshold(int t) {
+    ana.SetThreshold(t);
+  }
+  
   template <typename Ntk, typename Ana>
   int CsoOptimizer<Ntk, Ana>::GetNext() {
     return ana.GetNext();
