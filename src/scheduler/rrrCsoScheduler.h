@@ -176,7 +176,7 @@ namespace rrr {
     timeStart = GetCurrentTime();
     double costStart = CostFunction(pNtk);
 
-    pOpt->AssignNetwork(pNtk, 0); // TODO: remove second input
+    pOpt->AssignNetwork(pNtk);
     pOpt->SetPrintLine([&](std::string str) {
       Print(-1, "", str);
     });

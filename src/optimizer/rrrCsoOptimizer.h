@@ -576,7 +576,14 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     std::vector<int> vInts = pNtk->GetInts();
-    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
+    critr it = vInts.rbegin();
+    if(ana.GetNext() == ana.GetThreshold()) {
+      while(*it != ana.GetNextPair().first) {
+        it++;
+        assert(it != vInts.rend());
+      }
+    }
+    for(; it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
         continue;
       }
@@ -584,13 +591,20 @@ namespace rrr {
         pNtk->RemoveUnused(*it);
         continue;
       }
+      if(vTrav[*it] == iTrav) {
+        continue;
+      }
       pNtk->TrivialCollapse(*it);
       assert(fSortPerNode);
       SortFanins(*it);
-      bool fReduced_ = RemoveRedundantFanins(*it);
-      fReduced |= fReduced_;
-      if(pNtk->GetNumFanins(*it) <= 1) {
-        pNtk->Propagate(*it);
+      if(RemoveRedundantFanins(*it)) {
+        fReduced = true;
+        if(pNtk->GetNumFanins(*it) <= 1) {
+          pNtk->Propagate(*it);
+        }
+        StartTraversal();
+      } else {
+        vTrav[*it] = iTrav;
       }
     }
     if(!fSubRoutine) {
@@ -605,9 +619,18 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     assert(fSortPerNode);
+    int tNext = -1;
+    int nNext = -1;
     while(RemoveRedundancyOneTraversal(true)) {
       fReduced = true;
+      tNext = ana.GetNext();
+      nNext = ana.GetNextPair().first;
       ana.ResetNext();
+    }
+    if(nNext != -1 && ana.GetNext() < tNext) {
+      bool f = RemoveRedundantFanins(nNext);
+      assert(!f);
+      assert(ana.GetNext() == tNext);
     }
     time_point timeEnd = GetCurrentTime();
     statsLocal.durationReduce += Duration(timeStart, timeEnd);
@@ -712,7 +735,8 @@ namespace rrr {
     ana(pPar),
     dDelta(0),
     nTemporary(0),
-    target(-1) {
+    target(-1),
+    iTrav(0) {
   }
   
   template <typename Ntk, typename Ana>
@@ -720,6 +744,7 @@ namespace rrr {
     pNtk = pNtk_;
     dDelta = 0;
     target = -1;
+    StartTraversal();
     pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
     ana.AssignNetwork(pNtk, fReuse);
   }
@@ -747,10 +772,6 @@ namespace rrr {
     if(fSortInitial) {
       SortFanins();
     }
-    std::pair<int, int> p = ana.GetNextPair();
-    if(p.first != -1) {
-      ana.SetThreshold(ana.GetNext());
-    }
     return RemoveRedundancy();
   }
 
@@ -767,6 +788,7 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetThreshold(int t) {
     ana.SetThreshold(t);
+    StartTraversal();
   }
   
   template <typename Ntk, typename Ana>
