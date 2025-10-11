@@ -49,7 +49,7 @@ namespace rrr {
     std::mt19937 rng;
     std::vector<int> vTmp;
     time_point start;
-    double dDelta;
+    int tDelta;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -100,8 +100,11 @@ namespace rrr {
 
     // run
     bool Run(int iSeed = 0, seconds nTimeout_ = 0);
+    int GetThreshold();
     void SetThreshold(int t);
     int GetNext(); // TODO: typname T?
+    int GetDelta();
+    void SetDelta(int tDelta_);
     void SetNumTargets(int nTargets_);
 
     // summary
@@ -556,7 +559,9 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
-        //TODO: relax threshold using delta here? use SetThreshold of optimize so temporary is saved
+        if(tDelta) {
+          SetThreshold(ana.GetThreshold() + tDelta);
+        }
       }
     }
     return fReduced;
@@ -648,7 +653,7 @@ namespace rrr {
     fGreedy(pPar->fGreedy),
     strTemporary(pPar->strTemporary),
     ana(pPar),
-    dDelta(0),
+    tDelta(0),
     target(-1),
     iTrav(0) {
   }
@@ -656,7 +661,7 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
-    dDelta = 0;
+    tDelta = 0;
     target = -1;
     StartTraversal();
     pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
@@ -690,6 +695,11 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana>
+  int CsoOptimizer<Ntk, Ana>::GetThreshold() {
+    return ana.GetThreshold();
+  }
+
+  template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetThreshold(int t) {
     if(!strTemporary.empty()) {
       Print(0, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
@@ -703,6 +713,16 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   int CsoOptimizer<Ntk, Ana>::GetNext() {
     return ana.GetNext();
+  }
+
+  template <typename Ntk, typename Ana>
+  int CsoOptimizer<Ntk, Ana>::GetDelta() {
+    return tDelta;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetDelta(int tDelta_) {
+    tDelta = tDelta_;
   }
   
   template <typename Ntk, typename Ana>
