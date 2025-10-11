@@ -44,11 +44,7 @@ namespace rrr {
     static constexpr bool fTwoArgSym = false;
     
     // data
-    Table<std::vector<int>> tab;
-    int nUniques;
-    std::map<std::string, int> table;
-    std::vector<std::string> strs;
-    std::vector<std::vector<std::pair<int, std::vector<Action>>>> history;
+    std::vector<Table<std::vector<int>>> tabs;
     int nCreatedJobs;
     int nFinishedJobs;
     std::queue<Job *> qPendingJobs;
@@ -56,7 +52,7 @@ namespace rrr {
 #ifdef ABC_USE_PTHREADS
     bool fTerminate;
     std::vector<std::thread> vThreads;
-    std::mutex mutexTable;
+    std::vector<std::unique_ptr<std::mutex>> mutexTables;
     std::mutex mutexPendingJobs;
     std::mutex mutexFinishedJobs;
     std::mutex mutexPrint;
@@ -69,13 +65,13 @@ namespace rrr {
     void Print(int nVerboseLevel, std::string prefix, Args... args);
 
     // table
-    bool Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index);
+    bool Register(Ntk *pNtk, int src_tab, int src_idx, std::vector<Action> const &vActions, int next_tab, int &index);
     
     // run jobs
     void RunJob(Opt &opt, Job *pJob);
 
     // manage jobs
-    Job *CreateJob(int src, int cost, bool fAdd);
+    Job *CreateJob(int src_tab, int src_idx, int cost, int nAdd);
     void Wait();
 
     // thread
@@ -98,17 +94,19 @@ namespace rrr {
   struct UrScheduler<Ntk, Opt, Par>::Job {
     // data
     int id;
-    int src;
+    int src_tab;
+    int src_idx;
     int cost;
-    bool fAdd;
+    int nAdd;
     std::string prefix;
     
     // constructor
-    Job(int id, int src, int cost, bool fAdd) :
+    Job(int id, int src_tab, int src_idx, int cost, int nAdd) :
       id(id),
-      src(src),
+      src_tab(src_tab),
+      src_idx(src_idx),
       cost(cost),
-      fAdd(fAdd) {
+      nAdd(nAdd) {
       std::stringstream ss;
       PrintNext(ss, "job", id, ":");
       prefix = ss.str() + " ";
@@ -144,9 +142,9 @@ namespace rrr {
   /* }}} */
     
   /* {{{ Table */
-  
+
   template <typename Ntk, typename Opt, typename Par>
-  bool UrScheduler<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
+  bool UrScheduler<Ntk, Opt, Par>::Register(Ntk *pNtk, int src_tab, int src_idx, std::vector<Action> const &vActions, int next_tab, int &index) {
     std::string str, str_sym;
     {
       Ntk ntk;
@@ -169,7 +167,8 @@ namespace rrr {
     }
     std::vector<int> his;
     {
-      his.push_back(src);
+      his.push_back(src_tab);
+      his.push_back(src_idx);
       for(auto const &action: vActions) {
         if(action.type == REMOVE_FANIN) {
           his.push_back(action.id);
@@ -183,56 +182,12 @@ namespace rrr {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
       {
-        std::unique_lock<std::mutex> l(mutexTable);
-        return tab.Register(str, his, index, str_sym);
-        /*
-        if(table.count(str)) {
-          index = table[str];
-          history[index].emplace_back(src, vActions);
-          return false;
-        }
-        if(fTwoArgSym && str != str_sym) {
-          if(table.count(str_sym)) {
-            index = table[str_sym];
-            history[index].emplace_back(src, vActions);
-            return false;
-          }
-        }
-        index = nUniques++;
-        table[str] = index;
-        strs.push_back(str);
-        if(int_size(history) < nUniques) {
-          history.resize(nUniques);
-        }
-        history[index].emplace_back(src, vActions);
-        return true;
-        */
+        std::unique_lock<std::mutex> l(*mutexTables[next_tab]);
+        return tabs[next_tab].Register(str, his, index, str_sym);
       }
     }
 #endif
-    return tab.Register(str, his, index, str_sym);
-    /*
-    if(table.count(str)) {
-      index = table[str];
-      history[index].emplace_back(src, vActions);
-      return false;
-    }
-    if(fTwoArgSym) {
-      if(table.count(str_sym)) {
-        index = table[str_sym];
-        history[index].emplace_back(src, vActions);
-        return false;
-      }
-    }
-    index = nUniques++;
-    table[str] = index;
-    strs.push_back(str);
-    if(int_size(history) < nUniques) {
-      history.resize(nUniques);
-    }
-    history[index].emplace_back(src, vActions);
-    return true;
-    */
+    return tabs[next_tab].Register(str, his, index, str_sym);
   }
   
   /* }}} */
@@ -242,41 +197,33 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void UrScheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     Ntk ntk;
-    //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
-    ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
-    //opt.AssignNetwork(&ntk, pJob->fAdd);
-    opt.AssignNetwork(&ntk, nJobs);
+    ntk.Read(tabs[pJob->src_tab].Get(pJob->src_idx), BinaryReader<Ntk>);
+    opt.AssignNetwork(&ntk, pJob->nAdd < nJobs);
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });
-    int nChoices = 0, nNews = 0;
-    while(true) {
+    for(int k = 0; true; k++) {
       auto vActions = opt.Run();
       if(vActions.empty()) {
+        if(k == 0 && pJob->nAdd == nJobs) {
+          if(!fNoIncrease || CostFunction(&ntk) <= pJob->cost) {
+            int index;
+            bool fNew = Register(&ntk, pJob->src_tab, pJob->src_idx, vActions, 0, index);
+            if(fNew) {
+              Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)");
+              CreateJob(0, index, CostFunction(&ntk), 0);
+            }
+          }
+        }
         break;
       }
       int index;
-      if(!fNoIncrease || CostFunction(&ntk) <= pJob->cost) {
-        bool fNew = Register(&ntk, pJob->src, vActions, index);
-        if(fNew) {
-          //if(index % 1000 == 0)
-          Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
-          CreateJob(index, CostFunction(&ntk), true);
-          nNews++;
-        } else {
-          //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
-        }
+      int next_tab = std::min(pJob->nAdd + 1, nJobs);
+      bool fNew = Register(&ntk, pJob->src_tab, pJob->src_idx, vActions, next_tab, index);
+      if(fNew) {
+        Print(1, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "tab", "=", next_tab, "idx", "=", index);
+        CreateJob(next_tab, index, CostFunction(&ntk), next_tab);
       }
-      /*
-      for(auto action: vActions) {
-        auto ss = GetActionDescription(action);
-        std::string str;
-        std::getline(ss, str);
-        std::cout << str << std::endl;
-      }
-      std::cout << std::endl;
-      */
-      nChoices++;
     }
     delete pJob;
 #ifdef ABC_USE_PTHREADS
@@ -297,18 +244,20 @@ namespace rrr {
   /* {{{ Manage jobs */
 
   template <typename Ntk, typename Opt, typename Par>
-  typename UrScheduler<Ntk, Opt, Par>::Job *UrScheduler<Ntk, Opt, Par>::CreateJob(int src, int cost, bool fAdd) {
-    Job *pJob = new Job(nCreatedJobs++, src, cost, fAdd);
+  typename UrScheduler<Ntk, Opt, Par>::Job *UrScheduler<Ntk, Opt, Par>::CreateJob(int src_tab, int src_idx, int cost, int nAdd) {
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
+      Job *pJob;
       {
         std::unique_lock<std::mutex> l(mutexPendingJobs);
+        pJob = new Job(nCreatedJobs++, src_tab, src_idx, cost, nAdd);
         qPendingJobs.push(pJob);
         condPendingJobs.notify_one();
       }
       return pJob;
     }
 #endif
+    Job *pJob = new Job(nCreatedJobs++, src_tab, src_idx, cost, nAdd);
     qPendingJobs.push(pJob);
     return pJob;
   }
@@ -394,8 +343,6 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
-    tab(27),
-    nUniques(0),
     nCreatedJobs(0),
     nFinishedJobs(0) {
     CostFunction = [](Ntk *pNtk) {
@@ -405,8 +352,14 @@ namespace rrr {
       });
       return nTwoInputSize;
     };
+    for(int i = 0; i < nJobs + 1; i++) {
+      tabs.emplace_back(20);
+    }
     pOpt = new Opt(pPar);
 #ifdef ABC_USE_PTHREADS
+    for(int i = 0; i < nJobs + 1; i++) {
+      mutexTables.emplace_back(std::make_unique<std::mutex>());
+    }
     fTerminate = false;
     if(fMultiThreading) {
       vThreads.reserve(pPar->nThreads);
@@ -445,15 +398,14 @@ namespace rrr {
     bool fRedundant = pOpt->IsRedundant(pOriginal);
     std::vector<Action> vActions;
     int index;
-    Register(pOriginal, -1, vActions, index);
+    Register(pOriginal, -1, 0, vActions, 0, index);
     assert(!fRedundant);
-    CreateJob(index, CostFunction(pOriginal), !fRedundant);
+    CreateJob(0, index, CostFunction(pOriginal), 0);
 
     // wait until all jobs are done
     Wait();
 
-    //Print(-1, "","unique", "=", nUniques - (int)fRedundant);
-    Print(-1, "","unique", "=", tab.Size() - (int)fRedundant);
+    Print(-1, "","unique", "=", tabs[0].Size() - (int)fRedundant);
     Print(-1, "","jobs", "=", nFinishedJobs);
     
     // for(std::string s: strs) {
