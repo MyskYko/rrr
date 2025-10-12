@@ -561,6 +561,7 @@ namespace rrr {
         }
         if(tDelta) {
           SetThreshold(ana.GetThreshold() + tDelta);
+          return true;
         }
       }
     }
@@ -598,6 +599,9 @@ namespace rrr {
         if(pNtk->GetNumFanins(*it) <= 1) {
           pNtk->Propagate(*it);
         }
+        if(tDelta) {
+          break;
+        }
         StartTraversal();
       } else {
         vTrav[*it] = iTrav;
@@ -623,7 +627,7 @@ namespace rrr {
       nNext = ana.GetNextPair().first;
       ana.ResetNext();
     }
-    if(nNext != -1 && pNtk->IsInt(nNext) && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
+    if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
       bool f = RemoveRedundantFanins(nNext);
       assert(!f);
       assert(ana.GetNext() == tNext);
