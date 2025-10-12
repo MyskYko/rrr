@@ -560,8 +560,7 @@ namespace rrr {
           pNtk->RemoveUnused(fi, true);
         }
         if(tDelta) {
-          SetThreshold(ana.GetThreshold() + tDelta);
-          return true;
+          break;
         }
       }
     }
@@ -623,9 +622,13 @@ namespace rrr {
     int nNext = -1;
     while(RemoveRedundancyOneTraversal(true)) {
       fReduced = true;
-      tNext = ana.GetNext();
-      nNext = ana.GetNextPair().first;
-      ana.ResetNext();
+      if(tDelta) {
+        SetThreshold(ana.GetThreshold() + tDelta);
+      } else {
+        tNext = ana.GetNext();
+        nNext = ana.GetNextPair().first;
+        ana.ResetNext();
+      }
     }
     if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
       bool f = RemoveRedundantFanins(nNext);
