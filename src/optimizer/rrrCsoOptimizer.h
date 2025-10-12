@@ -623,7 +623,7 @@ namespace rrr {
       nNext = ana.GetNextPair().first;
       ana.ResetNext();
     }
-    if(nNext != -1 && ana.GetNext() > tNext) { // TODO: change inequality if threshold is increasing/decreasing
+    if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
       bool f = RemoveRedundantFanins(nNext);
       assert(!f);
       assert(ana.GetNext() == tNext);
