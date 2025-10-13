@@ -43,6 +43,7 @@ namespace rrr {
     std::vector<word> care;
     std::vector<word> tmp;
     std::vector<word> tmp2;
+    std::vector<word> tmp3;
     std::vector<word> vErrors;
     
     // backups
@@ -81,7 +82,6 @@ namespace rrr {
     
     // simulation
     void SimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) const;
-    bool ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id);
     void Simulate();
     void Resimulate();
 
@@ -436,39 +436,6 @@ namespace rrr {
       assert(0);
     }
   }
-      
-  template <typename Ntk>
-  bool L0Simulator<Ntk>::ResimulateNode(Ntk *pNtk_, std::vector<word> &v, int id) {
-    itr x = v.end();
-    bool cx = false;
-    switch(pNtk_->GetNodeType(id)) {
-    case AND:
-      pNtk_->ForEachFanin(id, [&](int fi, bool c) {
-        if(x == v.end()) {
-          x = v.begin() + fi * nWords;
-          cx = c;
-        } else {
-          And(nWords, tmp.begin(), x, v.begin() + fi * nWords, cx, c);
-          x = tmp.begin();
-          cx = false;
-        }
-      });
-      if(x == v.end()) {
-        Fill(nWords, tmp.begin());
-      } else if(x != tmp.begin()) {
-        Copy(nWords, tmp.begin(), x, cx);
-      }
-      break;
-    default:
-      assert(0);
-    }
-    itr y = v.begin() + id * nWords;
-    if(IsEq(nWords, y, tmp.begin(), false, wLastMask)) {
-      return false;
-    }
-    Copy(nWords, y, tmp.begin(), false);
-    return true;
-  }
   
   template <typename Ntk>
   void L0Simulator<Ntk>::Simulate() {
@@ -484,15 +451,11 @@ namespace rrr {
         std::cout << std::endl;
       }
     });
-    /*
-    vPoValues.resize(pNtk->GetNumPos());
-    int index = 0;
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
-      vPoValues[index].resize(nWords);
-      Copy(nWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c);
-      index++;
+    pNtk->ForEachPo([&](int id) {
+      int fi = pNtk->GetFanin(id, 0);
+      bool c = pNtk->GetCompl(id, 0);
+      Copy(nWords, vValues.begin() + id * nWords, vValues.begin() + fi * nWords, c);
     });
-    */
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
   
@@ -502,7 +465,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "resimulating" << std::endl;
     }
-    pNtk->ForEachTfosUpdate(sUpdates, false, [&](int fo) {
+    pNtk->ForEachTfosUpdate(sUpdates, true, [&](int fo) {
       bool fUpdated = false;
       {
         itr x = vValues.end();
@@ -521,25 +484,26 @@ namespace rrr {
           });
           if(x == vValues.end()) {
             Fill(nWords, tmp.begin());
-          } else if(x != tmp.begin()) {
-            Copy(nWords, tmp.begin(), x, cx);
+            x = tmp.begin();
           }
           break;
+        case PO: {
+          int fi = pNtk->GetFanin(fo, 0);
+          x = vValues.begin() + fi * nWords;
+          cx = pNtk->GetCompl(fo, 0);
+          break;
+        }
         default:
           assert(0);
         }
         itr y = vValues.begin() + fo * nWords;
-        if(!IsEq(nWords, y, tmp.begin(), false, wLastMask)) {
-          if(pNtk->IsPoDriver(fo)) {
-            Xor(nWords, tmp2.begin(), y, tmp.begin(), false);
-            pNtk->ForEachFanout(fo, true, [&](int id) {
-              if(pNtk->IsPo(id)) {
-                int idx = pNtk->GetPoIndex(id);
-                Xor(nWords, vErrors.begin() + idx * nWords, vErrors.begin() + idx * nWords, tmp2.begin(), false);
-              }
-            });
+        if(!IsEq(nWords, y, x, cx, wLastMask)) {
+          if(pNtk->IsPo(fo)) {
+            int idx = pNtk->GetPoIndex(fo);
+            Xor(nWords, tmp2.begin(), y, x, cx);
+            Xor(nWords, vErrors.begin() + idx * nWords, vErrors.begin() + idx * nWords, tmp2.begin(), false);
           }
-          Copy(nWords, y, tmp.begin(), false);
+          Copy(nWords, y, x, cx);
           fUpdated = true;
         }
       }
@@ -560,14 +524,6 @@ namespace rrr {
       }
     });
     */
-    /*
-    int index = 0;
-    pNtk->ForEachPoDriver([&](int fi, bool c){
-      assert(IsEq(nWords, vPoValues[index].begin(), vValues.begin() + fi * nWords, c));
-      index++;
-    });
-    */
-    // TODO: update vError
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
@@ -781,6 +737,7 @@ namespace rrr {
       care.resize(nWords * pNtk->GetNumPos());
       tmp.resize(nWords);
       tmp2.resize(nWords);
+      tmp3.resize(nWords);
       vErrors.resize(nWords * pNtk->GetNumPos());
     }
   }
@@ -822,18 +779,17 @@ namespace rrr {
         x = tmp.begin();
         cx = false;
       }
-      
-      std::vector<word> v(nWords);
+      Clear(nWords, tmp3.begin());
       pNtk->ForEachPoDriverIdx([&](int idx, int fi) {
         if(vTrav[fi] == iTrav) { // affected POs
           And(nWords, tmp2.begin(), x, care.begin() + idx * nWords, cx, false);
           Xor(nWords, tmp2.begin(), tmp2.begin(), vErrors.begin() + idx * nWords, false);
-          Or(nWords, v.begin(), v.begin(), tmp2.begin(), false, false);
+          Or(nWords, tmp3.begin(), tmp3.begin(), tmp2.begin(), false, false);
         } else {
-          Or(nWords, v.begin(), v.begin(), vErrors.begin() + idx * nWords, false, false);
+          Or(nWords, tmp3.begin(), tmp3.begin(), vErrors.begin() + idx * nWords, false, false);
         }
       });
-      return Popcount(nWords, v.begin(), wLastMask);
+      return Popcount(nWords, tmp3.begin(), wLastMask);
     }
     default:
       assert(0);
