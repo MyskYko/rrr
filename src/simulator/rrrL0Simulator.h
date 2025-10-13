@@ -568,6 +568,12 @@ namespace rrr {
   template <typename Ntk>
   void L0Simulator<Ntk>::ComputeCare(int id) {
     if(sUpdates.empty() && id == target) {
+      if(fUpdate) {
+        sUpdates.insert(target);
+        Resimulate();
+        sUpdates.clear();
+        fUpdate = false;
+      }
       return;
     }
     if(fUpdate) {
