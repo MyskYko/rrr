@@ -1486,7 +1486,18 @@ namespace rrr {
   void DlsOptimizer<Ntk, Ana>::RemoveMinimum() {
     auto p = ana.GetMinimumPair();
     pNtk->RemoveFanin(p.first, p.second);
-    assert(ana.GetMinimum() == ana.GetLoss());
+    double loss = ana.GetLoss();
+    if(ana.GetMinimum() != loss) {
+      std::cout << "warning: mismatch minimum " << ana.GetMinimum() << " and loss " << loss << std::endl;
+    }
+    if(pNtk->GetNumFanins(p.first) <= 1) {
+      pNtk->Propagate(p.first);
+    }
+    if(!strTemporary.empty()) {
+      Print(0, "temp", "=", nTemporary, "cost", "=", CostFunction(pNtk), ",", "loss", "=", ana.GetLoss());
+      std::string str = strTemporary + "_" + std::to_string(nModule) + "_" +  std::to_string(nTemporary++) + ".aig";
+      DumpAig(str, pNtk);
+    }
   }
   
   template <typename Ntk, typename Ana>

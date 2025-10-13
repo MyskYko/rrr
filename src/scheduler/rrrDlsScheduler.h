@@ -190,8 +190,9 @@ namespace rrr {
     int nTemporary = 0;
     double cost = costStart;
     double dDelta = 0;
+    double dDeltaDelta = 0;
     for(int k = 0; cost > 0; k++) {
-      Print(0, "round", k, ":", "cost", "=", cost);
+      Print(0, "round", k, ":", "cost", "=", cost, "elapsed", "=", GetElapsedTime(), "s");
       bool fReduced = false;
       for(int i = 0; i < int_size(vNtks); i++) {
         Print(1, "module", i);
@@ -224,7 +225,7 @@ namespace rrr {
             idx = i;
           }
         }
-        Print(1, "increasing threshold to", dMinimum, "for module", idx);
+        Print(1, "increasing threshold to", dMinimum, "for module", idx, "elapsed", "=", GetElapsedTime(), "s");
         vOpts[idx]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(idx) + " : ", str);
         });
@@ -234,8 +235,11 @@ namespace rrr {
         for(Ntk *pNtk: vNtks) {
           cost += CostFunction(pNtk);
         }
-        if(fRelaxOnRemoval && dDelta == 0) {
-          dDelta = vOpts[idx]->GetLoss() / cost;
+        if(fRelaxOnRemoval) {
+          if(dDeltaDelta == 0) {
+            dDeltaDelta = vOpts[idx]->GetLoss() / cost;
+          }
+          dDelta += dDeltaDelta;
           Print(1, "", "setting delta to", dDelta);
           for(int i = 0; i < int_size(vNtks); i++) {
             vOpts[i]->SetDelta(dDelta);
