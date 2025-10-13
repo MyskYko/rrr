@@ -532,23 +532,20 @@ namespace rrr {
     case REMOVE_FANIN:
       assert(fInitialized);
       sUpdates.insert(action.id);
+      Resimulate();
       break;
     case REMOVE_UNUSED:
       break;
     case REMOVE_BUFFER:
     case REMOVE_CONST:
       if(fInitialized) {
-        if(sUpdates.count(action.id)) {
-          sUpdates.erase(action.id);
-          for(int fo: action.vFanouts) {
-            sUpdates.insert(fo);
-          }
-        }
+        assert(!sUpdates.count(action.id));
       }
       break;
     case ADD_FANIN:
       assert(fInitialized);
       sUpdates.insert(action.id);
+      Resimulate();
       break;
     case TRIVIAL_COLLAPSE:
       break;
