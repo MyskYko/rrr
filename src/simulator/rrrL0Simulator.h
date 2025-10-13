@@ -54,7 +54,6 @@ namespace rrr {
     // marks
     unsigned iTrav;
     std::vector<unsigned> vTrav;
-    std::vector<unsigned> vTravCond;
 
     // updates
     bool fUpdate;
@@ -394,17 +393,11 @@ namespace rrr {
         iTrav++;
         if(iTrav == 0) {
           vTrav.clear();
-          if(pNtk->GetCond()) {
-            vTravCond.clear();
-          }
           break;
         }
       }
     } while(iTrav == 0);
     vTrav.resize(pNtk->GetNumNodes());
-    if(pNtk->GetCond()) {
-      vTravCond.resize(pNtk->GetCond()->GetNumNodes());
-    }
     return iTrav - n + 1;
   }
 
