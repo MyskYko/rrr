@@ -8,6 +8,7 @@ namespace rrr {
   template <typename His>
   class Table {
   private:
+    float resize_factor = 0.75;
     std::vector<std::string> data;
     std::vector<int> table;
     std::vector<int> next;
@@ -29,10 +30,24 @@ namespace rrr {
       return key & mask;
     }
     */
+
+    void Resize() {
+      unsigned size = table.size() << 1;
+      assert(size);
+      table.assign(size, -1);
+      std::fill(next.begin(), next.end(), -1);
+      mask = size - 1;
+      for(int i = 0; i < int_size(data); i++) {
+        unsigned h = hash(data[i]);
+        next[i] = table[h];
+        table[h] = i;
+      }
+    }
     
   public:
     Table(int size_pow) {
       unsigned size = 1 << size_pow;
+      assert(size);
       table.resize(size, -1);
       data.reserve(size);
       next.reserve(size);
@@ -60,11 +75,14 @@ namespace rrr {
         }
       }
       *it = int_size(data);
-      data.push_back(str);
-      next.push_back(-1);
       record.resize(record.size() + 1);
       record[*it].push_back(his);
       index = *it;
+      data.push_back(str);
+      next.push_back(-1);
+      if(data.size() >= table.size() * resize_factor) {
+        Resize();
+      }
       return true;
     }
 

@@ -222,7 +222,7 @@ namespace rrr {
       bool fNew = Register(&ntk, pJob->src_tab, pJob->src_idx, vActions, next_tab, index);
       if(fNew) {
         Print(1, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "tab", "=", next_tab, "idx", "=", index);
-        CreateJob(next_tab, index, CostFunction(&ntk), next_tab);
+        CreateJob(next_tab, index, std::min(pJob->cost, (int)CostFunction(&ntk)), next_tab);
       }
     }
     delete pJob;
