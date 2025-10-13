@@ -37,6 +37,7 @@ namespace rrr {
     int nWords;
     int nRemainder;
     word wLastMask;
+    int nCurrent;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
     std::vector<word> vValues2; // simulation with an inverter
@@ -45,6 +46,7 @@ namespace rrr {
     std::vector<word> tmp2;
     std::vector<word> tmp3;
     std::vector<word> vErrors;
+    //std::vector<word> vPoValues;
     
     // backups
     std::vector<L0Simulator> vBackups;
@@ -110,6 +112,7 @@ namespace rrr {
 
     // others
     int GetDefaultThreshold();
+    int GetCurrent();
  
     // summary
     void ResetSummary();
@@ -456,6 +459,12 @@ namespace rrr {
       bool c = pNtk->GetCompl(id, 0);
       Copy(nWords, vValues.begin() + id * nWords, vValues.begin() + fi * nWords, c);
     });
+    /*
+    vPoValues.resize(pNtk->GetNumPos() * nWords);
+    pNtk->ForEachPoDriverIdx([&](int idx, int fi, bool c) {
+      Copy(nWords, vPoValues.begin() + idx * nWords, vValues.begin() + fi * nWords, c);
+    });
+    */
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
   
@@ -465,6 +474,7 @@ namespace rrr {
     if(nVerbose) {
       std::cout << "resimulating" << std::endl;
     }
+    bool fPoChanged = false;
     pNtk->ForEachTfosUpdate(sUpdates, true, [&](int fo) {
       bool fUpdated = false;
       {
@@ -502,6 +512,7 @@ namespace rrr {
             int idx = pNtk->GetPoIndex(fo);
             Xor(nWords, tmp2.begin(), y, x, cx);
             Xor(nWords, vErrors.begin() + idx * nWords, vErrors.begin() + idx * nWords, tmp2.begin(), false);
+            fPoChanged = true;
           }
           Copy(nWords, y, x, cx);
           fUpdated = true;
@@ -524,6 +535,20 @@ namespace rrr {
       }
     });
     */
+    if(fPoChanged) {
+      nCurrent = 0;
+      Clear(nWords, tmp3.begin());
+      for(int idx = 0; idx < pNtk->GetNumPos(); idx++) {
+        Or(nWords, tmp3.begin(), tmp3.begin(), vErrors.begin() + idx * nWords, false, false);
+      }
+      nCurrent = Popcount(nWords, tmp3.begin(), wLastMask);
+      /*
+      pNtk->ForEachPoDriverIdx([&](int idx, int fi, bool c){
+        Xor(nWords, tmp.begin(), vPoValues.begin() + idx * nWords, vValues.begin() + fi * nWords, c);
+        assert(IsEq(nWords, vErrors.begin() + idx * nWords, tmp.begin(), false, wLastMask));
+      });
+      */
+    }
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
@@ -696,6 +721,7 @@ namespace rrr {
     nWords(0),
     nRemainder(0),
     wLastMask(one),
+    nCurrent(0),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -712,6 +738,7 @@ namespace rrr {
     nWords(0),
     nRemainder(0),
     wLastMask(one),
+    nCurrent(0),
     target(-1),
     iTrav(0),
     fUpdate(false) {
@@ -840,6 +867,18 @@ namespace rrr {
   template <typename Ntk>
   int L0Simulator<Ntk>::GetDefaultThreshold() {
     return 0;
+  }
+
+  template <typename Ntk>
+  int L0Simulator<Ntk>::GetCurrent() {
+    if(!fInitialized) {
+      Initialize();
+    }
+    if(!sUpdates.empty()) {
+      Resimulate();
+      sUpdates.clear();
+    }
+    return nCurrent;
   }
   
   /* }}} */

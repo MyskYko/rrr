@@ -109,6 +109,7 @@ namespace rrr {
 
     // others
     int GetDefaultThreshold();
+    int GetCurrent();
     void Drop(int from);
  
     // summary
@@ -855,6 +856,11 @@ namespace rrr {
     } else {
       return nWords * 64;
     }
+  }
+
+  template <typename Ntk>
+  int CsoSimulator<Ntk>::GetCurrent() {
+    assert(0);
   }
   
   template <typename Ntk>

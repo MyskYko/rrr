@@ -36,7 +36,7 @@ namespace rrr {
     // interface
     T GetThreshold() const;
     void SetThreshold(T tThreshold_);
-    //T GetCurrent();
+    T GetCurrent();
     T GetNext() const;
     std::pair<int, int> GetNextPair() const;
     void ResetNext();
@@ -124,7 +124,7 @@ namespace rrr {
     }
     pNtk->AddCallback(std::bind(&ThresholdAnalyzer<Ntk, Sim, T, fAscending>::ActionCallback, this, std::placeholders::_1));
     sim.AssignNetwork(pNtk, fReuse);
-    tThreshold = sim.GetDefaultThreshold();
+    tThreshold = sim.GetDefaultThreshold(); // TODO: GetCurrent()? it doesn't really matter though
   }
 
   /* }}} */
@@ -144,10 +144,10 @@ namespace rrr {
     }
   }
 
-  // template <typename Ntk, typename Sim, typename T, bool fAscending>
-  // T ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetCurrent() {
-  //   return sim.GetCurrent();
-  // }
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  T ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetCurrent() {
+    return sim.GetCurrent();
+  }
 
   template <typename Ntk, typename Sim, typename T, bool fAscending>
   T ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetNext() const {
