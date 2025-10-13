@@ -495,7 +495,7 @@ namespace rrr {
       if(x == v.end()) {
         Fill(nWords, tmp.begin());
       } else if(x != tmp.begin()) {
-        Copy(nWords, tmp.begin(), x, cx);
+        Copy(nWords, tmp.begin(), x, cx); // TODO: unnecessary copy
       }
       break;
     default:
