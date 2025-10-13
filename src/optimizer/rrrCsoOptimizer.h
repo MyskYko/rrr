@@ -560,7 +560,12 @@ namespace rrr {
           pNtk->RemoveUnused(fi, true);
         }
         if(tDelta) {
-          break;
+          int t = ana.GetCurrent() + tDelta;
+          if(t != ana.GetThreshold()) {
+            SetThreshold(t);
+          } else {
+            StartTraversal();
+          }
         }
       }
     }
@@ -598,10 +603,9 @@ namespace rrr {
         if(pNtk->GetNumFanins(*it) <= 1) {
           pNtk->Propagate(*it);
         }
-        if(tDelta) {
-          break;
+        if(!tDelta) {
+          StartTraversal();
         }
-        StartTraversal();
       } else {
         vTrav[*it] = iTrav;
       }
@@ -622,18 +626,18 @@ namespace rrr {
     int nNext = -1;
     while(RemoveRedundancyOneTraversal(true)) {
       fReduced = true;
-      if(tDelta) {
-        SetThreshold(ana.GetThreshold() + tDelta);
-      } else {
-        tNext = ana.GetNext();
-        nNext = ana.GetNextPair().first;
-        ana.ResetNext();
-      }
+      tNext = ana.GetNext();
+      nNext = ana.GetNextPair().first;
+      ana.ResetNext();
     }
     if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
-      bool f = RemoveRedundantFanins(nNext);
-      assert(!f);
-      assert(ana.GetNext() == tNext);
+      if(!pNtk->IsInt(nNext)) {
+        std::cout << "warning: nNext does not exist where tNext " << tNext << " at " << nNext << " is smaller than GetNext " << ana.GetNext() << " at " << ana.GetNextPair().first << std::endl;
+      } else {
+        bool f = RemoveRedundantFanins(nNext);
+        assert(!f);
+        assert(ana.GetNext() == tNext);
+      }
     }
     time_point timeEnd = GetCurrentTime();
     statsLocal.durationReduce += Duration(timeStart, timeEnd);
