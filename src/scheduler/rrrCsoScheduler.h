@@ -190,7 +190,7 @@ namespace rrr {
 
     // iterative threshold increase
     for(int k = 1; cost > 0; k++) {
-      Print(0, "", "round", k, ":", "cost", "=", cost, "next threshold", "=", pOpt->GetNext());
+      Print(0, "", "round", k, ":", "cost", "=", cost, "next threshold", "=", pOpt->GetNext(), "elapsed", "=", GetElapsedTime(), "s");
       if(fRelaxOnRemoval) {
         Print(0, "", "increasing delta from", pOpt->GetDelta(), "by", pOpt->GetNext() - pOpt->GetThreshold());
         pOpt->SetDelta(pOpt->GetDelta() + pOpt->GetNext() - pOpt->GetThreshold());
