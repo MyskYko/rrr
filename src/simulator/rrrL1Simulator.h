@@ -46,7 +46,7 @@ namespace rrr {
     std::vector<word> tmp2;
     std::vector<word> tmp3;
     std::vector<word> vErrors;
-    std::vector<word> vPoValues; // TODO: debug
+    //std::vector<word> vPoValues;
     
     // backups
     std::vector<L1Simulator> vBackups;
@@ -452,13 +452,12 @@ namespace rrr {
       bool c = pNtk->GetCompl(id, 0);
       Copy(nWords, vValues.begin() + id * nWords, vValues.begin() + fi * nWords, c);
     });
-
-    // TODO: debug
+    /*
     vPoValues.resize(pNtk->GetNumPos() * nWords);
     pNtk->ForEachPoDriverIdx([&](int idx, int fi, bool c) {
       Copy(nWords, vPoValues.begin() + idx * nWords, vValues.begin() + fi * nWords, c);
     });
-
+    */
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
   
@@ -533,9 +532,8 @@ namespace rrr {
       }
     });
     */
+    /*
     if(fPoChanged) {
-      
-      // TODO: debug
       pNtk->ForEachPoDriverIdx([&](int idx, int fi, bool c){
         Xor(nWords, tmp.begin(), vPoValues.begin() + idx * nWords, vValues.begin() + fi * nWords, c);
         assert(IsEq(nWords, vErrors.begin() + idx * nWords, tmp.begin(), false, wLastMask));
@@ -545,8 +543,8 @@ namespace rrr {
         nCurrent_ += Popcount(nWords, vErrors.begin() + idx * nWords, wLastMask);
       }
       assert(nCurrent == nCurrent_);
-
     }
+    */
     durationSimulation += Duration(timeStart, GetCurrentTime());
   }
 
@@ -820,8 +818,7 @@ namespace rrr {
           nDiff -= Popcount(nWords, tmp3.begin(), wLastMask);
         }
       });
-
-      // TODO: debug
+      /*
       int nCurrent_ = 0;
       pNtk->ForEachPoDriverIdx([&](int idx, int fi) {
         if(vTrav[fi] == iTrav) { // affected POs
@@ -833,7 +830,7 @@ namespace rrr {
         }
       });
       assert(nCurrent_ == nCurrent + nDiff);
-      
+      */
       return nCurrent + nDiff;
     }
     default:
