@@ -746,7 +746,7 @@ namespace rrr {
       SortFanins();
     }
     assert(fSortPerNode);
-    bool fReduced = RemoveRedundancyOneTraversal();
+    bool fReduced = RemoveRedundancyOneTraversal(false);
     if(fReduced) {
       tNext = ana.GetNext();
       nNext = ana.GetNextPair().first;
@@ -767,9 +767,33 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::RemoveNext() {
-    assert(nNext != -1);
-    bool f = RemoveRedundantFanins(nNext);
+    // assume set threshold is called already
+    int id = ana.GetNextPair().first;
+    int t = ana.GetNext();
+    bool f = RemoveRedundantFanins(id);
     assert(f);
+    assert(ana.GetCurrent() == t);
+    if(nTemporary > 0 && !strTemporary.empty()) {
+      Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+      std::string str = strTemporary;
+      if(nModule != -1) {
+        str += "_" + std::to_string(nModule);
+      }
+      str += "_" +  std::to_string(nTemporary) + ".aig";
+      DumpAig(str, pNtk);
+      nTemporary++;
+    }
+    if(tDelta) {
+      int t = ana.GetCurrent() + tDelta;
+      if(t != ana.GetThreshold()) {
+        SetThreshold(t);
+      } else {
+        StartTraversal(); // this is probably not needed, but not harmful
+      }
+    }
+    if(pNtk->GetNumFanins(id) <= 1) {
+      pNtk->Propagate(id);
+    }
     nNext = -1;
   }
 

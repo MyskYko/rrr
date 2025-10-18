@@ -218,7 +218,7 @@ namespace rrr {
         vOpts[i]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(i) + " : ", str);
         });
-        fReduced |= vOpts[i]->Run();
+        fReduced |= vOpts[i]->RunOneTraversal();
         nTemporary = vOpts[i]->GetNumTemporary();
       }
       if(!fReduced) {
