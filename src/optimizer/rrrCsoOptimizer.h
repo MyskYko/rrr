@@ -583,6 +583,7 @@ namespace rrr {
         if(tDelta) {
           int t = ana.GetCurrent() + tDelta;
           if(t != ana.GetThreshold()) {
+            Print(1, "increasing threshold to", t);
             SetThreshold(t);
           } else {
             StartTraversal();
@@ -769,8 +770,9 @@ namespace rrr {
   void CsoOptimizer<Ntk, Ana>::RemoveNext() {
     // assume set threshold is called already
     int id = ana.GetNextPair().first;
+    int idx = ana.GetNextPair().second;
     int t = ana.GetNext();
-    bool f = RemoveRedundantFanins(id);
+    bool f = pNtk->RemoveFanin(id, idx);
     assert(f);
     assert(ana.GetCurrent() == t);
     if(nTemporary > 0 && !strTemporary.empty()) {
