@@ -194,6 +194,7 @@ namespace rrr {
       if(fRelaxOnRemoval) {
         Print(0, "", "increasing delta from", pOpt->GetDelta(), "by", pOpt->GetNext() - pOpt->GetThreshold());
         pOpt->SetDelta(pOpt->GetDelta() + pOpt->GetNext() - pOpt->GetThreshold());
+        // Note: separating set delta and set threshold is good because it allows to set delta to other values than delta + next - current
       }
       pOpt->SetThreshold(pOpt->GetNext());
       bool fReduced = pOpt->Run();

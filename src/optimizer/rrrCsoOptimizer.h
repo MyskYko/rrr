@@ -40,6 +40,7 @@ namespace rrr {
     bool fGreedy;
     std::string strTemporary;
     seconds nTimeout; // assigned upon Run
+    int nModule;
     std::function<void(std::string)> PrintLine;
 
     int nTargets = 3;
@@ -50,6 +51,7 @@ namespace rrr {
     std::vector<int> vTmp;
     time_point start;
     int tDelta;
+    int nTemporary;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -105,6 +107,9 @@ namespace rrr {
     int GetNext(); // TODO: typname T?
     int GetDelta();
     void SetDelta(int tDelta_);
+    int GetNumTemporary();
+    void SetNumTemporary(int nTemporary_);
+    int SetNumModule(int nModule_);
     void SetNumTargets(int nTargets_);
 
     // summary
@@ -559,6 +564,16 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
+        if(nTemporary > 0 && !strTemporary.empty()) {
+          Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+          std::string str = strTemporary;
+          if(nModule != -1) {
+            str += "_" + std::to_string(nModule);
+          }
+          str += "_" +  std::to_string(nTemporary) + ".aig";
+          DumpAig(str, pNtk);
+          nTemporary++;
+        }
         if(tDelta) {
           int t = ana.GetCurrent() + tDelta;
           if(t != ana.GetThreshold()) {
@@ -663,8 +678,10 @@ namespace rrr {
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
     strTemporary(pPar->strTemporary),
+    nModule(-1),
     ana(pPar),
     tDelta(0),
+    nTemporary(0),
     target(-1),
     iTrav(0) {
   }
@@ -672,7 +689,9 @@ namespace rrr {
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
+    nModule = -1;
     tDelta = 0;
+    nTemporary = 0;
     target = -1;
     StartTraversal();
     pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana>::ActionCallback, this, std::placeholders::_1));
@@ -712,11 +731,16 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetThreshold(int t) {
-    if(!strTemporary.empty()) {
+    if(nTemporary == 0 && !strTemporary.empty()) {
       Print(0, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
-      std::string str = strTemporary + "_" +  std::to_string(ana.GetThreshold()) + ".aig";
+      std::string str = strTemporary;
+      if(nModule != -1) {
+        str += "_" + std::to_string(nModule);
+      }
+      str += "_" +  std::to_string(ana.GetThreshold()) + ".aig";
       DumpAig(str, pNtk);
     }
+    assert(t != ana.GetThreshold());
     ana.SetThreshold(t);
     StartTraversal();
   }
@@ -735,12 +759,27 @@ namespace rrr {
   void CsoOptimizer<Ntk, Ana>::SetDelta(int tDelta_) {
     tDelta = tDelta_;
   }
-  
+
+  template <typename Ntk, typename Ana>
+  int CsoOptimizer<Ntk, Ana>::GetNumTemporary() {
+    return nTemporary
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetDelta(int nTemporary_) {
+    nTemporary = nTemporary_;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetNumModule(int nModule_) {
+    nModule = nModule_;
+  }
+
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetNumTargets(int nTargets_) {
     nTargets = nTargets_;
   }
-
+  
   /* }}} */
 
   /* {{{ Summary */
