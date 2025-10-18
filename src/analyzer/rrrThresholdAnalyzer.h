@@ -40,6 +40,8 @@ namespace rrr {
     T GetNext() const;
     std::pair<int, int> GetNextPair() const;
     void ResetNext();
+    bool SetBias(std::vector<std::vector<int>> const &vBias);
+    std::vector<std::vector<int>> GetContribution();
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -169,6 +171,20 @@ namespace rrr {
     }
   }
 
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  bool ThresholdAnalyzer<Ntk, Sim, T, fAscending>::SetBias(std::vector<std::vector<int>> const &vBias) {
+    if(sim.SetBias(vBias)) {
+      ResetNext();
+      return true;
+    }
+    return false;
+  }
+
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  std::vector<std::vector<int>> ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetContribution() {
+    return sim.GetContribution();
+  }
+  
   /* }}} */
   
   /* {{{ Checks */

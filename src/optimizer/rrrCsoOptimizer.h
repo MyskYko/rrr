@@ -51,6 +51,8 @@ namespace rrr {
     std::vector<int> vTmp;
     time_point start;
     int tDelta;
+    int tNext;
+    int nNext;
     int nTemporary;
 
     // fanin sorting data
@@ -102,6 +104,8 @@ namespace rrr {
 
     // run
     bool Run(int iSeed = 0, seconds nTimeout_ = 0);
+    bool RunOneTraversal(int iSeed = 0, seconds nTimeout_ = 0);
+    void RemoveNext();
     int GetThreshold();
     void SetThreshold(int t);
     int GetNext(); // TODO: typname T?
@@ -109,9 +113,11 @@ namespace rrr {
     void SetDelta(int tDelta_);
     int GetNumTemporary();
     void SetNumTemporary(int nTemporary_);
-    int SetNumModule(int nModule_);
+    void SetNumModule(int nModule_);
+    void SetBias(std::vector<std::vector<int>> const &vBias);
+    std::vector<std::vector<int>> GetContribution();
     void SetNumTargets(int nTargets_);
-
+    
     // summary
     void ResetSummary();
     summary<int> GetStatsSummary() const;
@@ -637,8 +643,7 @@ namespace rrr {
     time_point timeStart = GetCurrentTime();
     bool fReduced = false;
     assert(fSortPerNode);
-    int tNext = -1;
-    int nNext = -1;
+    nNext = -1;
     while(RemoveRedundancyOneTraversal(true)) {
       fReduced = true;
       tNext = ana.GetNext();
@@ -681,6 +686,7 @@ namespace rrr {
     nModule(-1),
     ana(pPar),
     tDelta(0),
+    nNext(-1),
     nTemporary(0),
     target(-1),
     iTrav(0) {
@@ -691,6 +697,7 @@ namespace rrr {
     pNtk = pNtk_;
     nModule = -1;
     tDelta = 0;
+    nNext = -1;
     nTemporary = 0;
     target = -1;
     StartTraversal();
@@ -722,6 +729,48 @@ namespace rrr {
       SortFanins();
     }
     return RemoveRedundancy();
+  }
+
+  template <typename Ntk, typename Ana>
+  bool CsoOptimizer<Ntk, Ana>::RunOneTraversal(int iSeed, seconds nTimeout_) {
+    rng.seed(iSeed);
+    vRandPiOrder.clear();
+    vRandCosts.clear();
+    if(nSortTypeOriginal < 0) {
+      nSortType = (rng() + 1) % 18; // default to 9
+      Print(0, "fanin cost function =", nSortType);
+    }
+    nTimeout = nTimeout_;
+    start = GetCurrentTime();
+    if(fSortInitial) {
+      SortFanins();
+    }
+    assert(fSortPerNode);
+    bool fReduced = RemoveRedundancyOneTraversal();
+    if(fReduced) {
+      tNext = ana.GetNext();
+      nNext = ana.GetNextPair().first;
+      ana.ResetNext();
+    } else {
+      if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
+        if(!pNtk->IsInt(nNext)) {
+          std::cout << "warning: nNext does not exist where tNext " << tNext << " at " << nNext << " is smaller than GetNext " << ana.GetNext() << " at " << ana.GetNextPair().first << std::endl;
+        } else {
+          bool f = RemoveRedundantFanins(nNext);
+          assert(!f);
+          assert(ana.GetNext() == tNext);
+        }
+      }
+    }
+    return fReduced;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::RemoveNext() {
+    assert(nNext != -1);
+    bool f = RemoveRedundantFanins(nNext);
+    assert(f);
+    nNext = -1;
   }
 
   template <typename Ntk, typename Ana>
@@ -762,17 +811,39 @@ namespace rrr {
 
   template <typename Ntk, typename Ana>
   int CsoOptimizer<Ntk, Ana>::GetNumTemporary() {
-    return nTemporary
+    return nTemporary;
   }
 
   template <typename Ntk, typename Ana>
-  void CsoOptimizer<Ntk, Ana>::SetDelta(int nTemporary_) {
+  void CsoOptimizer<Ntk, Ana>::SetNumTemporary(int nTemporary_) {
     nTemporary = nTemporary_;
   }
 
   template <typename Ntk, typename Ana>
   void CsoOptimizer<Ntk, Ana>::SetNumModule(int nModule_) {
     nModule = nModule_;
+  }
+
+  template <typename Ntk, typename Ana>
+  void CsoOptimizer<Ntk, Ana>::SetBias(std::vector<std::vector<int>> const &vBias) {
+    if(ana.SetBias(vBias)) {
+      nNext = -1;
+      if(tDelta) {
+        int t = ana.GetCurrent() + tDelta;
+        if(t != ana.GetThreshold()) {
+          SetThreshold(t);
+        } else {
+          StartTraversal();
+        }
+      } else {
+        StartTraversal();
+      }
+    }
+  }
+
+  template <typename Ntk, typename Ana>
+  std::vector<std::vector<int>> CsoOptimizer<Ntk, Ana>::GetContribution() {
+    return ana.GetContribution();
   }
 
   template <typename Ntk, typename Ana>
