@@ -194,7 +194,6 @@ namespace rrr {
       Print(0, "", "round", k, ":", "cost", "=", cost, "elapsed", "=", GetElapsedTime(), "s");
       bool fReduced = false;
       for(int i = 0; i < int_size(vNtks); i++) {
-        Print(1, "", "module", i, ":", "cost", "=", CostFunction(vNtks[i]), "elapsed", "=", GetElapsedTime(), "s");
         std::vector<std::vector<int>> vBias;
         for(int j = 0; j < int_size(vNtks); j++) {
           if(i != j) {
@@ -214,6 +213,7 @@ namespace rrr {
         }
         // Note: by sharing bias, threshold is also shared through recomputation of current + delta; otherwise (when delta = 0) all modules have the same threshold as set to next below
         vOpts[i]->SetBias(vBias);
+        Print(1, "", "module", i, ":", "threshold", "=", vOpts[i]->GetThreshold(), "cost", "=", CostFunction(vNtks[i]), "elapsed", "=", GetElapsedTime(), "s");
         vOpts[i]->SetNumTemporary(nTemporary);
         vOpts[i]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(i) + " : ", str);

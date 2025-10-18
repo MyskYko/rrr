@@ -852,6 +852,7 @@ namespace rrr {
   void CsoOptimizer<Ntk, Ana>::SetBias(std::vector<std::vector<int>> const &vBias) {
     if(ana.SetBias(vBias)) {
       nNext = -1;
+      ana.ResetNext();
       if(tDelta) {
         int t = ana.GetCurrent() + tDelta;
         if(t != ana.GetThreshold()) {
