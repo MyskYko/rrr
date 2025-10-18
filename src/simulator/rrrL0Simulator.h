@@ -873,6 +873,10 @@ namespace rrr {
     if(!fInitialized) {
       Initialize();
     }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
     if(!sUpdates.empty()) {
       Resimulate();
       sUpdates.clear();

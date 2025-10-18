@@ -772,8 +772,7 @@ namespace rrr {
     int id = ana.GetNextPair().first;
     int idx = ana.GetNextPair().second;
     int t = ana.GetNext();
-    bool f = pNtk->RemoveFanin(id, idx);
-    assert(f);
+    pNtk->RemoveFanin(id, idx);
     assert(ana.GetCurrent() == t);
     if(nTemporary > 0 && !strTemporary.empty()) {
       Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));

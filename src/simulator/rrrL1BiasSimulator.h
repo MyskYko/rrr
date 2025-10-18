@@ -1104,6 +1104,10 @@ namespace rrr {
     if(!fInitialized) {
       Initialize();
     }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
     if(!sUpdates.empty()) {
       Resimulate();
       sUpdates.clear();
@@ -1120,6 +1124,10 @@ namespace rrr {
     if(!fInitialized) {
       Initialize();
     }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
+    }
     Resimulate();
     sUpdates.clear();
     return true;
@@ -1129,6 +1137,10 @@ namespace rrr {
   std::vector<std::vector<int>> L1BiasSimulator<Ntk>::GetContribution() {
     if(!fInitialized) {
       Initialize();
+    }
+    if(fUpdate) {
+      sUpdates.insert(target);
+      fUpdate = false;
     }
     if(!sUpdates.empty()) {
       Resimulate();
