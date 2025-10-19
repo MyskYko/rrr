@@ -109,10 +109,6 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  // TODO: put this back for loss
-  //at::set_num_interop_threads(1);
-  //at::set_num_threads(1);
-
   std::vector<std::string> input_filenames = result["inputs"].as<std::vector<std::string>>();
   std::string output_filename;
   if(result.count("output")) {

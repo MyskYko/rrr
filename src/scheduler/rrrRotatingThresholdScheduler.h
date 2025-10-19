@@ -188,6 +188,34 @@ namespace rrr {
       vOpts[i]->SetNumModule(i);
     }
 
+    // set default threshold
+    for(int i = 0; i < int_size(vNtks); i++) {
+      std::vector<std::vector<int>> vBias;
+      for(int j = 0; j < int_size(vNtks); j++) {
+        if(i != j) {
+          std::vector<std::vector<int>> vContribution = vOpts[j]->GetContribution();
+          if(vBias.empty()) {
+            vBias = vContribution;
+          } else {
+            assert(vBias.size() == vContribution.size());
+            for(int idx = 0; idx < int_size(vBias); idx++) {
+              assert(vBias[idx].size() == vContribution[idx].size());
+              for(int k = 0; k < int_size(vBias[idx]); k++) {
+                vBias[idx][k] += vContribution[idx][k];
+              }
+            }
+          }
+        }
+      }
+      vOpts[i]->SetBias(vBias);
+      vOpts[i]->ResetThreshold();
+    }
+
+    // hack delta with double min so loss decrease may lower the threshold
+    for(int i = 0; i < int_size(vNtks); i++) {
+      vOpts[i]->SetDelta(std::numeric_limits<double>::min());
+    }
+
     int nTemporary = 1;
     double cost = costStart;
     for(int k = 0; cost > 0; k++) {
