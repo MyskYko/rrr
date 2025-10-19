@@ -207,6 +207,7 @@ namespace rrr {
           }
         }
       }
+      vOpts[i]->SetNumTemporary(1); // prevent print
       vOpts[i]->SetBias(vBias);
       vOpts[i]->ResetThreshold();
     }
