@@ -7,7 +7,7 @@ namespace rrr {
 
   template <typename His>
   class Table {
-  private:
+  protected:
     float resize_factor = 0.75;
     std::vector<std::string> data;
     std::vector<int> table;
@@ -54,8 +54,10 @@ namespace rrr {
       record.reserve(size);
       mask = size - 1;
     }
+    
+    virtual ~Table() = default;
 
-    bool Register(std::string const &str, His const &his, int &index, std::string const &str2) {
+    virtual bool Register(std::string const &str, His const &his, int &index, std::string const &str2) {
       std::vector<int>::iterator it;
       for(it = table.begin() + hash(str); *it != -1; it = next.begin() + *it) {
         if(data[*it] == str) {
@@ -92,6 +94,10 @@ namespace rrr {
 
     int Size() {
       return int_size(data);
+    }
+
+    virtual void Deref(int index) {
+      (void)index;
     }
     
   };

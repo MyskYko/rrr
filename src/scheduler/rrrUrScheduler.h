@@ -14,6 +14,7 @@
 // #include "rrrAbc.h"
 #include "io/rrrBinary.h"
 #include "extra/rrrTable.h"
+#include "extra/rrrEvictTable.h"
 #include "extra/rrrCanonicalizer.h"
 
 namespace rrr {
@@ -44,7 +45,7 @@ namespace rrr {
     static constexpr bool fTwoArgSym = false;
     
     // data
-    std::vector<Table<std::vector<int>>> tabs;
+    std::vector<std::unique_ptr<Table<std::vector<int>>>> tabs;
     int nCreatedJobs;
     int nFinishedJobs;
     std::queue<Job *> qPendingJobs;
@@ -183,11 +184,11 @@ namespace rrr {
     if(fMultiThreading) {
       {
         std::unique_lock<std::mutex> l(*mutexTables[next_tab]);
-        return tabs[next_tab].Register(str, his, index, str_sym);
+        return tabs[next_tab]->Register(str, his, index, str_sym);
       }
     }
 #endif
-    return tabs[next_tab].Register(str, his, index, str_sym);
+    return tabs[next_tab]->Register(str, his, index, str_sym);
   }
   
   /* }}} */
@@ -197,7 +198,7 @@ namespace rrr {
   template <typename Ntk, typename Opt, typename Par>
   void UrScheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
     Ntk ntk;
-    ntk.Read(tabs[pJob->src_tab].Get(pJob->src_idx), BinaryReader<Ntk>);
+    ntk.Read(tabs[pJob->src_tab]->Get(pJob->src_idx), BinaryReader<Ntk>);
     opt.AssignNetwork(&ntk, pJob->nAdd < nJobs);
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
@@ -225,6 +226,7 @@ namespace rrr {
         CreateJob(next_tab, index, std::min(pJob->cost, (int)CostFunction(&ntk)), next_tab);
       }
     }
+    tabs[pJob->src_tab]->Deref(pJob->src_idx);
     delete pJob;
 #ifdef ABC_USE_PTHREADS
     if(fMultiThreading) {
@@ -352,9 +354,10 @@ namespace rrr {
       });
       return nTwoInputSize;
     };
-    for(int i = 0; i < nJobs + 1; i++) {
-      tabs.emplace_back(20);
+    for(int i = 0; i < nJobs; i++) {
+      tabs.emplace_back(std::make_unique<Table<std::vector<int>>>(20));
     }
+    tabs.emplace_back(std::make_unique<EvictTable<std::vector<int>>>(20, 27));
     pOpt = new Opt(pPar);
 #ifdef ABC_USE_PTHREADS
     for(int i = 0; i < nJobs + 1; i++) {
@@ -405,7 +408,7 @@ namespace rrr {
     // wait until all jobs are done
     Wait();
 
-    Print(-1, "","unique", "=", tabs[0].Size() - (int)fRedundant);
+    Print(-1, "","unique", "=", tabs[0]->Size() - (int)fRedundant);
     Print(-1, "","jobs", "=", nFinishedJobs);
     
     // for(std::string s: strs) {
