@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+#include <sstream>
 #include <fstream>
 #include <cassert>
 
