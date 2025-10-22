@@ -531,15 +531,16 @@ namespace rrr {
     timeStart = GetCurrentTime();
     double costStart = CostFunction(pNtk);
     if(fPartitioning) {
+      std::mt19937 rng(iSeed);      
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
       par.AssignNetwork(pNtk);
       while(nCreatedJobs < nJobs) {
         assert(nParallelPartitions > 0);
         if(nCreatedJobs < nFinishedJobs + nParallelPartitions) {
-          Ntk *pSubNtk = par.Extract(iSeed + nCreatedJobs);
+          Ntk *pSubNtk = par.Extract(rng());
           if(pSubNtk) {
-            Job *pJob = CreateJob(pSubNtk, iSeed + nCreatedJobs, CostFunction(pSubNtk));
+            Job *pJob = CreateJob(pSubNtk, rng(), CostFunction(pSubNtk));
             Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
             continue;
           }
