@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
+  rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
 
   if(!output_filename.empty()) {
     rrr::DumpAig(output_filename, &ntk);
