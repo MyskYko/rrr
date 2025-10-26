@@ -13,6 +13,7 @@
 // #include "misc/rrrUtils.h"
 #include "interface/rrrAbc.h"
 #include "io/rrrBinary.h"
+#include "io/rrrAig.h"
 #include "extra/rrrTable.h"
 #include "extra/rrrCanonicalizer.h"
 
@@ -38,6 +39,7 @@ namespace rrr {
     int nParallelPartitions;
     bool fOptOnInsert;
     seconds nTimeout;
+    std::string strTemporary;
     std::function<double(Ntk *)> CostFunction;
     static constexpr bool fTwoArgSym = false;
     std::vector<std::string> CommandList;
@@ -324,6 +326,7 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
+    strTemporary(pPar->strTemporary),
     tab(27),
     nCreatedJobs(0),
     nFinishedJobs(0) {
@@ -421,6 +424,17 @@ namespace rrr {
     }
 
     Print(-1, "","unique2", "=", tab2.Size());
+
+    if(!strTemporary.empty()) {
+      for(int i = 0; i < tab2.Size(); i++) {
+        std::string str = tab2.Get(i);
+        Ntk ntk;
+        ntk.Read(str, BinaryReader<Ntk>);
+        std::string filename = strTemporary + "_" + std::to_string(i) + ".aig";
+        rrr::DumpAig(filename, &ntk);
+      }
+    }
+
   }
 
   /* }}} */

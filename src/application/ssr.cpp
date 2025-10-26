@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
   options.add_options()
     ("input", "Input file name", cxxopts::value<std::string>())
     ("o,output", "Output file name", cxxopts::value<std::string>())
+    ("l,log", "Directory name to dump log files", cxxopts::value<std::string>())
     ("R,seed", "Random seed integer", cxxopts::value<int>()->default_value("0"))
     ("T,timeout", "Timeout in seconds (0 = no limit)", cxxopts::value<int>()->default_value("0"))
     ("J,thread", "Number of threads", cxxopts::value<int>()->default_value("1"))
@@ -109,6 +110,9 @@ int main(int argc, char **argv) {
   }
   
   rrr::Parameter Par;
+  if(result.count("log")) {
+    Par.strTemporary = result["log"].as<std::string>();
+  }
   Par.iSeed = result["seed"].as<int>();
   Par.nTimeout = result["timeout"].as<int>();
   Par.nThreads = result["thread"].as<int>();

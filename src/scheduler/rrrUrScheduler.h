@@ -13,6 +13,7 @@
 // #include "misc/rrrUtils.h"
 // #include "rrrAbc.h"
 #include "io/rrrBinary.h"
+#include "io/rrrAig.h"
 #include "extra/rrrTable.h"
 #include "extra/rrrEvictTable.h"
 #include "extra/rrrCanonicalizer.h"
@@ -41,6 +42,7 @@ namespace rrr {
     int nParallelPartitions;
     bool fOptOnInsert;
     seconds nTimeout;
+    std::string strTemporary;
     std::function<double(Ntk *)> CostFunction;
     static constexpr bool fTwoArgSym = false;
     
@@ -345,6 +347,7 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     nTimeout(pPar->nTimeout),
+    strTemporary(pPar->strTemporary),
     nCreatedJobs(0),
     nFinishedJobs(0) {
     CostFunction = [](Ntk *pNtk) {
@@ -357,7 +360,7 @@ namespace rrr {
     for(int i = 0; i < nJobs; i++) {
       tabs.emplace_back(std::make_unique<Table<std::vector<int>>>(20));
     }
-    tabs.emplace_back(std::make_unique<EvictTable<std::vector<int>>>(20, 27));
+    tabs.emplace_back(std::make_unique<EvictTable<std::vector<int>>>(20, 25));
     pOpt = new Opt(pPar);
 #ifdef ABC_USE_PTHREADS
     for(int i = 0; i < nJobs + 1; i++) {
@@ -410,12 +413,16 @@ namespace rrr {
 
     Print(-1, "","unique", "=", tabs[0]->Size() - (int)fRedundant);
     Print(-1, "","jobs", "=", nFinishedJobs);
-    
-    // for(std::string s: strs) {
-    //   Ntk a;
-    //   a.Read(s, BinaryReader<Ntk>);
-    //   a.Print();
-    // }
+
+    if(!strTemporary.empty()) {
+      for(int i = 0; i < tabs[0]->Size(); i++) {
+        std::string str = tabs[0]->Get(i);
+        Ntk ntk;
+        ntk.Read(str, BinaryReader<Ntk>);
+        std::string filename = strTemporary + "_" + std::to_string(i) + ".aig";
+        rrr::DumpAig(filename, &ntk);
+      }
+    }
   }
 
   /* }}} */
