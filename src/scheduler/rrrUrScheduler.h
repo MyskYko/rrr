@@ -50,7 +50,8 @@ namespace rrr {
     std::vector<std::unique_ptr<Table<std::vector<int>>>> tabs;
     int nCreatedJobs;
     int nFinishedJobs;
-    std::queue<Job *> qPendingJobs;
+    //std::queue<Job *> qPendingJobs;
+    std::vector<std::queue<Job *>> vqPendingJobs;
     Opt *pOpt; // used only in case of single thread execution
 #ifdef ABC_USE_PTHREADS
     bool fTerminate;
@@ -213,7 +214,11 @@ namespace rrr {
             int index;
             bool fNew = Register(&ntk, pJob->src_tab, pJob->src_idx, vActions, 0, index);
             if(fNew) {
-              Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)");
+              std::vector<int> sizes;
+              for(auto const &qPendingJobs: vqPendingJobs) {
+                sizes.push_back(qPendingJobs.size());
+              }
+              Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)", ",", "remaining", "=", sizes);
               CreateJob(0, index, CostFunction(&ntk), 0);
             }
           }
@@ -255,14 +260,14 @@ namespace rrr {
       {
         std::unique_lock<std::mutex> l(mutexPendingJobs);
         pJob = new Job(nCreatedJobs++, src_tab, src_idx, cost, nAdd);
-        qPendingJobs.push(pJob);
+        vqPendingJobs[nJobs - src_tab].push(pJob);
         condPendingJobs.notify_one();
       }
       return pJob;
     }
 #endif
     Job *pJob = new Job(nCreatedJobs++, src_tab, src_idx, cost, nAdd);
-    qPendingJobs.push(pJob);
+    vqPendingJobs[nJobs - src_tab].push(pJob);
     return pJob;
   }
   
@@ -295,9 +300,15 @@ namespace rrr {
     }
 #endif
     while(nCreatedJobs > nFinishedJobs) {
-      assert(!qPendingJobs.empty());
-      Job *pJob = qPendingJobs.front();
-      qPendingJobs.pop();
+      Job *pJob = NULL;
+      for(auto &qPendingJobs: vqPendingJobs) {
+        if(!qPendingJobs.empty()) {
+          pJob = qPendingJobs.front();
+          qPendingJobs.pop();
+          break;
+        }
+      }
+      assert(pJob != NULL);
       RunJob(*pOpt, pJob);
     }
   }
@@ -314,15 +325,33 @@ namespace rrr {
       Job *pJob = NULL;
       {
         std::unique_lock<std::mutex> l(mutexPendingJobs);
-        while(!fTerminate && qPendingJobs.empty()) {
+        while(!fTerminate) {
+          bool fFound = false;
+          for(auto &qPendingJobs: vqPendingJobs) {
+            if(!qPendingJobs.empty()) {
+              fFound = true;
+              break;
+            }
+          }
+          if(fFound) {
+            break;
+          }
           condPendingJobs.wait(l);
         }
         if(fTerminate) {
-          assert(qPendingJobs.empty());
+          for(auto &qPendingJobs: vqPendingJobs) {
+            assert(qPendingJobs.empty());
+          }
           return;
         }
-        pJob = qPendingJobs.front();
-        qPendingJobs.pop();
+        pJob = NULL;
+        for(auto &qPendingJobs: vqPendingJobs) {
+          if(!qPendingJobs.empty()) {
+            pJob = qPendingJobs.front();
+            qPendingJobs.pop();
+            break;
+          }
+        }
       }
       assert(pJob != NULL);
       RunJob(opt, pJob);
@@ -357,10 +386,11 @@ namespace rrr {
       });
       return nTwoInputSize;
     };
+    vqPendingJobs.resize(nJobs + 1);
+    tabs.emplace_back(std::make_unique<Table<std::vector<int>>>(20));
     for(int i = 0; i < nJobs; i++) {
-      tabs.emplace_back(std::make_unique<Table<std::vector<int>>>(20));
+      tabs.emplace_back(std::make_unique<EvictTable<std::vector<int>>>(20, 25));
     }
-    tabs.emplace_back(std::make_unique<EvictTable<std::vector<int>>>(20, 25));
     pOpt = new Opt(pPar);
 #ifdef ABC_USE_PTHREADS
     for(int i = 0; i < nJobs + 1; i++) {
