@@ -99,6 +99,10 @@ namespace rrr {
     virtual void Deref(int index) {
       (void)index;
     }
+
+    virtual int GetPopulation() {
+      return int_size(data);
+    }
     
   };
   

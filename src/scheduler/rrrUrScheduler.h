@@ -219,6 +219,7 @@ namespace rrr {
                 sizes.push_back(qPendingJobs.size());
               }
               Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)", ",", "remaining", "=", sizes);
+              assert(index < 200100);
               CreateJob(0, index, CostFunction(&ntk), 0);
             }
           }
@@ -240,11 +241,14 @@ namespace rrr {
       {
         std::unique_lock<std::mutex> l(mutexFinishedJobs);
         if(nFinishedJobs % 1000000 == 0) {
-          std::vector<int> sizes;
+          std::vector<int> sizes, pops;
           for(auto const &qPendingJobs: vqPendingJobs) {
             sizes.push_back(qPendingJobs.size());
           }
-          Print(0, "", "finished", nFinishedJobs, "jobs", ":", "remaining", "=", sizes);
+          for(int i = 0; i < nJobs + 1; i++) {
+            pops.push_back(tabs[i]->GetPopulation());
+          }
+          Print(0, "", "finished", nFinishedJobs, "jobs", ":", "remaining", "=", sizes, ",", "population", "=", pops);
         }
         nFinishedJobs++;
         condFinishedJobs.notify_one();

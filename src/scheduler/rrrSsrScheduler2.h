@@ -145,7 +145,7 @@ namespace rrr {
       Ntk ntk;
       ntk.Read(*pNtk);
       Canonicalizer<Ntk> can;
-      can.Run(&ntk);
+      can.Run(&ntk, true);
       str = CreateBinary(&ntk, true);
       if(fTwoArgSym) {
         std::vector<int> vOrder;
@@ -156,7 +156,7 @@ namespace rrr {
           vOrder.push_back(i);
         }        
         ntk.ChangePiOrder(vOrder);
-        can.Run(&ntk);
+        can.Run(&ntk, true);
         str_sym = CreateBinary(&ntk, true);
       }
     }
@@ -203,6 +203,10 @@ namespace rrr {
       if(fNew) {
         //if(index % 1000 == 0)
         Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
+        if(!strTemporary.empty()) {
+          std::string filename = strTemporary + "_" + std::to_string(index) + ".aig";
+          rrr::DumpAig(filename, &ntk);
+        }
         CreateJob(index);
         nNews++;
       } else {
@@ -339,12 +343,12 @@ namespace rrr {
     };
     CommandList = {"balance",
                    "balance -l",
-                   "rewrite",
-                   "rewrite -l",
+                   //"rewrite",
+                   //"rewrite -l",
                    "rewrite -z",
                    "rewrite -zl",
-                   "refactor",
-                   "refactor -l",
+                   //"refactor",
+                   //"refactor -l",
                    "refactor -z",
                    "refactor -zl"};
     for(int K = 4; K <= 16; K++) {
@@ -354,8 +358,8 @@ namespace rrr {
         command += std::to_string(N);
         command += " -K ";
         command += std::to_string(K);
-        CommandList.push_back(command);
-        CommandList.push_back(command + " -l");
+        //CommandList.push_back(command);
+        //CommandList.push_back(command + " -l");
         CommandList.push_back(command + " -z");
         CommandList.push_back(command + " -zl");
       }

@@ -106,6 +106,10 @@ namespace rrr {
     void Deref(int index) override {
       ref[index] = false;
     }
+
+    int GetPopulation() override {
+      return std::count(ref.begin(), ref.end(), true);
+    }
     
   };
   
