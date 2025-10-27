@@ -154,7 +154,7 @@ namespace rrr {
       Ntk ntk;
       ntk.Read(*pNtk);
       Canonicalizer<Ntk> can;
-      can.Run(&ntk);
+      can.Run(&ntk, next_tab == 0);
       str = CreateBinary(&ntk);
       if(fTwoArgSym) {
         std::vector<int> vOrder;
@@ -165,7 +165,7 @@ namespace rrr {
           vOrder.push_back(i);
         }        
         ntk.ChangePiOrder(vOrder);
-        can.Run(&ntk);
+        can.Run(&ntk, next_tab == 0);
         str_sym = CreateBinary(&ntk);
       }
     }

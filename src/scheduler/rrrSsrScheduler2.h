@@ -416,7 +416,7 @@ namespace rrr {
       ntk.TrivialCollapse();
       //bool fRedundant = pOpt->IsRedundant(&ntk);
       Canonicalizer<Ntk> can;
-      can.Run(&ntk);
+      can.Run(&ntk, true);
       str = CreateBinary(&ntk);
       int index;
       std::vector<int> his{i};
