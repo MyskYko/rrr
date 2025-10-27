@@ -180,8 +180,10 @@ namespace rrr {
               if(pNtk->GetNumFanins(id) <= 1) {
                 pNtk->Propagate(id);
               }
-              pNtk->TrivialCollapse();
               pNtk->Sweep();
+              while(pNtk->TrivialCollapse()) {
+                pNtk->Sweep(true);
+              }
               pNtk->DeleteCallback(index);
               return true;
             }

@@ -167,8 +167,8 @@ namespace rrr {
     void RemoveBuffer(int id);
     void RemoveConst(int id);
     void AddFanin(int id, int fi, bool c);
-    void TrivialCollapse(int id);
-    void TrivialCollapse();
+    bool TrivialCollapse(int id);
+    bool TrivialCollapse();
     int  TrivialDecompose(int id, int nFanins);
     void TrivialDecompose(int id);
     void SortFanins(int id, std::vector<int> const &vIndices);
@@ -1483,7 +1483,8 @@ namespace rrr {
     TakenAction(action);
   }
 
-  inline void AndNetwork::TrivialCollapse(int id) {
+  inline bool AndNetwork::TrivialCollapse(int id) {
+    bool fConst0 = false;
     for(int idx = 0; idx < GetNumFanins(id);) {
       int fi_edge = vvFaninEdges[id][idx];
       int fi = Edge2Node(fi_edge);
@@ -1513,9 +1514,11 @@ namespace rrr {
             it++;
             action.vFanins.push_back(GetConst0());
             action.vIndices.push_back(idx2);
+            fConst0 = true;
           } else {
             // duplication with the same polarity
             vRefs[fi2]--;
+            idx = 0; // need to start over
           }
         });
         // remove collapsed fanin
@@ -1528,15 +1531,18 @@ namespace rrr {
         idx++;
       }
     }
+    return fConst0;
   }
   
-  inline void AndNetwork::TrivialCollapse() {
+  inline bool AndNetwork::TrivialCollapse() {
+    bool fConst0 = false;
     std::list<int> lInts_ = lInts;
     for(critr it = lInts_.rbegin(); it != lInts_.rend(); it++) {
       if(IsInt(*it)) {
-        TrivialCollapse(*it);
+        fConst0 |= TrivialCollapse(*it);
       }
     }
+    return fConst0;
   }
 
   inline int AndNetwork::TrivialDecompose(int id, int nFanins) {

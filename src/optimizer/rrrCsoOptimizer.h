@@ -618,7 +618,10 @@ namespace rrr {
       if(vTrav[*it] == iTrav) {
         continue;
       }
-      pNtk->TrivialCollapse(*it);
+      if(pNtk->TrivialCollapse(*it)) {
+        pNtk->Propagate(*it);
+        continue;
+      }
       assert(fSortPerNode);
       SortFanins(*it);
       if(RemoveRedundantFanins(*it)) {
