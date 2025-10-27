@@ -214,11 +214,11 @@ namespace rrr {
             int index;
             bool fNew = Register(&ntk, pJob->src_tab, pJob->src_idx, vActions, 0, index);
             if(fNew) {
-              std::vector<int> sizes;
+              std::vector<int> rems;
               for(auto const &qPendingJobs: vqPendingJobs) {
-                sizes.push_back(qPendingJobs.size());
+                rems.push_back(qPendingJobs.size());
               }
-              Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)", ",", "remaining", "=", sizes);
+              Print(0, pJob->prefix, "src_tab", "=", pJob->src_tab, ",", "src_idx", "=", pJob->src_idx, "cost", "=", CostFunction(&ntk), ",", "idx", "=", index, "(new)", ",", "remaining", "=", rems);
               assert(index < 200100);
               CreateJob(0, index, CostFunction(&ntk), 0);
             }
@@ -241,14 +241,15 @@ namespace rrr {
       {
         std::unique_lock<std::mutex> l(mutexFinishedJobs);
         if(nFinishedJobs % 1000000 == 0) {
-          std::vector<int> sizes, pops;
+          std::vector<int> rems, pops, sizes;
           for(auto const &qPendingJobs: vqPendingJobs) {
-            sizes.push_back(qPendingJobs.size());
+            rems.push_back(qPendingJobs.size());
           }
           for(int i = 0; i < nJobs + 1; i++) {
             pops.push_back(tabs[i]->GetPopulation());
+            sizes.push_back(tabs[i]->Size());
           }
-          Print(0, "", "finished", nFinishedJobs, "jobs", ":", "remaining", "=", sizes, ",", "population", "=", pops);
+          Print(0, "", "finished", nFinishedJobs, "jobs", ":", "remaining", "=", rems, ",", "population", "=", pops, ",", "size", "=", sizes);
         }
         nFinishedJobs++;
         condFinishedJobs.notify_one();

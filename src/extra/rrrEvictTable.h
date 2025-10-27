@@ -57,7 +57,7 @@ namespace rrr {
               break;
             }
           }
-          if(!ref[i]) {
+          if(ref[i]) {
             index = int_size(data);
             data.resize(data.size() + 1);
             next.resize(next.size() + 1);
