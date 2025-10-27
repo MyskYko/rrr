@@ -78,7 +78,7 @@ namespace rrr {
     void ChangePiOrder(std::vector<int> const &vOrder);
     void Read(AndNetwork const &from);
     template <typename Ntk, typename Reader>
-    void Read(Ntk const &from, Reader const &reader);
+    int Read(Ntk const &from, Reader const &reader);
 
     // network properties
     bool UseComplementedEdges() const;
@@ -394,12 +394,18 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Reader>
-  void AndNetwork::Read(Ntk const &from, Reader const &reader) {
+  int AndNetwork::Read(Ntk const &from, Reader const &reader) {
+    int r = 0;
     Clear(true, false, false);
-    reader(from, this);
+    if constexpr(returns_int_v<Reader, Ntk const &, AndNetwork *>) {
+      r = reader(from, this);
+    } else {
+      reader(from, this);
+    }
     Action action;
     action.type = READ;
     TakenAction(action);
+    return r;
   }
   
   /* }}} */

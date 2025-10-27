@@ -147,12 +147,12 @@ int main(int argc, char **argv) {
   */
 
   rrr::AndNetwork ntk;
-  ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
+  int nLatches = ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
   rrr::PerformHelo(&ntk, &Par);
 
   if(!output_filename.empty()) {
-    rrr::DumpAig(output_filename, &ntk);
+    rrr::DumpAig(output_filename, &ntk, nLatches);
   }
 
   return 0;
