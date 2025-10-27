@@ -239,6 +239,13 @@ namespace rrr {
     if(fMultiThreading) {
       {
         std::unique_lock<std::mutex> l(mutexFinishedJobs);
+        if(nFinishedJobs % 1000000 == 0) {
+          std::vector<int> sizes;
+          for(auto const &qPendingJobs: vqPendingJobs) {
+            sizes.push_back(qPendingJobs.size());
+          }
+          Print(0, "", "finished", nFinishedJobs, "jobs", ":", "remaining", "=", sizes);
+        }
         nFinishedJobs++;
         condFinishedJobs.notify_one();
       }
