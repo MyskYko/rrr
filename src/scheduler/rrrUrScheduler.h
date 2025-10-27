@@ -89,7 +89,7 @@ namespace rrr {
     ~UrScheduler();
     
     // run
-    void Run();
+    std::vector<Ntk *> Run();
   };
 
   /* {{{ Job */
@@ -428,7 +428,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Opt, typename Par>
-  void UrScheduler<Ntk, Opt, Par>::Run() {
+  std::vector<Ntk *> UrScheduler<Ntk, Opt, Par>::Run() {
     pOriginal->Sweep(true);
     pOriginal->TrivialCollapse();
     bool fRedundant = pOpt->IsRedundant(pOriginal);
@@ -444,15 +444,14 @@ namespace rrr {
     Print(-1, "","unique", "=", tabs[0]->Size() - (int)fRedundant);
     Print(-1, "","jobs", "=", nFinishedJobs);
 
-    if(!strTemporary.empty()) {
-      for(int i = 0; i < tabs[0]->Size(); i++) {
-        std::string str = tabs[0]->Get(i);
-        Ntk ntk;
-        ntk.Read(str, BinaryReader<Ntk>);
-        std::string filename = strTemporary + "_" + std::to_string(i) + ".aig";
-        rrr::DumpAig(filename, &ntk);
-      }
+    std::vector<Ntk *> vNtks;
+    for(int i = 0; i < tabs[0]->Size(); i++) {
+      std::string str = tabs[0]->Get(i);
+      Ntk *pNtk = new Ntk;
+      pNtk->Read(str, BinaryReader<Ntk>);
+      vNtks.push_back(pNtk);
     }
+    return vNtks;
   }
 
   /* }}} */

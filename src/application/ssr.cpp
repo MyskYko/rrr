@@ -18,17 +18,17 @@
 namespace rrr {
   
   template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
-  void PerformInt(Ntk *pNtk, Parameter const *pPar) {
+  std::vector<Ntk *> PerformInt(Ntk *pNtk, Parameter const *pPar) {
     assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     if(pPar->fUseBddCspf) {
       Sch<Ntk, Opt<Ntk, BddCspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
-      sch.Run();
+      return sch.Run();
     } else if(pPar->fUseBddMspf) {
       Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
-      sch.Run();
+      return sch.Run();
     } else {
       Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver2<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
-      sch.Run();
+      return sch.Run();
     }
   }
   
@@ -172,13 +172,21 @@ int main(int argc, char **argv) {
   */
 
   rrr::AndNetwork ntk;
-  ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
+  int nLatches = ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
+  std::vector<rrr::AndNetwork *> vNtks = rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
 
   if(!output_filename.empty()) {
-    rrr::DumpAig(output_filename, &ntk);
+    for(int i = 0; i < int_size(vNtks); i++) {
+      std::string filename = output_filename + "_" + std::to_string(i) + ".aig";
+      rrr::DumpAig(filename, vNtks[i], nLatches);
+    }
   }
+
+  for(int i = 0; i < int_size(vNtks); i++) {
+    delete vNtks[i];
+  }
+  vNtks.clear();
 
   return 0;
 }

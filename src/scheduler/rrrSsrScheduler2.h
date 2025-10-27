@@ -86,7 +86,7 @@ namespace rrr {
     ~SsrScheduler2();
     
     // run
-    void Run();
+    std::vector<Ntk *> Run();
   };
 
   /* {{{ Job */
@@ -394,7 +394,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Opt, typename Par>
-  void SsrScheduler2<Ntk, Opt, Par>::Run() {
+  std::vector<Ntk *> SsrScheduler2<Ntk, Opt, Par>::Run() {
     std::vector<int> vCommands;
     int index;
     Register(pOriginal, -1, vCommands, index);
@@ -425,16 +425,14 @@ namespace rrr {
 
     Print(-1, "","unique2", "=", tab2.Size());
 
-    if(!strTemporary.empty()) {
-      for(int i = 0; i < tab2.Size(); i++) {
-        std::string str = tab2.Get(i);
-        Ntk ntk;
-        ntk.Read(str, BinaryReader<Ntk>);
-        std::string filename = strTemporary + "_" + std::to_string(i) + ".aig";
-        rrr::DumpAig(filename, &ntk);
-      }
+    std::vector<Ntk *> vNtks;
+    for(int i = 0; i < tab2.Size(); i++) {
+      std::string str = tab2.Get(i);
+      Ntk *pNtk = new Ntk;
+      pNtk->Read(str, BinaryReader<Ntk>);
+      vNtks.push_back(pNtk);
     }
-
+    return vNtks;
   }
 
   /* }}} */
