@@ -1490,7 +1490,6 @@ namespace rrr {
   }
 
   inline bool AndNetwork::TrivialCollapse(int id) {
-    bool fConst0 = false;
     for(int idx = 0; idx < GetNumFanins(id);) {
       int fi_edge = vvFaninEdges[id][idx];
       int fi = Edge2Node(fi_edge);
@@ -1502,6 +1501,7 @@ namespace rrr {
         action.idx = idx;
         action.fi = fi;
         action.c = c;
+        bool fConst0 = false;
         std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
         it = vvFaninEdges[id].erase(it);
         ForEachFaninIdx(fi, [&](int idx2, int fi2, bool c2) {
@@ -1533,11 +1533,14 @@ namespace rrr {
         lInts.erase(std::find(lInts.begin(), lInts.end(), fi));
         sInts.erase(fi);
         TakenAction(action);
+        if(fConst0) {
+          return true;
+        }
       } else {
         idx++;
       }
     }
-    return fConst0;
+    return false;
   }
   
   inline bool AndNetwork::TrivialCollapse() {
