@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   options.add_options("Approximation")
     ("F,pattern", "File of simulation patterns", cxxopts::value<std::string>())
     ("j,label", "File of output labels", cxxopts::value<std::string>())
-    ("f,relax", "Increase error threshold on removal after minimum", cxxopts::value<bool>()->default_value("false"))
+    ("f,relax", "Increase error threshold on removal after minimum", cxxopts::value<int>()->default_value("0"))
     ;
 
   options.add_options("Scheduler")
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
   if(result.count("label")) {
     Par.strPatternLabel = result["label"].as<std::string>();
   }
-  Par.fRelaxOnRemoval = result["relax"].as<bool>();
+  Par.nRelaxOnRemoval = result["relax"].as<int>();
   
   Par.nSchedulerVerbose = result["verbose"].as<int>();
   Par.nSchedulerFlow = result["flow"].as<int>();

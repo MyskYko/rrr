@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
   if(result.count("label")) {
     Par.strPatternLabel = result["label"].as<std::string>();
   }
-  Par.fRelaxOnRemoval = result["relax"].as<bool>();
+  Par.nRelaxOnRemoval = result["relax"].as<bool>()? 100: 0; // TODO: think about better parameter usage
   
   Par.nSchedulerVerbose = result["verbose"].as<int>();
   Par.nSchedulerFlow = result["flow"].as<int>();

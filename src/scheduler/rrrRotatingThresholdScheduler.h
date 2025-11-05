@@ -35,7 +35,7 @@ namespace rrr {
     bool fDeterministic;
     int nParallelPartitions;
     bool fOptOnInsert;
-    bool fRelaxOnRemoval;
+    int nRelaxOnRemoval;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -145,7 +145,7 @@ namespace rrr {
     fDeterministic(pPar->fDeterministic),
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
-    fRelaxOnRemoval(pPar->fRelaxOnRemoval),
+    nRelaxOnRemoval(pPar->nRelaxOnRemoval),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -219,6 +219,7 @@ namespace rrr {
 
     int nTemporary = 1;
     double cost = costStart;
+    double tDeltaDelta = 0;
     for(int k = 0; cost > 0; k++) {
       Print(0, "", "round", k, ":", "cost", "=", cost, "elapsed", "=", GetElapsedTime(), "s");
       bool fReduced = false;
@@ -260,12 +261,37 @@ namespace rrr {
           }
         }
         Print(1, "", "increasing threshold to", tNext, "for module", idx);
-        if(fRelaxOnRemoval) {
-          Print(0, "", "increasing delta from", vOpts[0]->GetDelta(), "by", tNext - vOpts[0]->GetThreshold());
-          double tDelta = vOpts[0]->GetDelta() + tNext - vOpts[0]->GetThreshold();
-          for(int i = 0; i < int_size(vNtks); i++) {
-            assert(vOpts[i]->GetDelta() + tNext - vOpts[i]->GetThreshold() == tDelta);
-            vOpts[i]->SetDelta(tDelta);
+        if(nRelaxOnRemoval) {
+          if(nRelaxOnRemoval == 3) {
+            if(tDeltaDelta == 0) {
+              tDeltaDelta = vOpts[0]->GetThreshold() / cost;
+            }
+            double tDelta = tDeltaDelta;
+            if(tDelta < tNext - vOpts[0]->GetThreshold()) {
+              tDelta = tNext - vOpts[0]->GetThreshold();
+            }
+            Print(0, "", "increasing delta from", vOpts[0]->GetDelta(), "by", tDelta);
+            tDelta += vOpts[0]->GetDelta();
+            for(int i = 0; i < int_size(vNtks); i++) {
+              vOpts[i]->SetDelta(tDelta);
+            }
+          } else if(nRelaxOnRemoval == 2 || (nRelaxOnRemoval == 1 && vOpts[0]->GetDelta() == std::numeric_limits<double>::min())) {
+            double tDelta = vOpts[0]->GetThreshold() / cost;
+            if(tDelta < tNext - vOpts[0]->GetThreshold()) {
+              tDelta = tNext - vOpts[0]->GetThreshold();
+            }
+            Print(0, "", "increasing delta from", vOpts[0]->GetDelta(), "by", tDelta);
+            tDelta += vOpts[0]->GetDelta();
+            for(int i = 0; i < int_size(vNtks); i++) {
+              vOpts[i]->SetDelta(tDelta);
+            }
+          } else {
+            Print(0, "", "increasing delta from", vOpts[0]->GetDelta(), "by", tNext - vOpts[0]->GetThreshold());
+            double tDelta = vOpts[0]->GetDelta() + tNext - vOpts[0]->GetThreshold();
+            for(int i = 0; i < int_size(vNtks); i++) {
+              assert(vOpts[i]->GetDelta() + tNext - vOpts[i]->GetThreshold() == tDelta);
+              vOpts[i]->SetDelta(tDelta);
+            }
           }
         }
         for(int i = 0; i < int_size(vNtks); i++) {
