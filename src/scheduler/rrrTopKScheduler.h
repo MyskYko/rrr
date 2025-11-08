@@ -251,6 +251,7 @@ namespace rrr {
         int idx = -1;
         double tNext = std::numeric_limits<double>::max();
         for(int i = 0; i < int_size(vNtks); i++) {
+          Print(1, "", "module", i, ":", "next", "=", vOpts[i]->GetNext());
           if(tNext > vOpts[i]->GetNext()) { // TODO: this assumes we are increasing threshold
             tNext = vOpts[i]->GetNext();
             idx = i;

@@ -660,6 +660,7 @@ namespace rrr {
         }
         if(pNtk->GetNumFanins(id) <= 1) {
           pNtk->Propagate(id);
+          pNtk->Sweep();
         }
         if(nTemporary > 0 && !strTemporary.empty()) {
           Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
