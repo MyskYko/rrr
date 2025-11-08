@@ -45,6 +45,7 @@ namespace rrr {
 
     // checks
     bool CheckRedundancy(int id, int idx);
+    T EvaluateRedundancy(int id, int idx);
     bool CheckFeasibility(int id, int fi, bool c);
 
     // summary
@@ -210,6 +211,11 @@ namespace rrr {
       }
     }
     return false;
+  }
+  
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  T ThresholdAnalyzer<Ntk, Sim, T, fAscending>::EvaluateRedundancy(int id, int idx) {
+    return sim.CheckRedundancy(id, idx);
   }
   
   template <typename Ntk, typename Sim, typename T, bool fAscending>

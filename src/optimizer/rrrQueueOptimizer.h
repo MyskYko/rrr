@@ -13,9 +13,10 @@ namespace rrr {
 
   // it is assumed that removing redundancy never degrades the cost in this optimizer
   template <typename Ntk, typename Ana, typename T = int>
-  class CsoOptimizer {
+  class QueueOptimizer {
   private:
-    static constexpr int nSamples = 1000;
+    // entry
+    struct Entry;
     
     // aliases
     using itr = std::vector<int>::iterator;
@@ -48,11 +49,8 @@ namespace rrr {
     // data
     Ana ana;
     std::mt19937 rng;
-    std::vector<int> vTmp;
+    std::vector<Entry> q;
     time_point start;
-    T tDelta;
-    T tNext;
-    int nNext;
     int nTemporary;
 
     // fanin sorting data
@@ -62,9 +60,6 @@ namespace rrr {
     // marks
     int target;
     std::vector<bool> vTfoMarks;
-    // marks
-    unsigned iTrav;
-    std::vector<unsigned> vTrav;
 
     // statistics
     struct Stats;
@@ -80,7 +75,6 @@ namespace rrr {
 
     // topology
     void MarkTfo(int id);
-    unsigned StartTraversal(int n = 1);
     
     // time
     bool Timeout();
@@ -91,27 +85,22 @@ namespace rrr {
     void SortFanins(int id);
     void SortFanins();
 
-    // remove redundancy
-    bool RemoveRedundantFanins(int id, bool fRemoveUnused = false);
-    bool RemoveRedundancyOneTraversal(bool fSubRoutine);
-    bool RemoveRedundancy();
+    // evaluate redundancy
+    void EvaluateRedundancy();
     
   public:
     // constructors
-    CsoOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
+    QueueOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction);
     void AssignNetwork(Ntk *pNtk_, bool fReuse = false);
     void SetPrintLine(std::function<void(std::string)> const &PrintLine_);
 
     // run
-    bool Run(int iSeed = 0, seconds nTimeout_ = 0);
-    bool RunOneTraversal(int iSeed = 0, seconds nTimeout_ = 0);
-    void RemoveNext();
-    T GetThreshold();
+    void Run(int iSeed = 0, seconds nTimeout_ = 0);
+    bool RemoveNext();
+    T GetCurrent();
     void SetThreshold(T tThreshold);
     void ResetThreshold();
-    T GetNext();
-    T GetDelta();
-    void SetDelta(T tDelta_);
+    T GetNext(int index = 0);
     int GetNumTemporary();
     void SetNumTemporary(int nTemporary_);
     void SetNumModule(int nModule_);
@@ -125,10 +114,33 @@ namespace rrr {
     summary<double> GetTimesSummary() const;
   };
 
+  /* {{{ Entry */
+  
+  template <typename Ntk, typename Ana, typename T>
+  struct QueueOptimizer<Ntk, Ana, T>::Entry {
+    // data
+    T t;
+    int id;
+    int fi;
+    
+    // constructor
+    Entry(T t, int id, int fi) :
+      t(t),
+      id(id),
+      fi(fi) {
+    }
+
+    bool operator<(const Entry& other) {
+      return t > other.t;
+    }
+  };
+
+  /* }}} */
+
   /* {{{ Stats */
   
   template <typename Ntk, typename Ana, typename T>
-  struct CsoOptimizer<Ntk, Ana, T>::Stats {
+  struct QueueOptimizer<Ntk, Ana, T>::Stats {
     int nTriedFis = 0;
     int nAddedFis = 0;
     int nTried = 0;
@@ -180,7 +192,7 @@ namespace rrr {
 
   template <typename Ntk, typename Ana, typename T>
   template <typename... Args>
-  inline void CsoOptimizer<Ntk, Ana, T>::Print(int nVerboseLevel, Args... args) {
+  inline void QueueOptimizer<Ntk, Ana, T>::Print(int nVerboseLevel, Args... args) {
     if(nVerbose > nVerboseLevel) {
       std::stringstream ss;
       for(int i = 0; i < nVerboseLevel; i++) {
@@ -196,7 +208,7 @@ namespace rrr {
   /* {{{ Callback */
   
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::ActionCallback(Action const &action) {
+  void QueueOptimizer<Ntk, Ana, T>::ActionCallback(Action const &action) {
     if(nVerbose > 4) {
       std::stringstream ss = GetActionDescription(action);
       std::string str;
@@ -252,7 +264,7 @@ namespace rrr {
   /* {{{ Topology */
   
   template <typename Ntk, typename Ana, typename T>
-  inline void CsoOptimizer<Ntk, Ana, T>::MarkTfo(int id) {
+  inline void QueueOptimizer<Ntk, Ana, T>::MarkTfo(int id) {
     // includes id itself
     if(id == target) {
       return;
@@ -266,27 +278,12 @@ namespace rrr {
     });
   }
   
-  template <typename Ntk, typename Ana, typename T>
-  inline unsigned CsoOptimizer<Ntk, Ana, T>::StartTraversal(int n) {
-    do {
-      for(int i = 0; i < n; i++) {
-        iTrav++;
-        if(iTrav == 0) {
-          vTrav.clear();
-          break;
-        }
-      }
-    } while(iTrav == 0);
-    vTrav.resize(pNtk->GetNumNodes());
-    return iTrav - n + 1;
-  }
-
   /* }}} */
 
   /* {{{ Time */
   
   template <typename Ntk, typename Ana, typename T>
-  inline bool CsoOptimizer<Ntk, Ana, T>::Timeout() {
+  inline bool QueueOptimizer<Ntk, Ana, T>::Timeout() {
     if(nTimeout) {
       time_point current = GetCurrentTime();
       if(DurationInSeconds(start, current) > nTimeout) {
@@ -301,7 +298,7 @@ namespace rrr {
   /* {{{ Sort fanins */
 
   template <typename Ntk, typename Ana, typename T>
-  inline void CsoOptimizer<Ntk, Ana, T>::SetRandPiOrder() {
+  inline void QueueOptimizer<Ntk, Ana, T>::SetRandPiOrder() {
     if(int_size(vRandPiOrder) != pNtk->GetNumPis()) {
       vRandPiOrder.clear();
       vRandPiOrder.resize(pNtk->GetNumPis());
@@ -311,7 +308,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana, typename T>
-  inline void CsoOptimizer<Ntk, Ana, T>::SetRandCosts() {
+  inline void QueueOptimizer<Ntk, Ana, T>::SetRandCosts() {
     std::uniform_real_distribution<> dis(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max());
     while(int_size(vRandCosts) < pNtk->GetNumNodes()) {
       vRandCosts.push_back(dis(rng));
@@ -319,7 +316,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana, typename T>
-  inline void CsoOptimizer<Ntk, Ana, T>::SortFanins(int id) {
+  inline void QueueOptimizer<Ntk, Ana, T>::SortFanins(int id) {
     switch(nSortType) {
     case 0: // no sorting
       break;
@@ -548,7 +545,7 @@ namespace rrr {
   }
   
   template <typename Ntk, typename Ana, typename T>
-  inline void CsoOptimizer<Ntk, Ana, T>::SortFanins() {
+  inline void QueueOptimizer<Ntk, Ana, T>::SortFanins() {
     pNtk->ForEachInt([&](int id) {
       SortFanins(id);
     });
@@ -559,63 +556,12 @@ namespace rrr {
   /* {{{ Remove redundancy */
   
   template <typename Ntk, typename Ana, typename T>
-  inline bool CsoOptimizer<Ntk, Ana, T>::RemoveRedundantFanins(int id, bool fRemoveUnused) {
-    assert(pNtk->GetNumFanouts(id) > 0);
-    bool fReduced = false;
-    for(int idx = 0; idx < pNtk->GetNumFanins(id); idx++) {
-      if(ana.CheckRedundancy(id, idx)) {
-        int fi = pNtk->GetFanin(id, idx);
-        pNtk->RemoveFanin(id, idx);
-        fReduced = true;
-        idx--;
-        if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
-          pNtk->RemoveUnused(fi, true);
-        }
-        if(nTemporary > 0 && !strTemporary.empty()) {
-          Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
-          std::string str = strTemporary;
-          if(nModule != -1) {
-            str += "_" + std::to_string(nModule);
-          }
-          str += "_" +  std::to_string(nTemporary) + ".aig";
-          DumpAig(str, pNtk);
-          nTemporary++;
-        }
-        if(tDelta) {
-          T t = ana.GetCurrent() + tDelta;
-          if(t != ana.GetThreshold()) {
-            Print(1, "changing threshold to", t);
-            SetThreshold(t);
-          } else {
-            StartTraversal();
-          }
-        }
-      }
-    }
-    return fReduced;
-  }
-
-  template <typename Ntk, typename Ana, typename T>
-  bool CsoOptimizer<Ntk, Ana, T>::RemoveRedundancyOneTraversal(bool fSubRoutine) {
+  void QueueOptimizer<Ntk, Ana, T>::EvaluateRedundancy() {
     time_point timeStart = GetCurrentTime();
-    bool fReduced = false;
+    q.clear();
     std::vector<int> vInts = pNtk->GetInts();
-    critr it = vInts.rbegin();
-    if(ana.GetNext() == ana.GetThreshold()) {
-      while(*it != ana.GetNextPair().first) {
-        it++;
-        assert(it != vInts.rend());
-      }
-    }
-    for(; it != vInts.rend(); it++) {
+    for(critr it = vInts.rbegin(); it != vInts.rend(); it++) {
       if(!pNtk->IsInt(*it)) {
-        continue;
-      }
-      if(pNtk->GetNumFanouts(*it) == 0) {
-        pNtk->RemoveUnused(*it);
-        continue;
-      }
-      if(vTrav[*it] == iTrav) {
         continue;
       }
       if(pNtk->TrivialCollapse(*it)) {
@@ -625,49 +571,16 @@ namespace rrr {
       }
       assert(fSortPerNode);
       SortFanins(*it);
-      if(RemoveRedundantFanins(*it)) {
-        fReduced = true;
-        if(pNtk->GetNumFanins(*it) <= 1) {
-          pNtk->Propagate(*it);
-        }
-        if(!tDelta) {
-          StartTraversal();
-        }
-      } else {
-        vTrav[*it] = iTrav;
+      assert(pNtk->GetNumFanouts(*it) > 0);
+      for(int idx = 0; idx < pNtk->GetNumFanins(*it); idx++) {
+        T t = ana.CheckRedundancy(*it, idx);
+        int fi = pNtk->GetFanin(*it, idx);
+        q.emplace_back(t, *it, fi);
       }
     }
-    if(!fSubRoutine) {
-      time_point timeEnd = GetCurrentTime();
-      statsLocal.durationReduce += Duration(timeStart, timeEnd);
-    }
-    return fReduced;
-  }
-
-  template <typename Ntk, typename Ana, typename T>
-  bool CsoOptimizer<Ntk, Ana, T>::RemoveRedundancy() {
-    time_point timeStart = GetCurrentTime();
-    bool fReduced = false;
-    assert(fSortPerNode);
-    nNext = -1;
-    while(RemoveRedundancyOneTraversal(true)) {
-      fReduced = true;
-      tNext = ana.GetNext();
-      nNext = ana.GetNextPair().first;
-      ana.ResetNext();
-    }
-    if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
-      if(!pNtk->IsInt(nNext)) {
-        std::cout << "warning: nNext does not exist where tNext " << tNext << " at " << nNext << " is smaller than GetNext " << ana.GetNext() << " at " << ana.GetNextPair().first << std::endl;
-      } else {
-        bool f = RemoveRedundantFanins(nNext);
-        assert(!f);
-        assert(ana.GetNext() == tNext);
-      }
-    }
+    std::sort(q.begin(), q.end());
     time_point timeEnd = GetCurrentTime();
     statsLocal.durationReduce += Duration(timeStart, timeEnd);
-    return fReduced;
   }
 
   /* }}} */
@@ -675,7 +588,7 @@ namespace rrr {
   /* {{{ Constructors */
   
   template <typename Ntk, typename Ana, typename T>
-  CsoOptimizer<Ntk, Ana, T>::CsoOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
+  QueueOptimizer<Ntk, Ana, T>::QueueOptimizer(Parameter const *pPar, std::function<double(Ntk *)> CostFunction) :
     pNtk(NULL),
     nVerbose(pPar->nOptimizerVerbose),
     CostFunction(CostFunction),
@@ -691,28 +604,22 @@ namespace rrr {
     strTemporary(pPar->strTemporary),
     nModule(-1),
     ana(pPar),
-    tDelta(0),
-    nNext(-1),
     nTemporary(0),
-    target(-1),
-    iTrav(0) {
+    target(-1) {
   }
   
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+  void QueueOptimizer<Ntk, Ana, T>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     pNtk = pNtk_;
     nModule = -1;
-    tDelta = 0;
-    nNext = -1;
     nTemporary = 0;
     target = -1;
-    StartTraversal();
-    pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana, T>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&QueueOptimizer<Ntk, Ana, T>::ActionCallback, this, std::placeholders::_1));
     ana.AssignNetwork(pNtk, fReuse);
   }
   
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetPrintLine(std::function<void(std::string)> const &PrintLine_) {
+  void QueueOptimizer<Ntk, Ana, T>::SetPrintLine(std::function<void(std::string)> const &PrintLine_) {
     PrintLine = PrintLine_;
   }
   
@@ -721,7 +628,7 @@ namespace rrr {
   /* {{{ Run */
 
   template <typename Ntk, typename Ana, typename T>
-  bool CsoOptimizer<Ntk, Ana, T>::Run(int iSeed, seconds nTimeout_) {
+  void QueueOptimizer<Ntk, Ana, T>::Run(int iSeed, seconds nTimeout_) {
     rng.seed(iSeed);
     vRandPiOrder.clear();
     vRandCosts.clear();
@@ -734,159 +641,87 @@ namespace rrr {
     if(fSortInitial) {
       SortFanins();
     }
-    return RemoveRedundancy();
+    EvaluateRedundancy();
   }
 
   template <typename Ntk, typename Ana, typename T>
-  bool CsoOptimizer<Ntk, Ana, T>::RunOneTraversal(int iSeed, seconds nTimeout_) {
-    rng.seed(iSeed);
-    vRandPiOrder.clear();
-    vRandCosts.clear();
-    if(nSortTypeOriginal < 0) {
-      nSortType = (rng() + 1) % 18; // default to 9
-      Print(0, "fanin cost function =", nSortType);
-    }
-    nTimeout = nTimeout_;
-    start = GetCurrentTime();
-    if(fSortInitial) {
-      SortFanins();
-    }
-    assert(fSortPerNode);
-    bool fReduced = RemoveRedundancyOneTraversal(false);
-    if(fReduced) {
-      tNext = ana.GetNext();
-      nNext = ana.GetNextPair().first;
-      ana.ResetNext();
-    } else {
-      if(nNext != -1 && ((ana.GetNext() > ana.GetThreshold() && ana.GetNext() > tNext) || (ana.GetNext() < ana.GetThreshold() && ana.GetNext() < tNext))) {
-        if(!pNtk->IsInt(nNext)) {
-          std::cout << "warning: nNext does not exist where tNext " << tNext << " at " << nNext << " is smaller than GetNext " << ana.GetNext() << " at " << ana.GetNextPair().first << std::endl;
-        } else {
-          bool f = RemoveRedundantFanins(nNext);
-          assert(!f);
-          assert(ana.GetNext() == tNext);
-        }
-      }
-    }
-    return fReduced;
-  }
-
-  template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::RemoveNext() {
+  bool QueueOptimizer<Ntk, Ana, T>::RemoveNext() {
     // assume set threshold is called already
-    int id = ana.GetNextPair().first;
-    int idx = ana.GetNextPair().second;
-    T t = ana.GetNext();
-    pNtk->RemoveFanin(id, idx);
-    assert(ana.GetCurrent() == t);
-    if(nTemporary > 0 && !strTemporary.empty()) {
-      Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
-      std::string str = strTemporary;
-      if(nModule != -1) {
-        str += "_" + std::to_string(nModule);
+    assert(!q.empty());
+    int id = q.back().id;
+    int fi = q.back().fi;
+    q.pop_back();
+    if(pNtk->IsInt(id)) {
+      int idx = pNtk->FindFanin(id, fi);
+      if(idx != -1 && ana.CheckRedundancy(id, idx)) {
+        pNtk->RemoveFanin(id, idx);
+        if(pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
+          pNtk->RemoveUnused(fi, true);
+        }
+        if(pNtk->GetNumFanins(id) <= 1) {
+          pNtk->Propagate(id);
+        }
+        if(nTemporary > 0 && !strTemporary.empty()) {
+          Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+          std::string str = strTemporary;
+          if(nModule != -1) {
+            str += "_" + std::to_string(nModule) + "_logic";
+          }
+          str += "_" +  std::to_string(nTemporary) + ".aig";
+          DumpAig(str, pNtk);
+          nTemporary++;
+        }
+        return true;
       }
-      str += "_" +  std::to_string(nTemporary) + ".aig";
-      DumpAig(str, pNtk);
-      nTemporary++;
     }
-    if(tDelta) {
-      T t = ana.GetCurrent() + tDelta;
-      if(t != ana.GetThreshold()) {
-        SetThreshold(t);
-      } else {
-        StartTraversal(); // this is probably not needed, but not harmful
-      }
-    }
-    if(pNtk->GetNumFanins(id) <= 1) {
-      pNtk->Propagate(id);
-    }
-    nNext = -1;
+    return false;
   }
 
   template <typename Ntk, typename Ana, typename T>
-  T CsoOptimizer<Ntk, Ana, T>::GetThreshold() {
-    return ana.GetThreshold();
+  T QueueOptimizer<Ntk, Ana, T>::GetCurrent() {
+    return ana.GetCurrent();
   }
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetThreshold(T tThreshold) {
-    if(nTemporary == 0 && !strTemporary.empty()) {
-      Print(0, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
-      std::string str = strTemporary;
-      if(nModule != -1) {
-        str += "_" + std::to_string(nModule);
-      }
-      str += "_" +  std::to_string(ana.GetThreshold()) + ".aig";
-      DumpAig(str, pNtk);
-    }
-    assert(tThreshold != ana.GetThreshold());
+  void QueueOptimizer<Ntk, Ana, T>::SetThreshold(T tThreshold) {
     ana.SetThreshold(tThreshold);
-    StartTraversal();
   }
   
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::ResetThreshold() {
-    nNext = -1;
-    ana.ResetNext();
-    ana.SetThreshold(ana.GetCurrent() + tDelta);
-    StartTraversal();
-  }
-  
-  template <typename Ntk, typename Ana, typename T>
-  T CsoOptimizer<Ntk, Ana, T>::GetNext() {
-    return ana.GetNext();
+  T QueueOptimizer<Ntk, Ana, T>::GetNext(int index) {
+    if(q.empty() || int_size(q) < index) {
+      return std::numeric_limits<T>::max();
+    }
+    return q[int_size(q) - index].t;
   }
 
   template <typename Ntk, typename Ana, typename T>
-  T CsoOptimizer<Ntk, Ana, T>::GetDelta() {
-    return tDelta;
-  }
-
-  template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetDelta(T tDelta_) {
-    tDelta = tDelta_;
-  }
-
-  template <typename Ntk, typename Ana, typename T>
-  int CsoOptimizer<Ntk, Ana, T>::GetNumTemporary() {
+  int QueueOptimizer<Ntk, Ana, T>::GetNumTemporary() {
     return nTemporary;
   }
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetNumTemporary(int nTemporary_) {
+  void QueueOptimizer<Ntk, Ana, T>::SetNumTemporary(int nTemporary_) {
     nTemporary = nTemporary_;
   }
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetNumModule(int nModule_) {
+  void QueueOptimizer<Ntk, Ana, T>::SetNumModule(int nModule_) {
     nModule = nModule_;
   }
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetBias(std::vector<std::vector<int>> const &vBias) {
-    if(ana.SetBias(vBias)) {
-      nNext = -1;
-      ana.ResetNext();
-      if(tDelta) {
-        T t = ana.GetCurrent() + tDelta;
-        if(t != ana.GetThreshold()) {
-          SetThreshold(t);
-        } else {
-          StartTraversal();
-        }
-      } else {
-        StartTraversal();
-      }
-    }
+  void QueueOptimizer<Ntk, Ana, T>::SetBias(std::vector<std::vector<int>> const &vBias) {
+    ana.SetBias(vBias);
   }
 
   template <typename Ntk, typename Ana, typename T>
-  std::vector<std::vector<int>> CsoOptimizer<Ntk, Ana, T>::GetContribution() {
+  std::vector<std::vector<int>> QueueOptimizer<Ntk, Ana, T>::GetContribution() {
     return ana.GetContribution();
   }
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::SetNumTargets(int nTargets_) {
+  void QueueOptimizer<Ntk, Ana, T>::SetNumTargets(int nTargets_) {
     nTargets = nTargets_;
   }
   
@@ -895,13 +730,13 @@ namespace rrr {
   /* {{{ Summary */
 
   template <typename Ntk, typename Ana, typename T>
-  void CsoOptimizer<Ntk, Ana, T>::ResetSummary() {
+  void QueueOptimizer<Ntk, Ana, T>::ResetSummary() {
     stats.clear();
     ana.ResetSummary();
   }
   
   template <typename Ntk, typename Ana, typename T>
-  summary<int> CsoOptimizer<Ntk, Ana, T>::GetStatsSummary() const {
+  summary<int> QueueOptimizer<Ntk, Ana, T>::GetStatsSummary() const {
     summary<int> v;
     for(auto const &entry: stats) {
       v.emplace_back("opt " + entry.first + " tried node", entry.second.nTried);
@@ -919,7 +754,7 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Ana, typename T>
-  summary<double> CsoOptimizer<Ntk, Ana, T>::GetTimesSummary() const {
+  summary<double> QueueOptimizer<Ntk, Ana, T>::GetTimesSummary() const {
     summary<double> v;
     for(auto const &entry: stats) {
       v.emplace_back("opt " + entry.first + " add", entry.second.durationAdd);
