@@ -241,6 +241,9 @@ namespace rrr {
         }
         vIndices[idx]++;
       }
+      if(tDelta < 0) {
+        tDelta = 0;
+      }
       Print(0, "", "using delta ", tDelta);
       // remove top K
       int nRemoved = 0;
