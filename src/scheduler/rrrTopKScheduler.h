@@ -189,7 +189,7 @@ namespace rrr {
       vOpts[i]->SetNumTemporary(1); // prevent print
     }
     
-    int K = 100;
+    int K = 1000;
     
     int nTemporary = 1;
     double cost = costStart;
@@ -267,10 +267,10 @@ namespace rrr {
               vBias = vContribution;
             } else {
               assert(vBias.size() == vContribution.size());
-              for(int idx = 0; idx < int_size(vBias); idx++) {
-                assert(vBias[idx].size() == vContribution[idx].size());
-                for(int p = 0; p < int_size(vBias[idx]); p++) {
-                  vBias[idx][p] += vContribution[idx][p];
+              for(int i = 0; i < int_size(vBias); i++) {
+                assert(vBias[i].size() == vContribution[i].size());
+                for(int p = 0; p < int_size(vBias[i]); p++) {
+                  vBias[i][p] += vContribution[i][p];
                 }
               }
             }
@@ -278,6 +278,7 @@ namespace rrr {
         }
         vOpts[idx]->SetBias(vBias);
         vOpts[idx]->SetNumTemporary(nTemporary);
+        Print(1, "", "module", idx, ":", "threshold", "=", vOpts[idx]->GetCurrent() + tDelta, "cost", "=", CostFunction(vNtks[idx]), "elapsed", "=", GetElapsedTime(), "s");
         vOpts[idx]->SetThreshold(vOpts[idx]->GetCurrent() + tDelta);
         vOpts[idx]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(idx) + " : ", str);
