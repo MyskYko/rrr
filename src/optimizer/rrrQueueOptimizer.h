@@ -573,7 +573,7 @@ namespace rrr {
       SortFanins(*it);
       assert(pNtk->GetNumFanouts(*it) > 0);
       for(int idx = 0; idx < pNtk->GetNumFanins(*it); idx++) {
-        T t = ana.CheckRedundancy(*it, idx);
+        T t = ana.EvaluateRedundancy(*it, idx);
         int fi = pNtk->GetFanin(*it, idx);
         q.emplace_back(t, *it, fi);
       }
@@ -693,7 +693,7 @@ namespace rrr {
     if(q.empty() || int_size(q) < index) {
       return std::numeric_limits<T>::max();
     }
-    return q[int_size(q) - index].t;
+    return q[int_size(q) - index - 1].t;
   }
 
   template <typename Ntk, typename Ana, typename T>
