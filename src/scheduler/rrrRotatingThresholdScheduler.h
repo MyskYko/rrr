@@ -36,6 +36,7 @@ namespace rrr {
     int nParallelPartitions;
     bool fOptOnInsert;
     int nRelaxOnRemoval;
+    bool fNoRelax;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -146,6 +147,7 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     nRelaxOnRemoval(pPar->nRelaxOnRemoval),
+    fNoRelax(pPar->fNoRelax),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -252,6 +254,9 @@ namespace rrr {
         nTemporary = vOpts[i]->GetNumTemporary();
       }
       if(!fReduced) {
+        if(fNoRelax) {
+          break;
+        }
         int idx = -1;
         double tNext = std::numeric_limits<double>::max();
         for(int i = 0; i < int_size(vNtks); i++) {

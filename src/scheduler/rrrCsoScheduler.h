@@ -36,6 +36,7 @@ namespace rrr {
     int nParallelPartitions;
     bool fOptOnInsert;
     bool fRelaxOnRemoval;
+    bool fNoRelax;
     seconds nTimeout;
     std::function<double(Ntk *)> CostFunction;
     
@@ -146,6 +147,7 @@ namespace rrr {
     nParallelPartitions(pPar->nParallelPartitions),
     fOptOnInsert(pPar->fOptOnInsert),
     fRelaxOnRemoval(pPar->fRelaxOnRemoval),
+    fNoRelax(pPar->fNoRelax),
     nTimeout(pPar->nTimeout),
     nCreatedJobs(0),
     nFinishedJobs(0),
@@ -189,7 +191,7 @@ namespace rrr {
     cost = CostFunction(pNtk);
 
     // iterative threshold increase
-    for(int k = 1; cost > 0; k++) {
+    for(int k = 1; !fNoRelax && cost > 0; k++) {
       Print(0, "", "round", k, ":", "cost", "=", cost, "next threshold", "=", pOpt->GetNext(), "elapsed", "=", GetElapsedTime(), "s");
       if(fRelaxOnRemoval) {
         Print(0, "", "increasing delta from", pOpt->GetDelta(), "by", pOpt->GetNext() - pOpt->GetThreshold());
