@@ -564,6 +564,10 @@ namespace rrr {
       if(!pNtk->IsInt(*it)) {
         continue;
       }
+      if(pNtk->GetNumFanouts(*it) == 0) {
+        pNtk->RemoveUnused(*it);
+        continue;
+      }
       if(pNtk->TrivialCollapse(*it)) {
         pNtk->Propagate(*it);
         pNtk->Sweep();
@@ -571,7 +575,6 @@ namespace rrr {
       }
       assert(fSortPerNode);
       SortFanins(*it);
-      assert(pNtk->GetNumFanouts(*it) > 0);
       for(int idx = 0; idx < pNtk->GetNumFanins(*it); idx++) {
         T t = ana.EvaluateRedundancy(*it, idx);
         int fi = pNtk->GetFanin(*it, idx);
