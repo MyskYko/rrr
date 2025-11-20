@@ -246,9 +246,9 @@ namespace rrr {
         tDelta = 0;
       }
       Print(0, "", "using delta ", tDelta);
-      // remove top K (or try all when delta is 0)
+      // remove top K
       int nRemoved = 0;
-      for(int k = 0; k < K || tDelta == 0; k++) {
+      for(int k = 0; k < K; k++) {
         int idx = -1;
         double tNext = std::numeric_limits<double>::max();
         for(int i = 0; i < int_size(vNtks); i++) {
@@ -279,7 +279,7 @@ namespace rrr {
         }
         vOpts[idx]->SetBias(vBias);
         vOpts[idx]->SetNumTemporary(nTemporary);
-        Print(1, "", "module", idx, ":", "threshold", "=", vOpts[idx]->GetCurrent() + tDelta, "cost", "=", CostFunction(vNtks[idx]), "elapsed", "=", GetElapsedTime(), "s");
+        //Print(1, "", "module", idx, ":", "threshold", "=", vOpts[idx]->GetCurrent() + tDelta, "cost", "=", CostFunction(vNtks[idx]), "elapsed", "=", GetElapsedTime(), "s");
         vOpts[idx]->SetThreshold(vOpts[idx]->GetCurrent() + tDelta);
         vOpts[idx]->SetPrintLine([&](std::string str) {
           Print(-1, "module " + std::to_string(idx) + " : ", str);
