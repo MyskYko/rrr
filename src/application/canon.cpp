@@ -15,6 +15,7 @@ int main(int argc, char **argv) {
       std::cout << argv[i] << std::endl;
       rrr::AndNetwork ntk;
       ntk.Read(argv[i], rrr::AigFileReader<rrr::AndNetwork>);
+      ntk.TrivialCollapse();
       Canonicalizer<rrr::AndNetwork> can;
       can.Run(&ntk);
       std::string str = CreateBinary(&ntk);

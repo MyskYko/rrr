@@ -207,7 +207,9 @@ namespace rrr {
           std::string filename = strTemporary + "_" + std::to_string(index) + ".aig";
           rrr::DumpAig(filename, &ntk);
         }
-        CreateJob(index);
+        if(tab.Size() < 200000) {
+          CreateJob(index);
+        }
         nNews++;
       } else {
         //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
