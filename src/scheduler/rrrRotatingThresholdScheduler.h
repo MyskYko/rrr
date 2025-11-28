@@ -222,6 +222,7 @@ namespace rrr {
     int nTemporary = 1;
     double cost = costStart;
     double tDeltaDelta = 0;
+    double dTemperature = vOpts[0]->GetTemperature();
     for(int k = 0; cost > 0; k++) {
       Print(0, "", "round", k, ":", "cost", "=", cost, "elapsed", "=", GetElapsedTime(), "s");
       bool fReduced = false;
@@ -245,6 +246,7 @@ namespace rrr {
         }
         // Note: by sharing bias, threshold is also shared through recomputation of current + delta; otherwise (when delta = 0) all modules have the same threshold as set to next below
         vOpts[i]->SetBias(vBias);
+        vOpts[i]->SetTemperature(dTemperature);
         Print(1, "", "module", i, ":", "threshold", "=", vOpts[i]->GetThreshold(), "cost", "=", CostFunction(vNtks[i]), "elapsed", "=", GetElapsedTime(), "s");
         vOpts[i]->SetNumTemporary(nTemporary);
         vOpts[i]->SetPrintLine([&](std::string str) {
@@ -252,6 +254,7 @@ namespace rrr {
         });
         fReduced |= vOpts[i]->RunOneTraversal();
         nTemporary = vOpts[i]->GetNumTemporary();
+        dTemperature = vOpts[i]->GetTemperature();
       }
       if(!fReduced) {
         if(fNoRelax) {

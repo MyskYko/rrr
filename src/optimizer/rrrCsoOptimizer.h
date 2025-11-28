@@ -936,6 +936,16 @@ namespace rrr {
   template <typename Ntk, typename Ana, typename T>
   void CsoOptimizer<Ntk, Ana, T>::SetTemperature(double dTemperature) {
     ana.SetTemperature(dTemperature);
+    if(tDelta) {
+      T t = ana.GetCurrent() + tDelta;
+      if(t != ana.GetThreshold()) {
+        SetThreshold(t);
+      } else {
+        StartTraversal();
+      }
+    } else {
+      StartTraversal();
+    }
   }
   
   /* }}} */
