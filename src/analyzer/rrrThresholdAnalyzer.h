@@ -6,6 +6,11 @@
 namespace rrr {
 
   template <typename T>
+  concept SimHasTemperature = requires(T t) {
+    { t.GetTemperature() };
+  };
+  
+  template <typename T>
   concept HasDrop = requires(T t, int x) {
     { t.Drop(x) };
   };
@@ -42,6 +47,9 @@ namespace rrr {
     void ResetNext();
     bool SetBias(std::vector<std::vector<int>> const &vBias);
     std::vector<std::vector<int>> GetContribution();
+    bool HasTemperature();
+    double GetTemperature();
+    void SetTemperature(double dTemperature);
 
     // checks
     bool CheckRedundancy(int id, int idx);
@@ -184,6 +192,29 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename T, bool fAscending>
   std::vector<std::vector<int>> ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetContribution() {
     return sim.GetContribution();
+  }
+
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  bool ThresholdAnalyzer<Ntk, Sim, T, fAscending>::HasTemperature() {
+    if constexpr(SimHasTemperature<Sim>) {
+      return true;
+    }
+    return false;
+  }
+  
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  double ThresholdAnalyzer<Ntk, Sim, T, fAscending>::GetTemperature() {
+    if constexpr(SimHasTemperature<Sim>) {
+      return sim.GetTemperature();
+    }
+    return 0;
+  }
+  
+  template <typename Ntk, typename Sim, typename T, bool fAscending>
+  void ThresholdAnalyzer<Ntk, Sim, T, fAscending>::SetTemperature(double dTemperature) {
+    if constexpr(SimHasTemperature<Sim>) {
+      sim.SetTemperature(dTemperature);
+    }
   }
   
   /* }}} */

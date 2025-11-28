@@ -16,6 +16,7 @@ namespace rrr {
   class CsoOptimizer {
   private:
     static constexpr int nSamples = 1000;
+    static constexpr bool fSearchTemperature = true;
     
     // aliases
     using itr = std::vector<int>::iterator;
@@ -118,6 +119,9 @@ namespace rrr {
     void SetBias(std::vector<std::vector<int>> const &vBias);
     std::vector<std::vector<int>> GetContribution();
     void SetNumTargets(int nTargets_);
+    double SearchTemperature();
+    double GetTemperature();
+    void SetTemperature(double dTemperature);
     
     // summary
     void ResetSummary();
@@ -571,8 +575,17 @@ namespace rrr {
         if(fRemoveUnused && pNtk->IsInt(fi) && pNtk->GetNumFanouts(fi) == 0) {
           pNtk->RemoveUnused(fi, true);
         }
+        if(ana.HasTemperature() && fSearchTemperature) {
+          double temperature = SearchTemperature();
+          Print(1, "changing temperature to", temperature);
+          ana.SetTemperature(temperature);
+        }
         if(nTemporary > 0 && !strTemporary.empty()) {
-          Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+          if(ana.HasTemperature()) {
+            Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "temperature", "=", ana.GetTemperature(), "cost", "=", CostFunction(pNtk));
+          } else {
+            Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+          }
           std::string str = strTemporary;
           if(nModule != -1) {
             str += "_" + std::to_string(nModule);
@@ -779,8 +792,17 @@ namespace rrr {
     T t = ana.GetNext();
     pNtk->RemoveFanin(id, idx);
     assert(ana.GetCurrent() == t);
+    if(ana.HasTemperature() && fSearchTemperature) {
+      double temperature = SearchTemperature();
+      Print(1, "changing temperature to", temperature);
+      ana.SetTemperature(temperature);
+    }
     if(nTemporary > 0 && !strTemporary.empty()) {
-      Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
+      if(ana.HasTemperature()) {
+        Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "temperature", "=", ana.GetTemperature(), "cost", "=", CostFunction(pNtk));
+      } else {
+        Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold()), "cost", "=", CostFunction(pNtk));
+      }
       std::string str = strTemporary;
       if(nModule != -1) {
         str += "_" + std::to_string(nModule);
@@ -888,6 +910,32 @@ namespace rrr {
   template <typename Ntk, typename Ana, typename T>
   void CsoOptimizer<Ntk, Ana, T>::SetNumTargets(int nTargets_) {
     nTargets = nTargets_;
+  }
+
+  template <typename Ntk, typename Ana, typename T>
+  double CsoOptimizer<Ntk, Ana, T>::SearchTemperature() {
+    double dCurrentTemperature = ana.GetTemperature();
+    double candidates[] = {1, 0.999, 0.9999, 1.0001, 1.001};
+    int best_idx = 0;
+    T best = ana.GetCurrent();
+    for(int i = 1; i < 5; i++) {
+      ana.SetTemperature(dCurrentTemperature * candidates[i]);
+      if(best > ana.GetCurrent()) {
+        best = ana.GetCurrent();
+        best_idx = i;
+      }
+    }
+    return dCurrentTemperature * candidates[best_idx];
+  }
+
+  template <typename Ntk, typename Ana, typename T>
+  double CsoOptimizer<Ntk, Ana, T>::GetTemperature() {
+    return ana.GetTemperature();
+  }
+
+  template <typename Ntk, typename Ana, typename T>
+  void CsoOptimizer<Ntk, Ana, T>::SetTemperature(double dTemperature) {
+    ana.SetTemperature(dTemperature);
   }
   
   /* }}} */

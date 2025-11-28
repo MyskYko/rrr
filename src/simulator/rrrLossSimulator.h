@@ -29,7 +29,7 @@ namespace rrr {
     static constexpr int nClasses = 10;
     static constexpr int nPosPerClass = 512;
     static constexpr int nPatterns = 60000 / 64 + (60000 % 64 != 0);
-    static constexpr double temperature = 6.498019;
+    static constexpr double initial_temperature = 6.498019;
     
     // pointer to network
     Ntk *pNtk;
@@ -45,6 +45,7 @@ namespace rrr {
     int nWords;
     int nRemainder;
     word wLastMask;
+    double dTemperature;
     double dCurrent;
     int target; // node for which the careset has been computed
     std::vector<word> vValues;
@@ -129,6 +130,8 @@ namespace rrr {
     double GetCurrent();
     bool SetBias(std::vector<std::vector<int>> const &vBias_);
     std::vector<std::vector<int>> GetContribution();
+    double GetTemperature();
+    void SetTemperature(double dTemperature_);
  
     // summary
     void ResetSummary();
@@ -548,7 +551,7 @@ namespace rrr {
     for(int i = 0; i < nPatterns * 64 - nRemainder; i++) {
       double *row = dst + i * nClasses;
       for(int cls = 0; cls < nClasses; cls++) {
-        row[cls] = static_cast<double>(v[cls][i] + vBias[cls][i]) / temperature;
+        row[cls] = static_cast<double>(v[cls][i] + vBias[cls][i]) / dTemperature;
       }
     }
     torch::Tensor loss = torch::nn::functional::cross_entropy(logits, tLabels);
@@ -909,6 +912,7 @@ namespace rrr {
     nWords(0),
     nRemainder(0),
     wLastMask(one),
+    dTemperature(initial_temperature),
     dCurrent(std::numeric_limits<double>::lowest()),
     target(-1),
     iTrav(0),
@@ -926,6 +930,7 @@ namespace rrr {
     nWords(0),
     nRemainder(0),
     wLastMask(one),
+    dTemperature(initial_temperature),
     dCurrent(std::numeric_limits<double>::lowest()),
     target(-1),
     iTrav(0),
@@ -1150,7 +1155,18 @@ namespace rrr {
       sUpdates.clear();
     }
     return vOutputs;
-  }  
+  }
+
+  template <typename Ntk>
+  double LossSimulator<Ntk>::GetTemperature() {
+    return dTemperature;
+  }
+
+  template <typename Ntk>
+  void LossSimulator<Ntk>::SetTemperature(double dTemperature_) {
+    dTemperature = dTemperature_;
+    dCurrent = ComputeLoss(vOutputs);    
+  }
 
   /* }}} */
   
