@@ -188,6 +188,7 @@ namespace rrr {
     for(int i = 0; i < int_size(vNtks); i++) {
       vOpts[i]->AssignNetwork(vNtks[i], i);
       vOpts[i]->SetNumModule(i);
+      vOpts[i]->SetInitialCost(costStart);
     }
 
     // set default threshold
@@ -228,8 +229,10 @@ namespace rrr {
       bool fReduced = false;
       for(int i = 0; i < int_size(vNtks); i++) {
         std::vector<std::vector<int>> vBias;
+        double dOtherCost = 0;
         for(int j = 0; j < int_size(vNtks); j++) {
           if(i != j) {
+            dOtherCost += CostFunction(vNtks[j]);
             std::vector<std::vector<int>> vContribution = vOpts[j]->GetContribution();
             if(vBias.empty()) {
               vBias = vContribution;
@@ -245,6 +248,7 @@ namespace rrr {
           }
         }
         // Note: by sharing bias, threshold is also shared through recomputation of current + delta; otherwise (when delta = 0) all modules have the same threshold as set to next below
+        vOpts[i]->SetOtherCost(dOtherCost);
         vOpts[i]->SetBias(vBias);
         vOpts[i]->SetTemperature(dTemperature);
         Print(1, "", "module", i, ":", "threshold", "=", vOpts[i]->GetThreshold(), "cost", "=", CostFunction(vNtks[i]), "elapsed", "=", GetElapsedTime(), "s");

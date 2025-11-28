@@ -51,6 +51,7 @@ namespace rrr {
     bool fRelaxOnRemoval = false;
     int nRelaxOnRemoval = 0;
     bool fNoRelax = false;
+    int nTemperatureSchedule = 0;
     std::string strTemporary;
     std::string strPattern;
     std::string strPatternOutput;

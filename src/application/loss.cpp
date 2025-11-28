@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
     ("j,label", "File of output labels", cxxopts::value<std::string>())
     ("f,relax", "Increase error threshold on removal after minimum", cxxopts::value<int>()->default_value("0"))
     ("n,norelax", "Do not increase error", cxxopts::value<bool>()->default_value("false"))
+    ("t,temperature", "Temperature scheduling", cxxopts::value<int>()->default_value("0"))
     ;
 
   options.add_options("Scheduler")
@@ -141,6 +142,7 @@ int main(int argc, char **argv) {
   }
   Par.nRelaxOnRemoval = result["relax"].as<int>();
   Par.fNoRelax = result["norelax"].as<bool>();
+  Par.nTemperatureSchedule = result["temperature"].as<int>();
   
   Par.nSchedulerVerbose = result["verbose"].as<int>();
   Par.nSchedulerFlow = result["flow"].as<int>();

@@ -39,6 +39,7 @@ namespace rrr {
     int nDistance;
     bool fCompatible;
     bool fGreedy;
+    int nTemperatureSchedule;
     std::string strTemporary;
     seconds nTimeout; // assigned upon Run
     int nModule;
@@ -55,6 +56,8 @@ namespace rrr {
     T tNext;
     int nNext;
     int nTemporary;
+    double dInitialCost;
+    double dOtherCost;
 
     // fanin sorting data
     std::vector<int> vRandPiOrder;
@@ -122,6 +125,8 @@ namespace rrr {
     double SearchTemperature();
     double GetTemperature();
     void SetTemperature(double dTemperature);
+    void SetInitialCost(double dInitialCost_);
+    void SetOtherCost(double dOtherCost_);
     
     // summary
     void ResetSummary();
@@ -701,12 +706,15 @@ namespace rrr {
     nDistance(pPar->nDistance),
     fCompatible(pPar->fUseBddCspf),
     fGreedy(pPar->fGreedy),
+    nTemperatureSchedule(pPar->nTemperatureSchedule),
     strTemporary(pPar->strTemporary),
     nModule(-1),
     ana(pPar),
     tDelta(0),
     nNext(-1),
     nTemporary(0),
+    dInitialCost(0),
+    dOtherCost(0),
     target(-1),
     iTrav(0) {
   }
@@ -718,6 +726,8 @@ namespace rrr {
     tDelta = 0;
     nNext = -1;
     nTemporary = 0;
+    dInitialCost = 0;
+    dOtherCost = 0;
     target = -1;
     StartTraversal();
     pNtk->AddCallback(std::bind(&CsoOptimizer<Ntk, Ana, T>::ActionCallback, this, std::placeholders::_1));
@@ -914,18 +924,26 @@ namespace rrr {
 
   template <typename Ntk, typename Ana, typename T>
   double CsoOptimizer<Ntk, Ana, T>::SearchTemperature() {
-    double dCurrentTemperature = ana.GetTemperature();
-    double candidates[] = {1, 0.999, 0.9999, 1.0001, 1.001};
-    int best_idx = 0;
-    T best = ana.GetCurrent();
-    for(int i = 1; i < 5; i++) {
-      ana.SetTemperature(dCurrentTemperature * candidates[i]);
-      if(best > ana.GetCurrent()) {
-        best = ana.GetCurrent();
-        best_idx = i;
-      }
+    if(nTemperatureSchedule == 0) {
+      return ana.GetTemperature();
     }
-    return dCurrentTemperature * candidates[best_idx];
+    if(nTemperatureSchedule == 1) {
+      double dCurrentTemperature = ana.GetTemperature();
+      double candidates[] = {1, 0.999, 0.9999, 1.0001, 1.001};
+      int best_idx = 0;
+      T best = ana.GetCurrent();
+      for(int i = 1; i < 5; i++) {
+        ana.SetTemperature(dCurrentTemperature * candidates[i]);
+        if(best > ana.GetCurrent()) {
+          best = ana.GetCurrent();
+          best_idx = i;
+        }
+      }
+      return dCurrentTemperature * candidates[best_idx];
+    }
+    if(nTemperatureSchedule == 2) {
+      return 35 * (dOtherCost + CostFunction(pNtk)) / dInitialCost;
+    }
   }
 
   template <typename Ntk, typename Ana, typename T>
@@ -935,17 +953,29 @@ namespace rrr {
 
   template <typename Ntk, typename Ana, typename T>
   void CsoOptimizer<Ntk, Ana, T>::SetTemperature(double dTemperature) {
-    ana.SetTemperature(dTemperature);
-    if(tDelta) {
-      T t = ana.GetCurrent() + tDelta;
-      if(t != ana.GetThreshold()) {
-        SetThreshold(t);
+    if(dTemperature != ana.GetTemperature()) {
+      ana.SetTemperature(dTemperature);
+      if(tDelta) {
+        T t = ana.GetCurrent() + tDelta;
+        if(t != ana.GetThreshold()) {
+          SetThreshold(t);
+        } else {
+          StartTraversal();
+        }
       } else {
         StartTraversal();
       }
-    } else {
-      StartTraversal();
     }
+  }
+
+  template <typename Ntk, typename Ana, typename T>
+  void CsoOptimizer<Ntk, Ana, T>::SetInitialCost(double dInitialCost_) {
+    dInitialCost = dInitialCost_;
+  }
+
+  template <typename Ntk, typename Ana, typename T>
+  void CsoOptimizer<Ntk, Ana, T>::SetOtherCost(double dOtherCost_) {
+    dOtherCost = dOtherCost_;
   }
   
   /* }}} */
