@@ -801,7 +801,7 @@ namespace rrr {
       if(ana.HasTemperature()) {
         Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "temperature", "=", ana.GetTemperature(), "cost", "=", CostFunction(pNtk));
       } else {
-        Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold()), "cost", "=", CostFunction(pNtk));
+        Print(0, "temporary", "=", nTemporary, "threshold", "=", ana.GetThreshold(), "cost", "=", CostFunction(pNtk));
       }
       std::string str = strTemporary;
       if(nModule != -1) {
