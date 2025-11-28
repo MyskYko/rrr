@@ -944,6 +944,7 @@ namespace rrr {
     if(nTemperatureSchedule == 2) {
       return 35 * (dOtherCost + CostFunction(pNtk)) / dInitialCost;
     }
+    return 0;
   }
 
   template <typename Ntk, typename Ana, typename T>
