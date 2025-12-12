@@ -3,17 +3,46 @@
 
 #include "misc/rrrParameter.h"
 #include "network/rrrAndNetwork.h"
+#include "scheduler/rrrSsrScheduler.h"
+#include "scheduler/rrrSsrScheduler2.h"
+#include "optimizer/rrrOptimizer2.h"
+#include "analyzer/rrrBddCspfAnalyzer.h"
+#include "analyzer/rrrBddMspfAnalyzer.h"
+#include "analyzer/rrrAnalyzer.h"
+#include "analyzer/sat/rrrSatSolver.h"
+#include "analyzer/sat/rrrSatSolver2.h"
+#include "simulator/rrrSimulator.h"
+#include "partitioner/rrrPartitioner.h"
 #include "io/rrrAig.h"
-#include "rrr.h"
+
+namespace rrr {
+  
+  template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
+  std::vector<Ntk *> PerformInt(Ntk *pNtk, Parameter const *pPar) {
+    assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
+    if(pPar->fUseBddCspf) {
+      Sch<Ntk, Opt<Ntk, BddCspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      return sch.Run();
+    } else if(pPar->fUseBddMspf) {
+      Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      return sch.Run();
+    } else {
+      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver2<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      return sch.Run();
+    }
+  }
+  
+}
 
 int main(int argc, char **argv) {
-  cxxopts::Options options("helo", "high-effort logic optimization");
+  cxxopts::Options options("ssr", "structure-space reachability analysis");
 
   options.set_width(100);
   
   options.add_options()
     ("input", "Input file name", cxxopts::value<std::string>())
     ("o,output", "Output file name", cxxopts::value<std::string>())
+    ("l,log", "Directory name to dump log files", cxxopts::value<std::string>())
     ("R,seed", "Random seed integer", cxxopts::value<int>()->default_value("0"))
     ("T,timeout", "Timeout in seconds (0 = no limit)", cxxopts::value<int>()->default_value("0"))
     ("J,thread", "Number of threads", cxxopts::value<int>()->default_value("1"))
@@ -43,16 +72,14 @@ int main(int argc, char **argv) {
     ("M,reduce", "Reduction method\n 0: reverse topological order\n 1: reverse topological order (legacy)\n 2: random order\n", cxxopts::value<int>()->default_value("0"))
     ("G,sort", "Fanin sorting method (-1 = random)", cxxopts::value<int>()->default_value("-1"))
     ("D,dist", "Maximum distance between node and new fanin (0 = no limit)", cxxopts::value<int>()->default_value("0"))
-    ("F,sample", "number of target nodes to try (0 = no limit)", cxxopts::value<int>()->default_value("0"))
-    ("g,no-greedy", "Discard changes that increased the cost", cxxopts::value<bool>()->default_value("false"))
+    ("g,greedy", "Discard changes that increased the cost", cxxopts::value<bool>()->default_value("true"))
     ("a,isort", "Sort fanins before each run", cxxopts::value<bool>()->default_value("false"))
     ("b,nsort", "Soft fanins before reducing each node", cxxopts::value<bool>()->default_value("true"))
     ;
 
   options.add_options("Analyzer")
     ("A,vana", "Verbosity level of analyzer", cxxopts::value<int>()->default_value("0"))
-    ("U,ana", "Analysis method\n 0: SAT\n 1: BDD (MSPF)\n 2: BDD (CSPF)\n 3: BDD (resim)\n 4: TT (MSPF)\n 5: TT (resim)\n", cxxopts::value<int>()->default_value("0"))
-    ("s,save", "Save data while testing temporary changes", cxxopts::value<bool>()->default_value("true"))
+    ("U,ana", "Analysis method\n 0: SAT\n 1: BDD (MSPF)\n 2: BDD (CSPF)\n", cxxopts::value<int>()->default_value("0"))
     ;    
 
   options.add_options("SAT handler")
@@ -62,7 +89,7 @@ int main(int argc, char **argv) {
   
   options.add_options("Simulator")
     ("Q,vsim", "Verbosity level of simulator", cxxopts::value<int>()->default_value("0"))
-    ("W,word", "Number of simualtion words", cxxopts::value<int>()->default_value("16"))
+    ("W,word", "Number of simualtion words", cxxopts::value<int>()->default_value("10"))
     ;
   
   options.parse_positional({"input"});
@@ -83,6 +110,9 @@ int main(int argc, char **argv) {
   }
   
   rrr::Parameter Par;
+  if(result.count("log")) {
+    Par.strTemporary = result["log"].as<std::string>();
+  }
   Par.iSeed = result["seed"].as<int>();
   Par.nTimeout = result["timeout"].as<int>();
   Par.nThreads = result["thread"].as<int>();
@@ -105,18 +135,13 @@ int main(int argc, char **argv) {
   Par.nSortType = result["sort"].as<int>();
   Par.nReductionMethod = result["reduce"].as<int>();
   Par.nDistance = result["dist"].as<int>();
-  Par.nSamples = result["sample"].as<int>();
-  Par.fGreedy = !result["no-greedy"].as<bool>();
+  Par.fGreedy = result["greedy"].as<bool>();
   Par.fSortInitial = result["isort"].as<bool>();
   Par.fSortPerNode = result["nsort"].as<bool>();
   
   Par.nAnalyzerVerbose = result["vana"].as<int>();
-  Par.fUseBddMspf = result["ana"].as<int>() == 1;
   Par.fUseBddCspf = result["ana"].as<int>() == 2;
-  Par.fUseBddResim = result["ana"].as<int>() == 3;
-  Par.fUseTt = result["ana"].as<int>() == 4;
-  Par.fUseTtResim = result["ana"].as<int>() == 5;
-  Par.fSave = result["save"].as<bool>();
+  Par.fUseBddMspf = result["ana"].as<int>() == 1;
 
   Par.nSatSolverVerbose = result["vsat"].as<int>();
   Par.nConflictLimit = result["conf"].as<int>();
@@ -149,11 +174,19 @@ int main(int argc, char **argv) {
   rrr::AndNetwork ntk;
   int nLatches = ntk.Read(input_filename, rrr::AigFileReader<rrr::AndNetwork>);
 
-  rrr::PerformHelo(&ntk, &Par);
+  std::vector<rrr::AndNetwork *> vNtks = rrr::PerformInt<rrr::AndNetwork, rrr::SsrScheduler2, rrr::Optimizer2, rrr::Partitioner>(&ntk, &Par);
 
   if(!output_filename.empty()) {
-    rrr::DumpAig(output_filename, &ntk, nLatches);
+    for(int i = 0; i < int_size(vNtks); i++) {
+      std::string filename = output_filename + "_" + std::to_string(i) + ".aig";
+      rrr::DumpAig(filename, vNtks[i], nLatches);
+    }
   }
+
+  for(int i = 0; i < int_size(vNtks); i++) {
+    delete vNtks[i];
+  }
+  vNtks.clear();
 
   return 0;
 }

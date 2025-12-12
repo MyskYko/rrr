@@ -1,0 +1,468 @@
+#pragma once
+
+#include <queue>
+#include <random>
+
+#ifdef ABC_USE_PTHREADS
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#endif
+
+// #include "misc/rrrParameter.h"
+// #include "misc/rrrUtils.h"
+// #include "rrrAbc.h"
+#include "io/rrrBinary.h"
+#include "extra/rrrTable.h"
+#include "extra/rrrCanonicalizer.h"
+
+namespace rrr {
+
+  template <typename Ntk, typename Opt, typename Par>
+  class SsrScheduler {
+  private:
+    static constexpr bool fNoIncrease = true;
+
+    // job
+    struct Job;
+    
+    // pointer to network
+    Ntk *pOriginal;
+
+    // parameters
+    int nVerbose;
+    int iSeed;
+    int nFlow;
+    int nJobs;
+    bool fMultiThreading;
+    bool fPartitioning;
+    bool fDeterministic;
+    int nParallelPartitions;
+    bool fOptOnInsert;
+    seconds nTimeout;
+    std::function<double(Ntk *)> CostFunction;
+    static constexpr bool fTwoArgSym = false;
+    
+    // data
+    Table<std::vector<int>> tab;
+    int nUniques;
+    std::map<std::string, int> table;
+    std::vector<std::string> strs;
+    std::vector<std::vector<std::pair<int, std::vector<Action>>>> history;
+    int nCreatedJobs;
+    int nFinishedJobs;
+    std::queue<Job *> qPendingJobs;
+    Opt *pOpt; // used only in case of single thread execution
+#ifdef ABC_USE_PTHREADS
+    bool fTerminate;
+    std::vector<std::thread> vThreads;
+    std::mutex mutexTable;
+    std::mutex mutexPendingJobs;
+    std::mutex mutexFinishedJobs;
+    std::mutex mutexPrint;
+    std::condition_variable condPendingJobs;
+    std::condition_variable condFinishedJobs;
+#endif
+
+    // print
+    template <typename... Args>
+    void Print(int nVerboseLevel, std::string prefix, Args... args);
+
+    // table
+    bool Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index);
+    
+    // run jobs
+    void RunJob(Opt &opt, Job *pJob);
+
+    // manage jobs
+    Job *CreateJob(int src, int cost, bool fAdd);
+    void Wait();
+
+    // thread
+#ifdef ABC_USE_PTHREADS
+    void Thread(Parameter const *pPar);
+#endif
+
+  public:
+    // constructors
+    SsrScheduler(Ntk *pNtk, Parameter const *pPar);
+    ~SsrScheduler();
+    
+    // run
+    void Run();
+  };
+
+  /* {{{ Job */
+  
+  template <typename Ntk, typename Opt, typename Par>
+  struct SsrScheduler<Ntk, Opt, Par>::Job {
+    // data
+    int id;
+    int src;
+    int cost;
+    bool fAdd;
+    std::string prefix;
+    
+    // constructor
+    Job(int id, int src, int cost, bool fAdd) :
+      id(id),
+      src(src),
+      cost(cost),
+      fAdd(fAdd) {
+      std::stringstream ss;
+      PrintNext(ss, "job", id, ":");
+      prefix = ss.str() + " ";
+    }
+  };
+  
+  /* }}} */
+
+  /* {{{ Print */
+  
+  template <typename Ntk, typename Opt, typename Par>
+  template<typename... Args>
+  inline void SsrScheduler<Ntk, Opt, Par>::Print(int nVerboseLevel, std::string prefix, Args... args) {
+    if(nVerbose <= nVerboseLevel) {
+      return;
+    }
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPrint);
+        std::cout << prefix;
+        PrintNext(std::cout, args...);
+        std::cout << std::endl;
+      }
+      return;
+    }
+#endif
+    std::cout << prefix;
+    PrintNext(std::cout, args...);
+    std::cout << std::endl;
+  }
+
+  /* }}} */
+    
+  /* {{{ Table */
+  
+  template <typename Ntk, typename Opt, typename Par>
+  bool SsrScheduler<Ntk, Opt, Par>::Register(Ntk *pNtk, int src, std::vector<Action> const &vActions, int &index) {
+    std::string str, str_sym;
+    {
+      Ntk ntk;
+      ntk.Read(*pNtk);
+      Canonicalizer<Ntk> can;
+      can.Run(&ntk);
+      str = CreateBinary(&ntk);
+      if(fTwoArgSym) {
+        std::vector<int> vOrder;
+        for(int i = 0; i < ntk.GetNumPis() / 2; i++) {
+          vOrder.push_back(i + ntk.GetNumPis() / 2);
+        }
+        for(int i = 0; i < ntk.GetNumPis() / 2; i++) {
+          vOrder.push_back(i);
+        }        
+        ntk.ChangePiOrder(vOrder);
+        can.Run(&ntk);
+        str_sym = CreateBinary(&ntk);
+      }
+    }
+    std::vector<int> his;
+    {
+      his.push_back(src);
+      for(auto const &action: vActions) {
+        if(action.type == REMOVE_FANIN) {
+          his.push_back(action.id);
+          his.push_back(action.idx);
+        } else if(action.type == ADD_FANIN) {
+          his.push_back(-action.id);
+          his.push_back(action.fi);
+        }
+      }
+    }
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexTable);
+        return tab.Register(str, his, index, str_sym);
+        /*
+        if(table.count(str)) {
+          index = table[str];
+          history[index].emplace_back(src, vActions);
+          return false;
+        }
+        if(fTwoArgSym && str != str_sym) {
+          if(table.count(str_sym)) {
+            index = table[str_sym];
+            history[index].emplace_back(src, vActions);
+            return false;
+          }
+        }
+        index = nUniques++;
+        table[str] = index;
+        strs.push_back(str);
+        if(int_size(history) < nUniques) {
+          history.resize(nUniques);
+        }
+        history[index].emplace_back(src, vActions);
+        return true;
+        */
+      }
+    }
+#endif
+    return tab.Register(str, his, index, str_sym);
+    /*
+    if(table.count(str)) {
+      index = table[str];
+      history[index].emplace_back(src, vActions);
+      return false;
+    }
+    if(fTwoArgSym) {
+      if(table.count(str_sym)) {
+        index = table[str_sym];
+        history[index].emplace_back(src, vActions);
+        return false;
+      }
+    }
+    index = nUniques++;
+    table[str] = index;
+    strs.push_back(str);
+    if(int_size(history) < nUniques) {
+      history.resize(nUniques);
+    }
+    history[index].emplace_back(src, vActions);
+    return true;
+    */
+  }
+  
+  /* }}} */
+    
+  /* {{{ Run jobs */
+
+  template <typename Ntk, typename Opt, typename Par>
+  void SsrScheduler<Ntk, Opt, Par>::RunJob(Opt &opt, Job *pJob) {
+    Ntk ntk;
+    //ntk.Read(strs[pJob->src], BinaryReader<Ntk>);
+    ntk.Read(tab.Get(pJob->src), BinaryReader<Ntk>);
+    //opt.AssignNetwork(&ntk, pJob->fAdd);
+    opt.AssignNetwork(&ntk, nJobs);
+    opt.SetPrintLine([&](std::string str) {
+      Print(-1, pJob->prefix, str);
+    });
+    int nChoices = 0, nNews = 0;
+    while(true) {
+      auto vActions = opt.Run();
+      if(vActions.empty()) {
+        break;
+      }
+      int index;
+      if(!fNoIncrease || CostFunction(&ntk) <= pJob->cost) {
+        bool fNew = Register(&ntk, pJob->src, vActions, index);
+        if(fNew) {
+          //if(index % 1000 == 0)
+          Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, "new", "=", nNews, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index, "(new)");
+          CreateJob(index, CostFunction(&ntk), true);
+          nNews++;
+        } else {
+          //Print(0, pJob->prefix, "src", "=", pJob->src, ",", "choice", "=", nChoices, ",", "cost", "=", CostFunction(&ntk), ",", "result", "=", index);
+        }
+      }
+      /*
+      for(auto action: vActions) {
+        auto ss = GetActionDescription(action);
+        std::string str;
+        std::getline(ss, str);
+        std::cout << str << std::endl;
+      }
+      std::cout << std::endl;
+      */
+      nChoices++;
+    }
+    delete pJob;
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexFinishedJobs);
+        nFinishedJobs++;
+        condFinishedJobs.notify_one();
+      }
+      return;
+    }
+#endif
+    nFinishedJobs++;
+  }
+
+  /* }}} */
+
+  /* {{{ Manage jobs */
+
+  template <typename Ntk, typename Opt, typename Par>
+  typename SsrScheduler<Ntk, Opt, Par>::Job *SsrScheduler<Ntk, Opt, Par>::CreateJob(int src, int cost, bool fAdd) {
+    Job *pJob = new Job(nCreatedJobs++, src, cost, fAdd);
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        qPendingJobs.push(pJob);
+        condPendingJobs.notify_one();
+      }
+      return pJob;
+    }
+#endif
+    qPendingJobs.push(pJob);
+    return pJob;
+  }
+  
+  template <typename Ntk, typename Opt, typename Par>
+  void SsrScheduler<Ntk, Opt, Par>::Wait() {
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      while(true) {
+        int nFinishedJobs_;
+        {
+          std::unique_lock<std::mutex> l(mutexFinishedJobs);
+          nFinishedJobs_ = nFinishedJobs;
+        }
+        int nCreatedJobs_;
+        {
+          std::unique_lock<std::mutex> l(mutexPendingJobs);
+          if(nCreatedJobs == nFinishedJobs) {
+            break;
+          }
+          nCreatedJobs_ = nCreatedJobs;
+        }
+        {
+          std::unique_lock<std::mutex> l(mutexFinishedJobs);
+          while(nCreatedJobs_ > nFinishedJobs) {
+            condFinishedJobs.wait(l);
+          }
+        }
+      }
+      return;
+    }
+#endif
+    while(nCreatedJobs > nFinishedJobs) {
+      assert(!qPendingJobs.empty());
+      Job *pJob = qPendingJobs.front();
+      qPendingJobs.pop();
+      RunJob(*pOpt, pJob);
+    }
+  }
+  
+  /* }}} */
+
+  /* {{{ Thread */
+
+#ifdef ABC_USE_PTHREADS
+  template <typename Ntk, typename Opt, typename Par>
+  void SsrScheduler<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
+    Opt opt(pPar);
+    while(true) {
+      Job *pJob = NULL;
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        while(!fTerminate && qPendingJobs.empty()) {
+          condPendingJobs.wait(l);
+        }
+        if(fTerminate) {
+          assert(qPendingJobs.empty());
+          return;
+        }
+        pJob = qPendingJobs.front();
+        qPendingJobs.pop();
+      }
+      assert(pJob != NULL);
+      RunJob(opt, pJob);
+    }
+  }
+#endif
+  
+  /* }}} */
+  
+  /* {{{ Constructors */
+
+  template <typename Ntk, typename Opt, typename Par>
+  SsrScheduler<Ntk, Opt, Par>::SsrScheduler(Ntk *pNtk, Parameter const *pPar) :
+    pOriginal(pNtk),
+    nVerbose(pPar->nSchedulerVerbose),
+    iSeed(pPar->iSeed),
+    nFlow(pPar->nSchedulerFlow),
+    nJobs(pPar->nJobs),
+    fMultiThreading(pPar->nThreads > 1),
+    fPartitioning(pPar->nPartitionSize > 0),
+    fDeterministic(pPar->fDeterministic),
+    nParallelPartitions(pPar->nParallelPartitions),
+    fOptOnInsert(pPar->fOptOnInsert),
+    nTimeout(pPar->nTimeout),
+    tab(27),
+    nUniques(0),
+    nCreatedJobs(0),
+    nFinishedJobs(0) {
+    CostFunction = [](Ntk *pNtk) {
+      int nTwoInputSize = 0;
+      pNtk->ForEachInt([&](int id) {
+        nTwoInputSize += pNtk->GetNumFanins(id) - 1;
+      });
+      return nTwoInputSize;
+    };
+    pOpt = new Opt(pPar);
+#ifdef ABC_USE_PTHREADS
+    fTerminate = false;
+    if(fMultiThreading) {
+      vThreads.reserve(pPar->nThreads);
+      for(int i = 0; i < pPar->nThreads; i++) {
+        vThreads.emplace_back(std::bind(&SsrScheduler::Thread, this, pPar));
+      }
+    }
+#endif
+  }
+
+  template <typename Ntk, typename Opt, typename Par>
+  SsrScheduler<Ntk, Opt, Par>::~SsrScheduler() {
+    delete pOpt;
+#ifdef ABC_USE_PTHREADS
+    if(fMultiThreading) {
+      {
+        std::unique_lock<std::mutex> l(mutexPendingJobs);
+        fTerminate = true;
+        condPendingJobs.notify_all();
+      }
+      for(std::thread &t: vThreads) {
+        t.join();
+      }
+    }
+#endif
+  }
+
+  /* }}} */
+
+  /* {{{ Run */
+
+  template <typename Ntk, typename Opt, typename Par>
+  void SsrScheduler<Ntk, Opt, Par>::Run() {
+    pOriginal->Sweep(true);
+    pOriginal->TrivialCollapse();
+    bool fRedundant = pOpt->IsRedundant(pOriginal);
+    std::vector<Action> vActions;
+    int index;
+    Register(pOriginal, -1, vActions, index);
+    assert(!fRedundant);
+    CreateJob(index, CostFunction(pOriginal), !fRedundant);
+
+    // wait until all jobs are done
+    Wait();
+
+    //Print(-1, "","unique", "=", nUniques - (int)fRedundant);
+    Print(-1, "","unique", "=", tab.Size() - (int)fRedundant);
+    Print(-1, "","jobs", "=", nFinishedJobs);
+    
+    // for(std::string s: strs) {
+    //   Ntk a;
+    //   a.Read(s, BinaryReader<Ntk>);
+    //   a.Print();
+    // }
+  }
+
+  /* }}} */
+
+}

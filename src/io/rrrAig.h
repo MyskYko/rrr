@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+#include <sstream>
 #include <fstream>
 #include <cassert>
 
@@ -27,7 +29,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void AigReader(std::string const &str, Ntk *pNtk) {
+  int AigReader(std::string const &str, Ntk *pNtk) {
     assert(pNtk->GetConst0() == 0);
     std::stringstream f(str);
     std::string line;
@@ -41,37 +43,45 @@ namespace rrr {
     std::getline(ss, token, ' ');
     int nPis = std::stoi(token);
     std::getline(ss, token, ' ');
-    assert(token == "0"); // no latches
+    int nLatches = std::stoi(token);
     std::getline(ss, token, ' ');
     int nPos = std::stoi(token);
     std::getline(ss, token, ' ');
-    int nInts = stoi(token);
-    assert(nObjs == nInts + nPis);
+    int nInts = std::stoi(token);
+    assert(nObjs == nInts + nPis + nLatches);
     nObjs++; // constant
     // contents
     pNtk->Reserve(nObjs);
     for(int i = 0; i < nPis; i++) {
       pNtk->AddPi();
     }
+    std::vector<int> vLatches(nLatches);
+    for(int i = 0; i < nLatches; i++) {
+      std::getline(f, token);
+      vLatches[i] = std::stoi(token);
+      pNtk->AddPi();
+    }
     std::vector<int> vPos(nPos);
     for(int i = 0; i < nPos; i++) {
       std::getline(f, token);
-      vPos[i] = stoi(token);
+      vPos[i] = std::stoi(token);
     }
-    for(int i = nPis + 1; i < nObjs; i++) {
+    for(int i = nPis + nLatches + 1; i < nObjs; i++) {
       int n0 = i + i - decode(f);
       int n1 = n0 - decode(f);
       pNtk->AddAnd(n1 >> 1, n0 >> 1, n1 & 1, n0 & 1);
     }
+    for(int i = 0; i < nLatches; i++) {
+      pNtk->AddPo(vLatches[i] >> 1, vLatches[i] & 1);
+    }
     for(int i = 0; i < nPos; i++) {
       pNtk->AddPo(vPos[i] >> 1, vPos[i] & 1);
     }
+    return nLatches;
   }
 
   template <typename Ntk>
-  std::string CreateAig(Ntk *pNtk) {
-    std::stringstream ss;
-    ss << "aig " << pNtk->GetNumPis() + pNtk->GetNumInts() << " " << pNtk->GetNumPis() << " 0 " << pNtk->GetNumPos() << " " << pNtk->GetNumInts() << std::endl;
+  std::string CreateAig(Ntk *pNtk, int nLatches) {
     std::vector<int> vValues(pNtk->GetNumNodes());
     int nNodes = 0;
     vValues[pNtk->GetConst0()] = nNodes++ << 1;
@@ -88,9 +98,7 @@ namespace rrr {
         nNodes += pNtk->GetNumFanins(id) - 1;
       }
     });
-    pNtk->ForEachPoDriver([&](int fi, bool c) {
-      ss << (vValues[fi] ^ (int)c) << std::endl;
-    });
+    std::stringstream ss;
     pNtk->ForEachInt([&](int id) {
       if(pNtk->GetNumFanins(id) > 1) {
         int i = pNtk->GetNumFanins(id) - 1;
@@ -111,21 +119,26 @@ namespace rrr {
         }
       }
     });
-    return ss.str();
+    std::stringstream ss0;
+    ss0 << "aig " << nNodes - 1 << " " << pNtk->GetNumPis() - nLatches << " " << nLatches << " " << pNtk->GetNumPos() - nLatches << " " << nNodes - pNtk->GetNumPis() - 1 << std::endl;
+    pNtk->ForEachPoDriver([&](int fi, bool c) {
+      ss0 << (vValues[fi] ^ (int)c) << std::endl;
+    });
+    return ss0.str() + ss.str();
   }
 
   template <typename Ntk>
-  void AigFileReader(std::string const &filename, Ntk *pNtk) {
+  int AigFileReader(std::string const &filename, Ntk *pNtk) {
     std::stringstream ss;
     std::ifstream f(filename, std::ios_base::binary);
     ss << f.rdbuf();
     std::string str = ss.str();
-    AigReader(str, pNtk);
+    return AigReader(str, pNtk);
   }
 
   template <typename Ntk>
-  void DumpAig(std::string filename, Ntk *pNtk) {
-    std::string str = CreateAig(pNtk);
+  void DumpAig(std::string filename, Ntk *pNtk, int nLatches = 0) {
+    std::string str = CreateAig(pNtk, nLatches);
     std::ofstream f(filename, std::ios_base::binary);
     f << str;
   }

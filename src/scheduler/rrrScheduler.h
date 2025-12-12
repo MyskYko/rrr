@@ -213,6 +213,7 @@ namespace rrr {
     opt.SetPrintLine([&](std::string str) {
       Print(-1, pJob->prefix, str);
     });
+    double durationAbc = 0;
     // start flow
     switch(nFlow) {
     case 0:
@@ -257,7 +258,11 @@ namespace rrr {
       break;
     }
     case 2: { // deep
-      std::mt19937 rng(pJob->iSeed);
+      SimpleRNG rng;
+      for(int s = 0; s < 11; s++ ) {
+        rng(); // to align with ABC
+      }
+      std::mt19937 rng2(pJob->iSeed);
       int n = 0;
       double cost = pJob->costInitial;
       int slot = pJob->pNtk->Save();
@@ -296,8 +301,8 @@ namespace rrr {
           if(GetRemainingTime() < 0) {
             break;
           }
-          opt.Run(rng(), GetRemainingTime());
-          if(rng() & 1) {
+          opt.Run(rng2(), GetRemainingTime());
+          if(rng2() & 1) {
             CallAbc(pJob->pNtk, "&dc2");
           } else {
             CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; &get");
@@ -321,6 +326,16 @@ namespace rrr {
       opt.Run(pJob->iSeed, GetRemainingTime());
       CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
       break;
+    case 4: {
+      for(int i = 0; i < 100; i++) {
+        opt.Run(pJob->iSeed, GetRemainingTime());
+        time_point timeAbcStart = GetCurrentTime();
+        CallAbc(pJob->pNtk, std::string("&put; ") + pCompress2rs + "; dc2; &get");
+        time_point timeAbcEnd = GetCurrentTime();
+        durationAbc += Duration(timeAbcStart, timeAbcEnd);
+      }
+      break;
+    }
     default:
       assert(0);
     }
@@ -328,6 +343,7 @@ namespace rrr {
     pJob->duration = Duration(timeStartLocal, timeEndLocal);
     pJob->stats = opt.GetStatsSummary();
     pJob->times = opt.GetTimesSummary();
+    pJob->times.emplace_back("abc", durationAbc);
     opt.ResetSummary();
   }
 
@@ -393,6 +409,7 @@ namespace rrr {
 #ifdef ABC_USE_PTHREADS
   template <typename Ntk, typename Opt, typename Par>
   void Scheduler<Ntk, Opt, Par>::Thread(Parameter const *pPar) {
+    Abc_Start();
     Opt opt(pPar, CostFunction);
     while(true) {
       Job *pJob = NULL;
@@ -403,6 +420,7 @@ namespace rrr {
         }
         if(fTerminate) {
           assert(qPendingJobs.empty());
+          Abc_Stop();
           return;
         }
         pJob = qPendingJobs.front();
@@ -482,6 +500,7 @@ namespace rrr {
 #endif
     assert(!fMultiThreading);
     pOpt = new Opt(pPar, CostFunction);
+    Abc_Start();
   }
 
   template <typename Ntk, typename Opt, typename Par>
@@ -500,6 +519,7 @@ namespace rrr {
     }
 #endif
     delete pOpt;
+    Abc_Stop();
   }
 
   /* }}} */
@@ -511,15 +531,16 @@ namespace rrr {
     timeStart = GetCurrentTime();
     double costStart = CostFunction(pNtk);
     if(fPartitioning) {
+      std::mt19937 rng(iSeed);      
       fDeterministic = false; // it is deterministic anyways as we wait until all jobs finish each round
       pNtk->Sweep();
       par.AssignNetwork(pNtk);
       while(nCreatedJobs < nJobs) {
         assert(nParallelPartitions > 0);
         if(nCreatedJobs < nFinishedJobs + nParallelPartitions) {
-          Ntk *pSubNtk = par.Extract(iSeed + nCreatedJobs);
+          Ntk *pSubNtk = par.Extract(rng());
           if(pSubNtk) {
-            Job *pJob = CreateJob(pSubNtk, iSeed + nCreatedJobs, CostFunction(pSubNtk));
+            Job *pJob = CreateJob(pSubNtk, rng(), CostFunction(pSubNtk));
             Print(1, pJob->prefix, "created ", ":", "i/o", "=", pJob->pNtk->GetNumPis(), "/", pJob->pNtk->GetNumPos(), ",", "node", "=", pJob->pNtk->GetNumInts(), ",", "level", "=", pJob->pNtk->GetNumLevels(), ",", "cost", "=", pJob->costInitial);
             continue;
           }

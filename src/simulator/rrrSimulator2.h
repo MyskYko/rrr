@@ -19,7 +19,6 @@ namespace rrr {
     using citr = std::vector<word>::const_iterator;
     static constexpr word one = 0xffffffffffffffff;
     static constexpr bool fKeepStimuli = true;
-    static constexpr bool fRelax = true;
 
     static constexpr word basepats[] = {0xaaaaaaaaaaaaaaaaull,
                                         0xccccccccccccccccull,
@@ -35,10 +34,10 @@ namespace rrr {
     int nWords;
     int nStimuli;
     bool fExSim;
-    int nRelaxedPatterns;
     bool fUseCustomCondition = false;
     std::function<word(std::vector<word> const &, std::vector<word> const &)> CustomCondition;
-    bool fUseOriginalPoValues = true;
+    bool fUseOriginalPoValues = false;
+    // TODO: support last_mask
 
     // data
     bool fGenerated;
@@ -284,7 +283,7 @@ namespace rrr {
     case REMOVE_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(!fRelax && action.id == target) {
+        if(action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -297,7 +296,7 @@ namespace rrr {
     case REMOVE_CONST:
       if(fInitialized) {
         if(target != -1) {
-          if(!fRelax && action.id == target) {
+          if(action.id == target) {
             if(fUpdate) {
               for(int fo: action.vFanouts) {
                 sUpdates.insert(fo);
@@ -319,7 +318,7 @@ namespace rrr {
     case ADD_FANIN:
       assert(fInitialized);
       if(target != -1) {
-        if(!fRelax && action.id == target) {
+        if(action.id == target) {
           fUpdate = true;
         } else {
           sUpdates.insert(action.id);
@@ -334,7 +333,7 @@ namespace rrr {
           vValues.resize(nStimuli * pNtk->GetNumNodes());
           SimulateNode(pNtk, vValues, action.fi);
           // time of this simulation is not measured for simplicity sake
-          if(pNtk->GetCond()) {
+          if(pNtk->GetCond()) { // TODO: this looks unnecessary
             vValuesCond.resize(nStimuli * pNtk->GetCond()->GetNumNodes());
           }
         }
@@ -763,6 +762,8 @@ namespace rrr {
         });
         if(x == vValues2.end()) {
           Fill(nStimuli, y);
+        } else if(x != y) {
+          Copy(nStimuli, y, x, cx);
         }
       break;
       default:
@@ -816,6 +817,8 @@ namespace rrr {
           });
           if(x == vValuesCond2.end()) {
             Fill(nStimuli, y);
+          } else if(x != y) {
+            Copy(nStimuli, y, x, cx);
           }
           break;
         default:
@@ -861,7 +864,7 @@ namespace rrr {
       }
     } else if(fUseOriginalPoValues) {
       int index = 0;
-      pNtk->ForEachPoDriver([&](int fi, bool c) {
+      pNtk->ForEachPoDriver([&](int fi, bool c) { // this is actually expensive for design with many POs
         itr x;
         if(vTrav[fi] == iTrav) {
           x = vValues2.begin() + fi * nStimuli;
@@ -983,7 +986,6 @@ namespace rrr {
     nWords(0),
     nStimuli(0),
     fExSim(true), // for sdc
-    nRelaxedPatterns(0),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -1000,7 +1002,6 @@ namespace rrr {
     nWords(pPar->nWords),
     nStimuli(nWords),
     fExSim(pPar->fExSim),
-    nRelaxedPatterns(pPar->nRelaxedPatterns),
     fGenerated(false),
     fInitialized(false),
     target(-1),
@@ -1089,9 +1090,6 @@ namespace rrr {
       int fi = pNtk->GetFanin(id, idx);
       bool c = pNtk->GetCompl(id, idx);
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
-      if(fRelax) {
-        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
-      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:
@@ -1188,9 +1186,6 @@ namespace rrr {
         x = tmp.begin();
       }
       And(nStimuli, tmp.begin(), x, vValues.begin() + fi * nStimuli, false, !c);
-      if(fRelax) {
-        return AtMostK(nStimuli, tmp.begin(), nRelaxedPatterns);
-      }
       return IsZero(nStimuli, tmp.begin());
     }
     default:

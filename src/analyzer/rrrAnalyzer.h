@@ -57,6 +57,12 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename Sol>
   bool Analyzer<Ntk, Sim, Sol>::CheckRedundancy(int id, int idx) {
     if(sim.CheckRedundancy(id, idx)) {
+      if(sim.IsExhaustive()) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " is already redundant" << std::endl;
+        }
+        return true;
+      }
       if(nVerbose) {
         std::cout << "node " << id << " fanin " << (pNtk->GetCompl(id, idx)? "!": "") << pNtk->GetFanin(id, idx) << " index " << idx << " seems redundant" << std::endl;
       }
@@ -84,6 +90,12 @@ namespace rrr {
   template <typename Ntk, typename Sim, typename Sol>
   bool Analyzer<Ntk, Sim, Sol>::CheckFeasibility(int id, int fi, bool c) {
     if(sim.CheckFeasibility(id, fi, c)) {
+      if(sim.IsExhaustive()) {
+        if(nVerbose) {
+          std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " is already feasible" << std::endl;
+        }
+        return true;
+      }
       if(nVerbose) {
         std::cout << "node " << id << " fanin " << (c? "!": "") << fi << " seems feasible" << std::endl;
       }

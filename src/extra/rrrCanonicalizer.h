@@ -93,7 +93,7 @@ namespace rrr {
     Canonicalizer() {};
 
     // run
-    void Run(Ntk *pNtk_);
+    void Run(Ntk *pNtk_, bool fExact = false);
   };
 
   /* {{{ Level */
@@ -412,7 +412,7 @@ namespace rrr {
   /* {{{ Run */
   
   template <typename Ntk>
-  void Canonicalizer<Ntk>::Run(Ntk *pNtk_) {
+  void Canonicalizer<Ntk>::Run(Ntk *pNtk_, bool fExact) {
     // network must have been fully swept and trivial-collapsed
     pNtk = pNtk_;
     // checks
@@ -438,6 +438,7 @@ namespace rrr {
     while(!vClasses.empty()) {
       if(!Classify(false)) {
         // tie break
+        assert(!fExact);
         AssignOneClass();
       }
     }

@@ -25,6 +25,34 @@ namespace rrr {
   struct is_invokable: std::is_constructible<std::function<void(Args...)>, std::reference_wrapper<typename std::remove_reference<Fn>::type>> {};
 #endif
 
+#if defined(__cpp_lib_is_invocable)
+  template <typename Fn, typename... Args>
+  using invoke_return_t = std::invoke_result_t<Fn, Args...>;
+#else
+  template <typename Fn, typename... Args>
+  struct invoke_return {
+  private:
+    template <typename F, typename... A>
+    static auto test(int) -> decltype(std::declval<F>()(std::declval<A>()...));
+    template <typename, typename...>
+    static void test(...);
+  public:
+    using type = decltype(test<Fn, Args...>(0));
+  };
+  template <typename Fn, typename... Args>
+  using invoke_return_t = typename invoke_return<Fn, Args...>::type;
+#endif
+
+#if defined(__cpp_lib_is_invocable)
+  template <typename Fn, typename... Args>
+  constexpr bool returns_int_v = std::is_same_v<invoke_return_t<Fn, Args...>, int>;
+#else
+  template <typename Fn, typename... Args>
+  struct returns_int: std::is_same<invoke_return_t<Fn, Args...>, int> {};
+  template <typename Fn, typename... Args>
+  constexpr bool returns_int_v = returns_int<Fn, Args...>::value;
+#endif
+  
   /* }}} */
 
   /* {{{ Int size */
@@ -53,7 +81,7 @@ namespace rrr {
   }
   
   /* }}} */
-  
+
   /* {{{ Print containers */
   
   template <typename T>
@@ -131,12 +159,14 @@ namespace rrr {
   }
   
   static inline void PrintNext(std::ostream &os, double t) {
-    os << std::fixed << std::setprecision(2) << std::setw(8) << t;
+    //os << std::fixed << std::setprecision(2) << std::setw(8) << t;
+    os << std::scientific << std::setprecision(std::numeric_limits<double>::max_digits10) << t;
   }
 
   template <typename... Args>
   static inline void PrintNext(std::ostream &os, double t, Args... args) {
-    os << std::fixed << std::setprecision(2) << std::setw(8) << t << " ";
+    //os << std::fixed << std::setprecision(2) << std::setw(8) << t << " ";
+    os << std::scientific << std::setprecision(std::numeric_limits<double>::max_digits10) << t << " ";
     PrintNext(os, args...);
   }
 
@@ -254,6 +284,37 @@ namespace rrr {
     v.reserve(k);
     ForEachCombinationStopRec(v, n, k, func);
   }
+  
+  /* }}} */
+
+  /* {{{ Random */
+
+  class SimpleRNG {
+    static constexpr unsigned NUMBER1 = 3716960521u;
+    static constexpr unsigned NUMBER2 = 2174103536u;
+    unsigned m_z, m_w;
+    
+  public:
+    SimpleRNG() :
+      m_z(NUMBER1),
+      m_w(NUMBER2) {
+    }
+    
+    unsigned operator()() {
+      m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+      m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+      return (m_z << 16) + m_w;
+    }
+
+    void Reset() {
+      m_z = NUMBER1;
+      m_w = NUMBER2;
+    }
+
+    unsigned long long W() {
+      return ((unsigned long long)(*this)() << 32) | ((unsigned long long)(*this)() << 0);
+    }
+  };
   
   /* }}} */
   

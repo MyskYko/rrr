@@ -157,15 +157,15 @@ namespace NewBdd {
     std::vector<var> *pVar2Level;
     Param() {
       nObjsAllocLog  = 20;
-      nObjsMaxLog    = 25;
+      nObjsMaxLog    = 28;
       nUniqueSizeLog = 10;
       UniqueDensity  = 4;
-      nCacheSizeLog  = 15;
-      nCacheMaxLog   = 20;
+      nCacheSizeLog  = 20;
+      nCacheMaxLog   = 27;
       nCacheVerbose  = 0;
       fCountOnes     = false;
-      nGbc           = 0;
-      nReo           = BvarMax();
+      nGbc           = 1;
+      nReo           = 4000;
       MaxGrowth      = 1.2;
       fReoVerbose    = false;
       nVerbose       = 0;

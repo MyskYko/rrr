@@ -78,7 +78,7 @@ namespace rrr {
     void ChangePiOrder(std::vector<int> const &vOrder);
     void Read(AndNetwork const &from);
     template <typename Ntk, typename Reader>
-    void Read(Ntk const &from, Reader const &reader);
+    int Read(Ntk const &from, Reader const &reader);
 
     // network properties
     bool UseComplementedEdges() const;
@@ -125,9 +125,14 @@ namespace rrr {
     void ForEachIntReverse(std::function<void(int)> const &func) const;
     void ForEachIntStop(std::function<bool(int)> const &func) const;
     void ForEachPiInt(std::function<void(int)> const &func) const;
+    void ForEachPiIntStop(std::function<bool(int)> const &func) const;
     void ForEachPo(std::function<void(int)> const &func) const;
     template <typename Func>
     void ForEachPoDriver(Func const &func) const;
+    template <typename Func>
+    void ForEachPoDriverIdx(Func const &func) const;
+    template <typename Func>
+    void ForEachPoDriverStop(Func const &func) const;
     template <typename Func>
     void ForEachFanin(int id, Func const &func) const;
     template <typename Func>
@@ -162,9 +167,11 @@ namespace rrr {
     void RemoveBuffer(int id);
     void RemoveConst(int id);
     void AddFanin(int id, int fi, bool c);
-    void TrivialCollapse(int id);
-    void TrivialCollapse();
+    bool TrivialCollapse(int id);
+    bool TrivialCollapse();
+    int  TrivialDecompose(int id, int nFanins);
     void TrivialDecompose(int id);
+    void SortFanins(int id, std::vector<int> const &vIndices);
     template <typename Func>
     void SortFanins(int id, Func const &cost);
     std::pair<std::vector<int>, std::vector<bool>> Insert(AndNetwork *pNtk, std::vector<int> const &vInputs, std::vector<bool> const &vCompls, std::vector<int> const &vOutputs);
@@ -387,12 +394,18 @@ namespace rrr {
   }
 
   template <typename Ntk, typename Reader>
-  void AndNetwork::Read(Ntk const &from, Reader const &reader) {
+  int AndNetwork::Read(Ntk const &from, Reader const &reader) {
+    int r = 0;
     Clear(true, false, false);
-    reader(from, this);
+    if constexpr(returns_int_v<Reader, Ntk const &, AndNetwork *>) {
+      r = reader(from, this);
+    } else {
+      reader(from, this);
+    }
     Action action;
     action.type = READ;
     TakenAction(action);
+    return r;
   }
   
   /* }}} */
@@ -834,6 +847,19 @@ namespace rrr {
     }
   }
   
+  inline void AndNetwork::ForEachPiIntStop(std::function<bool(int)> const &func) const {
+    for(int pi: vPis) {
+      if(func(pi)) {
+        return;
+      }
+    }
+    for(int id: lInts) {
+      if(func(id)) {
+        return;
+      }
+    }
+  }
+  
   inline void AndNetwork::ForEachPo(std::function<void(int)> const &func) const {
     for(int po: vPos) {
       func(po);
@@ -848,6 +874,34 @@ namespace rrr {
         func(GetFanin(po, 0));
       } else if constexpr(is_invokable<Func, int, bool>::value) {
         func(GetFanin(po, 0), GetCompl(po, 0));
+      }
+    }
+  }
+
+  template <typename Func>
+  inline void AndNetwork::ForEachPoDriverIdx(Func const &func) const {
+    static_assert(is_invokable<Func, int, int>::value || is_invokable<Func, int, int, bool>::value, "for each edge function format error");
+    for(int idx = 0; idx < GetNumPos(); idx++) {
+      if constexpr(is_invokable<Func, int, int>::value) {
+        func(idx, GetFanin(vPos[idx], 0));
+      } else if constexpr(is_invokable<Func, int, int, bool>::value) {
+        func(idx, GetFanin(vPos[idx], 0), GetCompl(vPos[idx], 0));
+      }
+    }
+  }
+
+  template <typename Func>
+  inline void AndNetwork::ForEachPoDriverStop(Func const &func) const {
+    static_assert(is_invokable<Func, int>::value || is_invokable<Func, int, bool>::value, "for each edge function format error");
+    for(int po: vPos) {
+      if constexpr(is_invokable<Func, int>::value) {
+        if(func(GetFanin(po, 0))) {
+          break;
+        }
+      } else if constexpr(is_invokable<Func, int, bool>::value) {
+        if(func(GetFanin(po, 0), GetCompl(po, 0))) {
+          break;
+        }
       }
     }
   }
@@ -1435,7 +1489,7 @@ namespace rrr {
     TakenAction(action);
   }
 
-  inline void AndNetwork::TrivialCollapse(int id) {
+  inline bool AndNetwork::TrivialCollapse(int id) {
     for(int idx = 0; idx < GetNumFanins(id);) {
       int fi_edge = vvFaninEdges[id][idx];
       int fi = Edge2Node(fi_edge);
@@ -1447,11 +1501,31 @@ namespace rrr {
         action.idx = idx;
         action.fi = fi;
         action.c = c;
+        bool fConst0 = false;
         std::vector<int>::iterator it = vvFaninEdges[id].begin() + idx;
         it = vvFaninEdges[id].erase(it);
-        vvFaninEdges[id].insert(it, vvFaninEdges[fi].begin(), vvFaninEdges[fi].end());
-        ForEachFanin(fi, [&](int fi) {
-          action.vFanins.push_back(fi);
+        ForEachFaninIdx(fi, [&](int idx2, int fi2, bool c2) {
+          int idx3 = FindFanin(id, fi2);
+          if(idx3 == -1) {
+            // no duplication
+            it = vvFaninEdges[id].insert(it, Node2Edge(fi2, c2));
+            it++;
+            action.vFanins.push_back(fi2);
+            action.vIndices.push_back(idx2);
+          } else if(c2 != GetCompl(id, idx3)) {
+            // duplication with differnt polarity, add const-0
+            vRefs[fi2]--;
+            vRefs[GetConst0()]++;
+            it = vvFaninEdges[id].insert(it, Node2Edge(GetConst0(), 0));
+            it++;
+            action.vFanins.push_back(GetConst0());
+            action.vIndices.push_back(idx2);
+            fConst0 = true;
+          } else {
+            // duplication with the same polarity
+            vRefs[fi2]--;
+            idx = 0; // need to start over
+          }
         });
         // remove collapsed fanin
         vRefs[fi] = 0;
@@ -1459,19 +1533,50 @@ namespace rrr {
         lInts.erase(std::find(lInts.begin(), lInts.end(), fi));
         sInts.erase(fi);
         TakenAction(action);
+        if(fConst0) {
+          return true;
+        }
       } else {
         idx++;
       }
     }
+    return false;
   }
   
-  inline void AndNetwork::TrivialCollapse() {
+  inline bool AndNetwork::TrivialCollapse() {
+    bool fConst0 = false;
     std::list<int> lInts_ = lInts;
     for(critr it = lInts_.rbegin(); it != lInts_.rend(); it++) {
       if(IsInt(*it)) {
-        TrivialCollapse(*it);
+        fConst0 |= TrivialCollapse(*it);
       }
     }
+    return fConst0;
+  }
+
+  inline int AndNetwork::TrivialDecompose(int id, int nFanins) {
+    assert(GetNumFanins(id) > 2);
+    assert(nFanins > 1);
+    assert(GetNumFanins(id) > nFanins);
+    Action action;
+    action.type = TRIVIAL_DECOMPOSE;
+    action.id = id;
+    action.idx = GetNumFanins(id) - nFanins;
+    int new_fi = CreateNode();
+    action.fi = new_fi;
+    for(int i = 0; i < nFanins; i++) {
+      int fi_edge = vvFaninEdges[id].back();
+      vvFaninEdges[id].pop_back();
+      vvFaninEdges[new_fi].push_back(fi_edge);
+      action.vFanins.push_back(Edge2Node(fi_edge));
+    }
+    vvFaninEdges[id].push_back(Node2Edge(new_fi, false));
+    vRefs[new_fi]++;
+    itr it = std::find(lInts.begin(), lInts.end(), id);
+    lInts.insert(it, new_fi);
+    sInts.insert(new_fi);
+    TakenAction(action);
+    return new_fi;
   }
 
   inline void AndNetwork::TrivialDecompose(int id) {
@@ -1497,6 +1602,23 @@ namespace rrr {
       sInts.insert(new_fi);
       TakenAction(action);
     }
+  }
+
+  inline void AndNetwork::SortFanins(int id, std::vector<int> const &vIndices) {
+    assert(vIndices.size() == vvFaninEdges[id].size());
+    std::vector<int> vFaninEdges = vvFaninEdges[id];
+    vvFaninEdges[id].clear();
+    for(int idx: vIndices) {
+      vvFaninEdges[id].push_back(vFaninEdges[idx]);
+    }
+    if(vFaninEdges == vvFaninEdges[id]) {
+      return;
+    }
+    Action action;
+    action.type = SORT_FANINS;
+    action.id = id;
+    action.vIndices = vIndices;
+    TakenAction(action);
   }
 
   template <typename Func>

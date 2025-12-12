@@ -18,6 +18,7 @@ namespace rrr {
     
     // parameters
     int nVerbose;
+    bool fSave;
     
     // data
     bool fInitialized;
@@ -30,6 +31,7 @@ namespace rrr {
     std::vector<bool> vGUpdates;
     std::vector<bool> vCUpdates;
     std::vector<bool> vVisits;
+    std::vector<bool> vWasReconvergent;
     
     // backups
     std::vector<BddMspfAnalyzer> vBackups;
@@ -197,6 +199,7 @@ namespace rrr {
             vGUpdates[fi] = true;
           }
         }
+        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -213,6 +216,7 @@ namespace rrr {
         if(vGUpdates[action.id] || vCUpdates[action.id]) {
           vGUpdates[action.fi] = true;
         }
+        Assign(vFs[action.id], LitMax);
         Assign(vGs[action.id], LitMax);
         DelVec(vvCs[action.id]);
       }
@@ -230,6 +234,9 @@ namespace rrr {
           vGUpdates[fi] = true;
         }
       }
+      Assign(vFs[action.id], LitMax);
+      Assign(vGs[action.id], LitMax);
+      DelVec(vvCs[action.id]);
       break;
     case ADD_FANIN:
       assert(fInitialized);
@@ -247,8 +254,12 @@ namespace rrr {
         std::vector<lit>::iterator it = vvCs[action.id].begin() + action.idx;
         DecRef(*it);
         it = vvCs[action.id].erase(it);
-        vvCs[action.id].insert(it,  vvCs[action.fi].begin(), vvCs[action.fi].end());
-        vvCs[action.fi].clear();
+        for(int idx: action.vIndices) {
+          it = vvCs[action.id].insert(it,  vvCs[action.fi][idx]);
+          IncRef(*it);
+          it++;
+        }
+        DelVec(vvCs[action.fi]);
         Assign(vFs[action.fi], LitMax);
         Assign(vGs[action.fi], LitMax);
       }
@@ -288,6 +299,8 @@ namespace rrr {
         vUpdates[action.fi] = false;
         vGUpdates[action.fi] = false;
         vCUpdates[action.fi] = false;
+        vVisits[action.fi] = false;
+        vWasReconvergent[action.fi] = false;
       }
       break;
     case SORT_FANINS:
@@ -303,13 +316,21 @@ namespace rrr {
       Reset(true);
       break;
     case SAVE:
-      Save(action.idx);
+      if(fSave) {
+        Save(action.idx);
+      }
       break;
     case LOAD:
-      Load(action.idx);
+      if(fSave) {
+        Load(action.idx);
+      } else {
+        Reset(true);
+      }
       break;
     case POP_BACK:
-      PopBack();
+      if(fSave) {
+        PopBack();
+      }
       break;
     default:
       assert(0);
@@ -330,6 +351,7 @@ namespace rrr {
     vGUpdates.resize(nNodes);
     vCUpdates.resize(nNodes);
     vVisits.resize(nNodes);
+    vWasReconvergent.resize(nNodes);
   }
 
   /* }}} */
@@ -503,7 +525,7 @@ namespace rrr {
 
   template <typename pNtk>
   void BddMspfAnalyzer<pNtk>::MspfNode(int id) {
-    if(vGUpdates[id]) {
+    if(vGUpdates[id] || !vVisits[id]) {
       if(pNtk->IsReconvergent(id)) {
         if(nVerbose) {
           std::cout << "computing reconvergent node " << id << " G " << std::endl;
@@ -511,22 +533,17 @@ namespace rrr {
         if(ComputeReconvergentG(id)) {
           vCUpdates[id] = true;
         }
-      } else {
+        vWasReconvergent[id] = true;
+      } else if(vGUpdates[id] || vWasReconvergent[id]) {
         if(nVerbose) {
           std::cout << "computing node " << id << " G " << std::endl;
         }
         if(ComputeG(id)) {
           vCUpdates[id] = true;
         }
+        vWasReconvergent[id] = false;
       }
       vGUpdates[id] = false;
-    } else if(!vVisits[id] && pNtk->IsReconvergent(id)) {
-      if(nVerbose) {
-        std::cout << "computing unvisited reconvergent node " << id << " G " << std::endl;
-      }
-      if(ComputeReconvergentG(id)) {
-        vCUpdates[id] = true;
-      }
     }
     if(vCUpdates[id]) {
       if(nVerbose) {
@@ -579,6 +596,7 @@ namespace rrr {
     vGUpdates.clear();
     vCUpdates.clear();
     vVisits.clear();
+    vWasReconvergent.clear();
     if(!fReuse) {
       nNodesOld = 0;
       if(pBdd) {
@@ -594,11 +612,6 @@ namespace rrr {
     bool fUseReo = false;
     if(!pBdd) {
       NewBdd::Param Par;
-      Par.nObjsMaxLog = 25;
-      Par.nCacheMaxLog = 20;
-      Par.fCountOnes = false;
-      Par.nGbc = 1;
-      Par.nReo = 4000;
       pBdd = new NewBdd::Man(pNtk->GetNumPis(), Par);
       fUseReo = true;
     }
@@ -649,6 +662,7 @@ namespace rrr {
     vBackups[slot].vGUpdates = vGUpdates;
     vBackups[slot].vCUpdates = vCUpdates;
     vBackups[slot].vVisits = vVisits;
+    vBackups[slot].vWasReconvergent = vWasReconvergent;
   }
 
   template <typename Ntk>
@@ -662,6 +676,7 @@ namespace rrr {
     vGUpdates = vBackups[slot].vGUpdates;
     vCUpdates = vBackups[slot].vCUpdates;
     vVisits = vBackups[slot].vVisits;
+    vWasReconvergent = vBackups[slot].vWasReconvergent;
   }
 
   template <typename Ntk>
@@ -681,6 +696,7 @@ namespace rrr {
   BddMspfAnalyzer<Ntk>::BddMspfAnalyzer() :
     pNtk(NULL),
     nVerbose(0),
+    fSave(false),
     fInitialized(false),
     pBdd(NULL),
     fUpdate(false) {
@@ -691,6 +707,7 @@ namespace rrr {
   BddMspfAnalyzer<Ntk>::BddMspfAnalyzer(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nAnalyzerVerbose),
+    fSave(pPar->fSave),
     fInitialized(false),
     pBdd(NULL),
     fUpdate(false) {

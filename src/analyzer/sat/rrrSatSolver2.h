@@ -10,7 +10,7 @@ ABC_NAMESPACE_USING_NAMESPACE
 namespace rrr {
 
   template <typename Ntk>
-  class SatSolver {
+  class SatSolver2 {
   private:
     // pointer to network
     Ntk *pNtk;
@@ -24,8 +24,10 @@ namespace rrr {
     bool status; // false indicates trivial UNSAT
     int  target; // node for which miter has been encoded
     std::vector<int> vVars; // SAT variable for each node
+    std::vector<int> vVars2; // SAT variable for each node for inverted copy
     std::vector<int> vLits; // temporary storage
     std::vector<VarValue> vValues; // values in satisfied problem
+    std::vector<VarValue> vValues2; // values in satisfied problem for inverted copy
     bool fUpdate;
 
     // stats
@@ -40,13 +42,13 @@ namespace rrr {
 
     // encode
     void EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate = -1) const;
-    void EncodeMiter(sat_solver *p, std::vector<int> &v, int id); // create a careset miter where the counterpart has the output of target negated
+    void EncodeMiter(sat_solver *p, std::vector<int> &v, std::vector<int> &v2, int id); // create a careset miter where the counterpart has the output of target negated
     void SetTarget(int id);
     
   public:
     // constructors
-    SatSolver(Parameter const *pPar);
-    ~SatSolver();
+    SatSolver2(Parameter const *pPar);
+    ~SatSolver2();
     void AssignNetwork(Ntk *pNtk_, bool fReuse);
     
     // checks
@@ -54,6 +56,7 @@ namespace rrr {
     SatResult CheckFeasibility(int id, int fi, bool c);
 
     // cex
+    void Justify(std::vector<VarValue> &v, int id);
     std::vector<VarValue> GetCex();
 
     // stats
@@ -65,7 +68,7 @@ namespace rrr {
   /* {{{ Callback */
 
   template <typename Ntk>
-  void SatSolver<Ntk>::ActionCallback(Action const &action) {
+  void SatSolver2<Ntk>::ActionCallback(Action const &action) {
     if(target == -1) {
       return;
     }
@@ -117,7 +120,7 @@ namespace rrr {
   /* {{{ Encode */
 
   template <typename Ntk>
-  void SatSolver<Ntk>::EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate) const {
+  void SatSolver2<Ntk>::EncodeNode(sat_solver *p, std::vector<int> const &v, int id, int to_negate) const {
     int RetValue;
     int x = -1, y = -1;
     bool cx = false, cy = false;
@@ -169,7 +172,7 @@ namespace rrr {
   }
   
   template <typename Ntk>
-  void SatSolver<Ntk>::EncodeMiter(sat_solver *p, std::vector<int> &v, int id) {
+  void SatSolver2<Ntk>::EncodeMiter(sat_solver *p, std::vector<int> &v, std::vector<int> &v2, int id) {
     int RetValue;
     // reset
     v.clear();
@@ -192,44 +195,36 @@ namespace rrr {
     pNtk->ForEachInt([&](int id) {
       EncodeNode(p, v, id);
     });
+    v2 = v;
     // always care if it is po
     if(pNtk->IsPoDriver(id)) {
       return;
     }
-    // store po vars (NOTE: it's not a lit)
-    vLits.clear();
-    pNtk->ForEachPoDriver([&](int fi) {
-      vLits.push_back(v[fi]);
-    });
     // encode an inverted copy
     if(nVerbose) {
       std::cout << "encoding an inverted copy" << std::endl;
     }
     pNtk->ForEachTfo(id, false, [&](int fo) {
-      v[fo] = sat_solver_addvar(p);
-      EncodeNode(p, v, fo, id);
+      v2[fo] = sat_solver_addvar(p);
+      EncodeNode(p, v2, fo, id);
     });
     // encode miter xors
     if(nVerbose) {
       std::cout << "encoding miter xors" << std::endl;
     }
-    int idx = 0;
-    int n = 0;
+    vLits.clear();
     pNtk->ForEachPoDriver([&](int fi) {
       assert(fi != id);
-      if(v[fi] != vLits[idx]) {
+      if(v[fi] != v2[fi]) {
         int x = sat_solver_addvar(p);
         if(nVerbose) {
-          std::cout << x << " = " << v[fi] << " ^ " << vLits[idx] << std::endl;
+          std::cout << x << " = " << v[fi] << " ^ " << v2[fi] << std::endl;
         }
-        RetValue = sat_solver_add_xor(p, x, v[fi], vLits[idx], 0);
+        RetValue = sat_solver_add_xor(p, x, v[fi], v2[fi], 0);
         assert(RetValue);
-        vLits[n] = toLitCond(x, 0);
-        n++;
+        vLits.push_back(toLitCond(x, 0));
       }
-      idx++;
     });
-    vLits.resize(n);
     // assign or of xors to 1
     if(nVerbose) {
       std::cout << "adding miter output clause" << std::endl;
@@ -241,22 +236,22 @@ namespace rrr {
       }
       std::cout << ")" << std::endl;
     }
-    if(n == 0) {
+    if(vLits.empty()) {
       status = false;
       return;
     }
-    RetValue = sat_solver_addclause(p, vLits.data(), vLits.data() + n);
+    RetValue = sat_solver_addclause(p, vLits.data(), vLits.data() + vLits.size());
     assert(RetValue);
   }
 
   template <typename Ntk>
-  void SatSolver<Ntk>::SetTarget(int id) {
+  void SatSolver2<Ntk>::SetTarget(int id) {
     if(!fUpdate && id == target) {
       return;
     }
     fUpdate = false;
     target = id;
-    EncodeMiter(pSat, vVars, target);
+    EncodeMiter(pSat, vVars, vVars2, target);
   }
 
   /* }}} */
@@ -264,7 +259,7 @@ namespace rrr {
   /* {{{ Constructors */
 
   template <typename Ntk>
-  SatSolver<Ntk>::SatSolver(Parameter const *pPar) :
+  SatSolver2<Ntk>::SatSolver2(Parameter const *pPar) :
     pNtk(NULL),
     nVerbose(pPar->nSatSolverVerbose),
     nConflictLimit(pPar->nConflictLimit),
@@ -276,19 +271,19 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  SatSolver<Ntk>::~SatSolver() {
+  SatSolver2<Ntk>::~SatSolver2() {
     sat_solver_delete(pSat);
     //std::cout << "SAT solver stats: calls = " << nCalls << " (SAT = " << nSats << ", UNSAT = " << nUnsats << ", UNDET = " << nCalls - nSats - nUnsats << ")" << std::endl;
   }
 
   template <typename Ntk>
-  void SatSolver<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
+  void SatSolver2<Ntk>::AssignNetwork(Ntk *pNtk_, bool fReuse) {
     (void)fReuse;
     status = false;
     target = -1;
     fUpdate = false;
     pNtk = pNtk_;
-    pNtk->AddCallback(std::bind(&SatSolver<Ntk>::ActionCallback, this, std::placeholders::_1));
+    pNtk->AddCallback(std::bind(&SatSolver2<Ntk>::ActionCallback, this, std::placeholders::_1));
   }
 
   /* }}} */
@@ -296,7 +291,7 @@ namespace rrr {
   /* {{{ Checks */
   
   template <typename Ntk>
-  SatResult SatSolver<Ntk>::CheckRedundancy(int id, int idx) {
+  SatResult SatSolver2<Ntk>::CheckRedundancy(int id, int idx) {
     time_point timeStart = GetCurrentTime();
     SetTarget(id);
     if(!status) {
@@ -355,24 +350,32 @@ namespace rrr {
         vValues[id] = TEMP_FALSE;
       }
     });
+    vValues2 = vValues;
     pNtk->ForEachInt([&](int id) {
       if(sat_solver_var_value(pSat, vVars[id])) {
         vValues[id] = TEMP_TRUE;
       } else {
         vValues[id] = TEMP_FALSE;
       }
+      if(sat_solver_var_value(pSat, vVars2[id])) {
+        vValues2[id] = TEMP_TRUE;
+      } else {
+        vValues2[id] = TEMP_FALSE;
+      }
     });
     // required values
+    // TODO: maybe this should be done at POs
     pNtk->ForEachFaninIdx(id, [&](int idx2, int fi, bool c) {
       assert((vValues[fi] == TEMP_TRUE) ^ (idx == idx2) ^ c);
       vValues[fi] = DecideVarValue(vValues[fi]);
+      vValues2[fi] = DecideVarValue(vValues2[fi]);
     });
     durationRedundancy += Duration(timeStart, GetCurrentTime());
     return SAT;
   }
 
   template <typename Ntk>
-  SatResult SatSolver<Ntk>::CheckFeasibility(int id, int fi, bool c) {
+  SatResult SatSolver2<Ntk>::CheckFeasibility(int id, int fi, bool c) {
     time_point timeStart = GetCurrentTime();
     SetTarget(id);
     if(!status) {
@@ -426,18 +429,29 @@ namespace rrr {
         vValues[id] = TEMP_FALSE;
       }
     });
+    vValues2 = vValues;
     pNtk->ForEachInt([&](int id) {
       if(sat_solver_var_value(pSat, vVars[id])) {
         vValues[id] = TEMP_TRUE;
       } else {
         vValues[id] = TEMP_FALSE;
       }
+      if(sat_solver_var_value(pSat, vVars2[id])) {
+        vValues2[id] = TEMP_TRUE;
+      } else {
+        vValues2[id] = TEMP_FALSE;
+      }
     });
     // required values
+    // TODO: maybe this should be done at POs
     assert(vValues[id] == TEMP_TRUE);
+    assert(vValues2[id] == TEMP_TRUE);
     vValues[id] = DecideVarValue(vValues[id]);
+    vValues2[id] = DecideVarValue(vValues2[id]);
     assert((vValues[fi] == TEMP_TRUE) ^ !c);
+    assert((vValues2[fi] == TEMP_TRUE) ^ !c);
     vValues[fi] = DecideVarValue(vValues[fi]);
+    vValues2[fi] = DecideVarValue(vValues2[fi]);
     durationFeasibility += Duration(timeStart, GetCurrentTime());
     return SAT;
   }
@@ -447,7 +461,57 @@ namespace rrr {
   /* {{{ Cex */
 
   template <typename Ntk>
-  std::vector<VarValue> SatSolver<Ntk>::GetCex() {
+  void SatSolver2<Ntk>::Justify(std::vector<VarValue> &v, int id) {
+    switch(pNtk->GetNodeType(id)) {
+    case AND:
+      if(v[id] == rrrTRUE) {
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          assert((v[fi] == TEMP_TRUE || v[fi] == rrrTRUE) ^ c);
+          v[fi] = DecideVarValue(v[fi]);
+        });
+      } else if(v[id] == rrrFALSE) {
+        bool fFound =  false;
+        pNtk->ForEachFanin(id, [&](int fi, bool c) {
+          if(fFound) {
+            return;
+          }
+          if(c) {
+            if(v[fi] == rrrTRUE) {
+              fFound = true;
+            }
+          } else {
+            if(v[fi] == rrrFALSE) {
+              fFound = true;
+            }
+          }
+        });
+        if(!fFound) {
+          pNtk->ForEachFanin(id, [&](int fi, bool c) {
+            if(fFound) {
+              return;
+            }
+            if(c) {
+              if(v[fi] == TEMP_TRUE) {
+                fFound = true;
+                v[fi] = DecideVarValue(v[fi]);
+              }
+            } else {
+              if(v[fi] == TEMP_FALSE) {
+                fFound = true;
+                v[fi] = DecideVarValue(v[fi]);
+              }
+            }
+          });
+        }
+      }
+      break;
+    default:
+      assert(0);
+    }
+  }
+
+  template <typename Ntk>
+  std::vector<VarValue> SatSolver2<Ntk>::GetCex() {
     if(nVerbose) {
       std::cout << "cex: ";
       pNtk->ForEachPi([&](int id) {
@@ -456,54 +520,54 @@ namespace rrr {
       std::cout << std::endl;
     }
     // reverse simulation
-    pNtk->ForEachIntReverse([&](int id) {
-      switch(pNtk->GetNodeType(id)) {
-      case AND:
-        if(vValues[id] == rrrTRUE) {
-          pNtk->ForEachFanin(id, [&](int fi, bool c) {
-            assert((vValues[fi] == TEMP_TRUE || vValues[fi] == rrrTRUE) ^ c);
-            vValues[fi] = DecideVarValue(vValues[fi]);
-          });
-        } else if(vValues[id] == rrrFALSE) {
-          bool fFound =  false;
-          pNtk->ForEachFanin(id, [&](int fi, bool c) {
-            if(fFound) {
-              return;
-            }
-            if(c) {
-              if(vValues[fi] == rrrTRUE) {
-                fFound = true;
-              }
-            } else {
-              if(vValues[fi] == rrrFALSE) {
-                fFound = true;
-              }
-            }
-          });
-          if(!fFound) {
-            pNtk->ForEachFanin(id, [&](int fi, bool c) {
-              if(fFound) {
-                return;
-              }
-              if(c) {
-                if(vValues[fi] == TEMP_TRUE) {
-                  fFound = true;
-                  vValues[fi] = DecideVarValue(vValues[fi]);
-                }
-              } else {
-                if(vValues[fi] == TEMP_FALSE) {
-                  fFound = true;
-                  vValues[fi] = DecideVarValue(vValues[fi]);
-                }
-              }
-            });
-          }
-        }
-        break;
-      default:
-        assert(0);
+    if(vVars == vVars2) {
+      pNtk->ForEachIntReverse([&](int id) {
+        Justify(vValues, id);
+      });
+    } else {
+      // negate target in copy
+      if(vValues2[target] == rrrTRUE) {
+        vValues2[target] = rrrFALSE;
+      } else if(vValues2[target] == rrrFALSE) {
+        vValues2[target] = rrrTRUE;
+      } else if(vValues2[target] == TEMP_TRUE) {
+        vValues2[target] = TEMP_FALSE;
+      } else if(vValues2[target] == TEMP_FALSE) {
+        vValues2[target] = TEMP_TRUE;
       }
-    });
+      // pick po
+      bool f = true;
+      pNtk->ForEachPoDriverStop([&](int fi) {
+        if(vVars[fi] != vVars2[fi] && vValues[fi] != vValues2[fi]) {
+          vValues[fi] = DecideVarValue(vValues[fi]);
+          vValues2[fi] = DecideVarValue(vValues2[fi]);
+          f = false;
+          return true;
+        }
+        return false;
+      });
+      assert(!f);
+      // observability
+      std::vector<bool> vVisited(pNtk->GetNumNodes());
+      pNtk->ForEachTfoReverse(target, false, [&](int fo) {
+        vVisited[fo] = true;
+        Justify(vValues, fo);
+        Justify(vValues2, fo);
+      });
+      assert(vValues[target] == rrrTRUE || vValues[target] == rrrFALSE);
+      assert(vValues2[target] == rrrTRUE || vValues2[target] == rrrFALSE);
+      // justify
+      pNtk->ForEachIntReverse([&](int id) {
+        if(vVisited[id]) {
+          return;
+        }
+        if(vValues2[id] == rrrTRUE || vValues2[id] == rrrFALSE) {
+          assert(id == target || vValues2[id] == DecideVarValue(vValues[id]));
+          vValues[id] = DecideVarValue(vValues[id]);
+        }
+        Justify(vValues, id);
+      });
+    }
     if(nVerbose) {
       std::cout << "pex: ";
       pNtk->ForEachPi([&](int id) {
@@ -560,7 +624,7 @@ namespace rrr {
   /* {{{ Stats */
 
   template <typename Ntk>
-  void SatSolver<Ntk>::ResetSummary() {
+  void SatSolver2<Ntk>::ResetSummary() {
     nCalls = 0;
     nSats = 0;
     nUnsats = 0;
@@ -569,7 +633,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  summary<int> SatSolver<Ntk>::GetStatsSummary() const {
+  summary<int> SatSolver2<Ntk>::GetStatsSummary() const {
     summary<int> v;
     v.emplace_back("sat call", nCalls);
     v.emplace_back("sat satisfiable", nSats);
@@ -578,7 +642,7 @@ namespace rrr {
   }
 
   template <typename Ntk>
-  summary<double> SatSolver<Ntk>::GetTimesSummary() const {
+  summary<double> SatSolver2<Ntk>::GetTimesSummary() const {
     summary<double> v;
     v.emplace_back("sat redundancy", durationRedundancy);
     v.emplace_back("sat feasibility", durationFeasibility);

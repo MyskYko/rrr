@@ -1,16 +1,18 @@
 #pragma once
 
-#include "rrrTypes.h"
-#include "rrrUtils.h"
+#include "misc/rrrTypes.h"
+#include "misc/rrrUtils.h"
 
 namespace rrr {
 
+  template <typename His>
   class Table {
-  private:
+  protected:
+    float resize_factor = 0.75;
     std::vector<std::string> data;
     std::vector<int> table;
     std::vector<int> next;
-    std::vector<std::vector<std::vector<int>>> record;
+    std::vector<std::vector<His>> record;
 
     unsigned mask;
     std::hash<std::string> hash_fn;
@@ -29,36 +31,37 @@ namespace rrr {
     }
     */
 
-    std::vector<int> translate(int src, std::vector<Action> const &vActions) const {
-      std::vector<int> v;
-      v.push_back(src);
-      for(auto const &action: vActions) {
-        if(action.type == REMOVE_FANIN) {
-          v.push_back(action.id);
-          v.push_back(action.idx);
-        } else if(action.type == ADD_FANIN) {
-          v.push_back(-action.id);
-          v.push_back(action.fi);
-        }
+    void Resize() {
+      unsigned size = table.size() << 1;
+      assert(size);
+      table.assign(size, -1);
+      std::fill(next.begin(), next.end(), -1);
+      mask = size - 1;
+      for(int i = 0; i < int_size(data); i++) {
+        unsigned h = hash(data[i]);
+        next[i] = table[h];
+        table[h] = i;
       }
-      return v;
     }
     
   public:
     Table(int size_pow) {
       unsigned size = 1 << size_pow;
+      assert(size);
       table.resize(size, -1);
       data.reserve(size);
       next.reserve(size);
       record.reserve(size);
       mask = size - 1;
     }
+    
+    virtual ~Table() = default;
 
-    bool Register(std::string const &str, int src, std::vector<Action> const &vActions, int &index, std::string const &str2) {
+    virtual bool Register(std::string const &str, His const &his, int &index, std::string const &str2) {
       std::vector<int>::iterator it;
       for(it = table.begin() + hash(str); *it != -1; it = next.begin() + *it) {
         if(data[*it] == str) {
-          record[*it].push_back(translate(src, vActions));
+          record[*it].push_back(his);
           index = *it;
           return false;
         }
@@ -67,18 +70,21 @@ namespace rrr {
         std::vector<int>::iterator it2;
         for(it2 = table.begin() + hash(str2); *it2 != -1; it2 = next.begin() + *it2) {
           if(data[*it2] == str2) {
-            record[*it2].push_back(translate(src, vActions));
+            record[*it2].push_back(his);
             index = *it2;
             return false;
           }
         }
       }
       *it = int_size(data);
+      record.resize(record.size() + 1);
+      record[*it].push_back(his);
+      index = *it;
       data.push_back(str);
       next.push_back(-1);
-      record.resize(record.size() + 1);
-      record[*it].push_back(translate(src, vActions));
-      index = *it;
+      if(data.size() >= table.size() * resize_factor) {
+        Resize();
+      }
       return true;
     }
 
@@ -87,6 +93,14 @@ namespace rrr {
     }
 
     int Size() {
+      return int_size(data);
+    }
+
+    virtual void Deref(int index) {
+      (void)index;
+    }
+
+    virtual int GetPopulation() {
       return int_size(data);
     }
     

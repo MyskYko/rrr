@@ -3,13 +3,16 @@
 #include "scheduler/rrrScheduler.h"
 #include "scheduler/rrrScheduler3.h"
 #include "optimizer/rrrOptimizer.h"
-#include "analyzer/rrrApproxAnalyzer.h"
-#include "analyzer/rrrBddAnalyzer.h"
+#include "analyzer/rrrTtAnalyzer.h"
+#include "analyzer/rrrBddCspfAnalyzer.h"
 #include "analyzer/rrrBddMspfAnalyzer.h"
+#include "analyzer/rrrBddResimAnalyzer.h"
 #include "analyzer/rrrAnalyzer.h"
 #include "analyzer/sat/rrrSatSolver.h"
+#include "analyzer/sat/rrrSatSolver2.h"
 #include "simulator/rrrSimulator.h"
-#include "simulator/rrrSimulator2.h"
+#include "simulator/rrrExhaustiveSimulator.h"
+#include "simulator/rrrDcSimulator.h"
 #include "partitioner/rrrPartitioner.h"
 #include "partitioner/rrrLevelBasePartitioner.h"
 #include "extra/rrrPattern.h"
@@ -18,27 +21,36 @@ namespace rrr {
 
   template <typename Ntk, template<typename, typename, typename> typename Sch, template<typename, typename> typename Opt, template<typename> typename Par>
   void PerformInt(Ntk *pNtk, Parameter const *pPar) {
-    assert(pPar->fUseApprox + pPar->fUseBddCspf + pPar->fUseBddMspf <= 1);
-    if(pPar->fUseApprox) {
-      Scheduler<Ntk, Optimizer<Ntk, ApproxAnalyzer<Ntk, Simulator2<Ntk>>>, Partitioner<Ntk>> sch(pNtk, pPar);
+    if(pPar->fUseTtResim) {
+      Sch<Ntk, Opt<Ntk, TtAnalyzer<Ntk, ExhaustiveSimulator<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    } else if(pPar->fUseTt) {
+      Sch<Ntk, Opt<Ntk, TtAnalyzer<Ntk, DcSimulator<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
+    } else if(pPar->fUseBddResim) {
+      Sch<Ntk, Opt<Ntk, BddResimAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      sch.Run();
     } else if(pPar->fUseBddCspf) {
-      Sch<Ntk, Opt<Ntk, BddAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
+      Sch<Ntk, Opt<Ntk, BddCspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else if(pPar->fUseBddMspf) {
       Sch<Ntk, Opt<Ntk, BddMspfAnalyzer<Ntk>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     } else {
-      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
+      Sch<Ntk, Opt<Ntk, Analyzer<Ntk, Simulator<Ntk>, SatSolver2<Ntk>>>, Par<Ntk>> sch(pNtk, pPar);
       sch.Run();
     }
   }
 
   template <typename Ntk>
-  void Perform(Ntk *pNtk, Parameter const *pPar) {
+  void PerformHelo(Ntk *pNtk, Parameter const *pPar) {
     Pattern *pPat = NULL;
     if(!pPar->strPattern.empty()) {
       pPat = new Pattern;
       pPat->Read(pPar->strPattern, pNtk->GetNumPis());
+      if(!pPar->strPatternOutput.empty()) {
+        pPat->ReadOutput(pPar->strPatternOutput, pNtk->GetNumPos());
+      }
       pNtk->RegisterPattern(pPat);
     }
     Ntk *pCond = NULL;
@@ -51,7 +63,6 @@ namespace rrr {
       Gia_ManStop(pGia);
       pNtk->RegisterCond(pCond);
     }
-    assert(!pPar->fUseBddCspf || !pPar->fUseBddMspf);
     switch(pPar->nPartitionType) {
     case 0:
       PerformInt<Ntk, Scheduler, Optimizer, Partitioner>(pNtk, pPar);
